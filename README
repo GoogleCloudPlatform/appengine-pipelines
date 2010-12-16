@@ -1,0 +1,14 @@
+Google App Engine Pipeline API
+===========================
+
+Official site: http://code.google.com/p/appengine-pipeline/
+Discussion group: http://groups.google.com/group/app-engine-pipeline-api
+
+Check the site for up-to-date status, latest version, getting started guide and other documentation.
+
+Archive contents:
+- demo           : demo application that uses the Pipeline API
+- lib            : required libraries
+- src            : python source code for the Pipeline API
+- test           : tests for the Pipeline API
+- ui             : status UI
