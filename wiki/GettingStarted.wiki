@@ -150,6 +150,7 @@ class MyPipeline(pipeline.Pipeline):
     self.base_path         # Relative URL of the pipeline library's handlers
     self.outputs           # PipelineFuture for this pipeline's output values
     self.test_mode         # The pipeline is running in test mode
+    self.current_attempt   # Current attempt number, starting at 1
     self.was_aborted       # The pipeline was aborted (available during finalized)
 }}}
 
@@ -213,7 +214,7 @@ When the outputs of a generator pipeline have been passed on to a child pipeline
 
 Pipelines can run in a fully asynchronous manner, meaning that after the run() method returns the pipeline will stay in the "run" state. It is then up to the pipeline itself to ensure that the complete() method for the pipeline is called at a later time (e.g., using the task queue, external input). To mark a pipeline as asynchronous, set the 'async' class property to True.
 
-To facilitate asynchronous execution, the pipeline library provides default URL routing for Pipeline sub-classes. For example, a pipeline with the module path 'foo.bar.Elephant' will have a callback URL available on the path '/_ah/pipeline/callback/foo.bar.Elephant'. The library also has convenience methods for invoking the callback() method with keyword parameters (get_callback_url and get_callback_task). This makes it easy to enqueue tasks that hit the callback URL or to have humans click a link to cause the asynchronous pipeline to move forward. Pipeline callback functions can be access restricted with the 'public_callbacks' and 'admin_callbacks' class properties, which both default to False.
+To facilitate asynchronous execution, the pipeline library provides default URL routing for Pipeline sub-classes. For example, a pipeline with the module path 'foo.bar.Elephant' will have a callback URL available on the path {{{/_ah/pipeline/callback/foo.bar.Elephant}}}. The library also has convenience methods for invoking the callback() method with keyword parameters (get_callback_url and get_callback_task). This makes it easy to enqueue tasks that hit the callback URL or to have humans click a link to cause the asynchronous pipeline to move forward. Pipeline callback functions can be access restricted with the 'public_callbacks' and 'admin_callbacks' class properties, which both default to False.
 
 Here's an example asynchronous pipeline that simply waits for N seconds:
 
@@ -288,3 +289,5 @@ Unfortunately, the Python 'with' operator is not on by default in Python 2.5, so
 {{{
 from __future__ import with_statement
 }}}
+
+_TODO: Talk about explicit abort and retry_
