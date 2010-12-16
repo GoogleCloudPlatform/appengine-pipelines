@@ -69,7 +69,7 @@ abbr {
 .slot-detail,
 .status-param-value {
   padding-left: 1em;
-  max-width: 200px;
+  max-width: 400px;
   word-wrap: break-word;
 }
 .status-param-detail {
