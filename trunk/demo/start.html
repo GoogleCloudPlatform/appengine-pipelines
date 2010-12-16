@@ -1,0 +1,26 @@
+<html>
+<head>
+  <title>Pipeline API demo</title>
+  <script type="text/javascript" src="/static/jquery.js"></script>
+  <script type="text/javascript" charset="utf-8">
+  function addColor() {
+    var field = $('<input type="text" autocomplete="off" name="color">');
+    $('#color-names').append($('<p>').append(field));
+    field.focus();
+  }
+  </script>
+</head>
+<body>
+<h2>Send an email to me with a count of favorite colors</h2>
+
+<form action="/pipeline" method="POST">
+  <p>Color names to count:</p>
+  <div id="color-names">
+    <p><input type="text" autocomplete="off" name="color"></p>
+  </div>
+  <p><a href="" onclick="javascript:addColor(); return false">+ Add another</a></p>
+  <p><input type="submit" value="Run"></p>
+</form>
+
+</body>
+</html>

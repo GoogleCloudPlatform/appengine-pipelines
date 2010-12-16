@@ -1,0 +1,21 @@
+<html>
+<head><title>Favorite color guestbook</title></head>
+<body>
+<h2>Post your favorite color!</h2>
+<form action="/" method="POST">
+<label for="color">Color:</label> <input type="text" name="color" id="color">
+<input type="submit" value="Post it">
+</form>
+
+<h2><a href="/pipeline">Run a report pipeline</a></h2>
+
+<h2>Other favorite colors</h2>
+{% if posts %}
+{% for post in posts %}
+<p><em>{{post.color|escape}}</em> posted at {{post.write_time|date:"Y-m-d\TH:i:s\Z"}}</p>
+{% endfor %}
+{% else %}
+<p>No posts yet.</p>
+{% endif %}
+</body>
+</html>
