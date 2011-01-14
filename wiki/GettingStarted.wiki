@@ -122,7 +122,7 @@ The reason this doesn't work is that previous outputs (from 'result' and 'final 
 {{{
 class LogMessage(pipeline.Pipeline):
 
-  def run(self, message, *args)
+  def run(self, message, *args):
     logging.info(message, *args)
 
 
