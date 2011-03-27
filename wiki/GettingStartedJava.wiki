@@ -72,15 +72,14 @@ In order to succinctly illustrate the concepts of the framework our examples wil
 Below are two examples of immediate jobs that take two integers and compute their difference and product respectively.
 
 {{{
-public static class DiffJob extends Job2<Integer, Integer, Integer> {
+class DiffJob extends Job2<Integer, Integer, Integer> {
   @Override
   public Value<Integer> run(Integer a, Integer b) {
-    return immediate(b - a);
+    return immediate(a - b);
   }
 }
 
-
-public static class MultJob extends Job2<Integer, Integer, Integer> {
+class MultJob extends Job2<Integer, Integer, Integer> {
   @Override
   public Value<Integer> run(Integer a, Integer b) {
     return immediate(a*b);
@@ -91,6 +90,89 @@ public static class MultJob extends Job2<Integer, Integer, Integer> {
 The method `immediate()` being invoked above is simply syntactic sugar. `immediate(x)` is equivalent to `new ImmediateValue(x)`.
 
 ==Job Graphs==
-The framework allows a user to express arrangements of multiple jobs in which the output of one job becomes an input of one or more jobs. These arrangements can best be described as a type of directed graph in which a directed edge from job A to one of the input slot in job B indicates that the output of A should be directed to the input slot of B. For example, suppose we wanted to use `DiffJob` and `MultJob` to build a job which takes three integers inputs, `x, y, z`, and performs the following calculation `[ (x - y) * (x - z) ] - 2`. That calculation may be expressed as the following job graph.
+The framework allows a user to express arrangements of multiple jobs in which the output of one job becomes an input of one or more jobs. These arrangements can best be described as a type of directed graph in which a directed edge from job A to one of the input slots in job B indicates that the output of A should be directed to the input slot of B. For example, suppose we wanted to use `DiffJob` and `MultJob` to build a job which takes three integers inputs, `x, y, z`, and performs the following calculation `[ (x - y) * (x - z) ] - 2`. That calculation may be expressed as the following job graph. (Graph reads from right to left.)
 
 <a href="http://appengine-pipeline.googlecode.com/svn/images/jobgraph1.png"><img border="0" src="http://appengine-pipeline.googlecode.com/svn/images/jobgraph1.png" width="600"/></a>
+
+==Generator Jobs==
+In the Pipeline framework the way in which a developer describes a job graph is by writing a parent job that generates it as part of the parent job's `run()` method. Below is a generator job called `ComplexJob` that generates the graph above.
+
+{{{
+class ComplexJob extends Job3<Integer, Integer, Integer, Integer> {
+  @Override
+  public Value<Integer> run(Integer x, Integer y, Integer z) {
+    DiffJob diffJob = new DiffJob();
+    MultJob multJob = new MultJob();
+    FutureValue<Integer> r = futureCall(diffJob, immediate(x), immediate(y));
+    FutureValue<Integer> s = futureCall(diffJob, immediate(x), immediate(z));
+    FutureValue<Integer> t = futureCall(multJob, r, s);
+    FutureValue<Integer> u = futureCall(diffJob, t, immediate(2));
+    return u;
+  }
+}
+}}}
+The following diagram illustrates the Pipeline that includes `ComplexJob` and the child graph it generates.
+
+<a href="http://appengine-pipeline.googlecode.com/svn/images/complexjob.png"><img border="0" src="http://appengine-pipeline.googlecode.com/svn/images/complexjob.png" width="650"/></a>
+
+The diagram indicates that when `ComplexJob` runs, it generates a child graph and provides immediate input to some of the input slots of some of the jobs. The `return` statement in `ComplexJob's` `run` method specifies that the final output for `ComplexJob` is `u`, the final output from the instance of `DiffJob` shown on the left side of the diagram. 
+
+When `ComplexJob's` `run` method returns, the child graph has been described, but none of the child jobs have run. Soon afterward the two instances of `DiffJob` on the right side of the diagram will start to run because their input slots are already filled. 
+
+Because `DiffJob` is an immediate job, it is finalized immediately after it is run and so the framework has access to the output values from the two `DiffJobs` on the right and can provide those output values to the input slots for`MultJob`. 
+
+`MultJob` will run as soon as its input slots are filled. `MultJob` is also an immediate job so the framework immediately has access to its output value, which it provides to the first input slot of the `DiffJob` on the left. The second input slot to that `DiffJob` has already been filled so that `DiffJob` runs and since it is an immediate job the framework immediately gets its output. 
+
+At this point `ComplexJob` can finalize because its finalize slot has been filled by `u`. Finally the framework has access to the output of `ComplexJob` and the Pipeline is complete.
+
+===futureCall===
+The way in which a generator job describes a child job graph is via a series of calls to  `futureCall()`. This is a protected method in the `Job<T>` class that the user invokes in his `run` method. The philosophy behind the syntax is that while describing a child job graph, a user should use a notation that is similar to the notation that he would use if he were simply invoking methods synchronously. In the example above, the syntax is similar to what the user would write if he were to directly invoke `DiffJob` (as if it were a Java method) on x and y, then directly invoke `DiffJob` on x and z, then take the outputs of those two invocations and invoke `MultJob` on them, and finally invoke `DiffJob` again on that output and 2, and then return that output.
+
+===Compile-time Type-checking===
+If the output of job A is to be sent to an input slot in Job B, then the type of the output must match the type of the input slot. The framework offers compile-time type-checking by overloading the `futureCall` method as follows:
+{{{
+protected <T> FutureValue<T> futureCall(Job0<T> jobInstance);
+
+protected <T, T1> FutureValue<T> futureCall(Job1<T, T1> jobInstance, Value<T1> v1);
+
+protected <T, T1, T2> FutureValue<T> futureCall(Job2<T, T1, T2> jobInstance, Value<T1> v1, Value<T2> v2);
+}}}
+There is a version of `futureCall` corresponding to each of the `Jobn` classes.  Each version of `futureCall` takes a job instance as its first argument. The version of futureCall corresponding to `Jobn` also takes n additional arguments that correspond to the n input parameters of the `run` method of `Jobn`. If a user passes either the wrong number or the wrong types of arguments to `futureCall`, the compiler will complain.
+
+==Running Pipelines===
+Here is how the `ComplexJob` Pipeline would be run on the inputs 11, 5 and 7:
+{{{
+PipelineService service = PipelineServiceFactory.newPipelineService();
+String pipelineId = service.startNewPipeline(new ComplexJob(), 11, 5, 7);
+
+// Later, check on the status and get the final output
+JobInfo jobInfo = service.getJobInfo(pipelineId);
+JobInfo.State state = jobInfo.getJobState();
+if (JobInfo.State.COMPLETED_SUCCESSFULLY == state){
+  System.out.println("The output is " + jobInfo.getOutput());
+}
+}}}
+
+===`startNewPipeline`===
+The `startNewPipeline` method is used to start new Pipelines. Similarly to the `futureCall` method, `startNewPipeline` is overloaded for type safety. There is a version of `startNewPipeline` for each `Jobn` class that takes n arguments after the job instance. There is also a non-type-safe version to handle larger numbers of arguments.
+
+`startNewPipeline` differs from `futureCall` in two ways. First, the arguments to `startNewPipeline` are real values---they don't have to be wrapped in `ImmediateValue`. 
+
+Also the return value from `startNewPipeline` is an opaque String that uniquely identifies the Pipeline, or equivalently, the root job of the Pipeline. In most applications this string will be saved (in the Datastore, or in an HTTP paramater or in a task payload for example) and then used in some later App Engine request in order to retrieve the `JobStatus`.
+
+===Job State===
+In addition to `COMPLETED_SUCCESSFULLY` the other job states are `RUNNING`, `STOPPED_BY_REQUEST`, `STOPPED_BY_ERROR`, and `WAITING_TO_RETRY`.
+
+In case the state is `STOPPED_BY_ERROR`, a stack trace can be retrieved via `jobInfo.getError()`.
+
+`WAITING_TO_RETRY` indicates that an exception occurred while running the job and the framework will retry sometime in the future. `JobSettings`.
+
+
+===`PipelineService`===
+In addition to `startNewPipeline` and `getJobInfo` the other methods on `PipelineService` are
+{{{
+void stopPipeline(String pipelineHandle);
+void deletePipelineRecords(String pipelineHandle);
+void submitPromisedValue(String promiseHandle, Object value);
+}}}
+`submitPromisedValue` is used to allow asynchronous, out-of-process agents, such as human users, to fill input slots that jobs are waiting on.
