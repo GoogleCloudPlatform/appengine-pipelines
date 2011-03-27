@@ -176,3 +176,49 @@ void deletePipelineRecords(String pipelineHandle);
 void submitPromisedValue(String promiseHandle, Object value);
 }}}
 `submitPromisedValue` is used to allow asynchronous, out-of-process agents, such as human users, to fill input slots that jobs are waiting on.
+
+===Promised Values and External Agents===
+A `PromisedValue` represents a value slot that will be filled in when some asynchronous external agent supplies a value. This mechanism allows the framework to call out to other frameworks such as MapReduce and also to wait for input from a human during a Pipeline.
+
+The following Pipeline will obtain three integers from a human, pass them as input to `ComplexJob`, return the answer to the human, ask for one more integer and then multiply the additional integer by the result of `ComplexJob`. Below the code we draw a diagram of this Pipeline.
+
+{{{
+public static class ExternalAgentJob extends Job1<Integer, String> {
+  @Override
+  public Value<Integer> run(String userEmail) {
+    // Invoke ComplexJob on three promised values
+    PromisedValue<Integer> x = newPromise(Integer.class);
+    PromisedValue<Integer> y = newPromise(Integer.class);
+    PromisedValue<Integer> z = newPromise(Integer.class);
+    FutureValue<Integer> intermediate = futureCall(new ComplexJob(), x, y, z);
+      
+    // Kick off the process of retrieving the data from the external agent
+    getIntFromUser("Please give 1st int", userEmail, x.getHandle());
+    getIntFromUser("Please give 2nd int", userEmail, y.getHandle());
+    getIntFromUser("Please give 3rd int", userEmail, z.getHandle());
+
+    // Send the user the intermediate result and ask for one more integer
+    FutureValue<Integer> oneMoreInt = futureCall(new PromptJob(), intermediate, immediate(userEmail));
+
+    // Invoke MultJob on intermediate and oneMoreInt
+    return futureCall(new MultJob(), intermediate, oneMoreInt);
+  }
+
+  public static void getIntFromUser(String prompt, String userEmail, String promiseHandle) {
+    // 1. Send the user an e-mail containing the prompt.
+    // 2. Ask user to submit one more integer on some web page.
+    // 3. promiseHandle is a query string argument
+    // 4. Handler for submit invokes submitPromisedValue(promiseHandle, value)
+  }
+}
+
+public static class PromptJob extends Job2<Integer, Integer, String> {
+  @Override
+  public Value<Integer> run(Integer intermediate, String userEmail) {
+    String prompt = "The intermediate result is " + intermediate + "." + " Please give one more int";
+    PromisedValue<Integer> oneMoreInt = newPromise(Integer.class);
+    ExternalAgentJob.getIntFromUser(prompt, userEmail, oneMoreInt.getHandle());
+    return oneMoreInt;
+  }
+}
+}}}
