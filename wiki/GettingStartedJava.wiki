@@ -31,10 +31,10 @@ A *job* is a Java class that extends `com.google.appengine.tools.pipeline.Job` a
 ==Job Phases==
 A job has two phases, the *run* phase, in which it's `run()` method is invoked, and the *finalize* phase, in which the job's final output is submitted to the framework. A job's final output may not be known at the end of its `run()` method. During the `run()` method a job may spawn one or more *child jobs* that will run asynchronously and the parent job may specify its final output to be the final output of one of its child jobs. We call such a job a *generator job*.
 
-===Values===
+==Values==
 `com.google.appengine.tools.pipeline.Value` is an interface that represents input to and output from a job. There are two types of values, *`ImmediateValues`* and *`FutureValues`*. An `ImmediateValue` is a value that is known now, whereas a `FutureValue` represents an empty slot that will be filled in the future when some job finalizes.
 
-===Job Signatures===
+==Job Signatures==
 A job is characterized by the signature of its run method. A 
 `<T, T1, …, Tn>-job` is a job whose final output is of type `T` and that takes as input n arguments of types `T1` through `Tn`.  The job's `run()` method will take these same argument types but will return a `Value<T>`. For example a `<T, T1, T2>-job` is a job whose `run()` method has the signature
 {{{
@@ -42,7 +42,7 @@ Value<T> run(T1 arg1, T2 arg2);
 }}}
 Recall that the final output of a job is not necessarily known when `run()` returns. That is why `run()` returns a `Value<T>` instead of a `T`. If `run()` returns an `ImmediateValue<T>` then the job is called an *immediate job* and in this case the final output of the job is known by the time `run()` returns. But `run()` may return a `FutureValue<T>` which is only an empty slot to be filled when some child job finalizes.
 
-===Generic Parameters==
+==Generic Parameters==
 The `Job<T>` class is parametrized by the output type `T`.  The framework also includes several subclasses of `Job` named `Job0`, `Job1`, `Job2`, etc that users should use as a superclass for their jobs instead of using `Job` directly. The `Jobn` class represents a job that takes n arguments. `Jobn` declares an abstract `run` method that must be overridden and implemented in the user’s job class.  For example here are `Job0`, `Job1` and `Job2`:
 
 {{{
@@ -66,7 +66,7 @@ By convention we use `java.lang.Void` for jobs that don't have a return value. T
 In case the user needs to write a job class that takes more arguments
 than the greatest `n` such that the framework provides a `Jobn` class (as of this writing `n=6`) the user may write a job class that directly subclasses `Job<T>`. `Job<T>` does not declare an abstract `run()` method and so the user is free to implement a `run()` method in his job class that takes as many arguments as he wishes. In this case though the user will forfeit some of the type-safety offered by the framework.
 
-===First Examples==
+==First Examples==
 In order to succinctly illustrate the concepts of the framework our examples will use trivial jobs that do simple arithmetic. 
 
 Below are two examples of immediate jobs that take two integers and compute their difference and product respectively.
