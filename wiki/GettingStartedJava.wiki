@@ -43,7 +43,7 @@ Value<T> run(T1 arg1, T2 arg2);
 Recall that the final output of a job is not necessarily known when `run()` returns. That is why `run()` returns a `Value<T>` instead of a `T`. If `run()` returns an `ImmediateValue<T>` then the job is called an *immediate job* and in this case the final output of the job is known by the time `run()` returns. But `run()` may return a `FutureValue<T>` which is only an empty slot to be filled when some child job finalizes.
 
 ===Generic Parameters==
-The `Job<T>` class is parametrized by the output type `T`.  The framework also includes several subclasses of `Job` named `Job0`, `Job1`, `Job2`, etc that users should use as a superclass for their jobs instead of using `Job` directly. The `Jobn` class represents a job that takes n arguments. `Jobn` defines an abstract `run` method that must be overridden and implemented in the user’s job class.  For example here are `Job0`, `Job1` and `Job2`:
+The `Job<T>` class is parametrized by the output type `T`.  The framework also includes several subclasses of `Job` named `Job0`, `Job1`, `Job2`, etc that users should use as a superclass for their jobs instead of using `Job` directly. The `Jobn` class represents a job that takes n arguments. `Jobn` declares an abstract `run` method that must be overridden and implemented in the user’s job class.  For example here are `Job0`, `Job1` and `Job2`:
 
 {{{
 public abstract class Job0<T> extends Job<T> {
@@ -64,7 +64,7 @@ So if the user wishes to write a job that takes two Integers as input and return
 By convention we use `java.lang.Void` for jobs that don't have a return value. Thus a job that takes a `List` of `Strings` but doesn't return anything should be a subclass of `Job1<Void, List<String>>`. 
 
 In case the user needs to write a job class that takes more arguments
-than the greatest `n` such that the framework provides a `Jobn` class (as of this writing `n=6`) the user may write a job class that directly subclasses `Job<T>`. `Job<T>` does not define an abstract `run()` method and so the user is free to implement a `run()` method in his job class that takes as many arguments as he wishes. In this case though the user will forfeit some of the type-safety offered by the framework.
+than the greatest `n` such that the framework provides a `Jobn` class (as of this writing `n=6`) the user may write a job class that directly subclasses `Job<T>`. `Job<T>` does not declare an abstract `run()` method and so the user is free to implement a `run()` method in his job class that takes as many arguments as he wishes. In this case though the user will forfeit some of the type-safety offered by the framework.
 
 ===First Examples==
 In order to succinctly illustrate the concepts of the framework our examples will use trivial jobs that do simple arithmetic. 
