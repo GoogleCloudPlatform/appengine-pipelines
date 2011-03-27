@@ -29,7 +29,7 @@ Add a servlet mapping to your web.xml file:
 A *job* is a Java class that extends `com.google.appengine.tools.pipeline.Job` and implements a method named `run()`. Jobs are written by the user and run asynchronously by the framework. (In this document the _user_ refers to the developer of an App Engine application who is using the Pipeline framework.)
 
 ==Job Phases==
-A job has two phases, the *run* phase, in which it's `run()` method is invoked, and the *finalize* phase, in which the job's final output is submitted to the framework. A job's final output may not be known at the end of its `run()` method. During the `run()` method a job may spawn one or more *child jobs* that will run asynchronously and the parent job may delegate its final output to one of its child jobs. We call such a job a *generator job*.
+A job has two phases, the *run* phase, in which it's `run()` method is invoked, and the *finalize* phase, in which the job's final output is submitted to the framework. A job's final output may not be known at the end of its `run()` method. During the `run()` method a job may spawn one or more *child jobs* that will run asynchronously and the parent job may specify its final output to be the final output of one of its child jobs. We call such a job a *generator job*.
 
 ===Values===
 `com.google.appengine.tools.pipeline.Value` is an interface that represents input to and output from a job. There are two types of values, *`ImmediateValues`* and *`FutureValues`*. An `ImmediateValue` is a value that is known now, whereas a `FutureValue` represents an empty slot that will be filled in the future when some job finalizes.
