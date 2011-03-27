@@ -1,4 +1,5 @@
 #summary etting started with the Google App Engine Pipeline API (Java)
+#labels Featured
 
 =Getting started with the Google App Engine Pipeline Framework (Java)=
 
