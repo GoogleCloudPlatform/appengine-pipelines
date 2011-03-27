@@ -3,4 +3,89 @@
 
 =Getting started with the Google App Engine Pipeline Framework (Java)=
 
-This page is under construction. Java Pipeline is coming soon.
+<wiki:toc max_depth="2" />
+
+==Introduction==
+
+Pipeline is a framework for building dynamic, complex workflows on Google App Engine. This a user’s guide for the Java version of Pipeline.
+
+==Add the Pipeline library to you project==
+
+Add *appengine-pipeline.jar* to your war/WEB-INF/lib directory.
+
+Add a servlet mapping to your web.xml file:
+{{{
+<servlet>
+  <servlet-name>PipelineServlet</servlet-name>
+  <servlet-class>com.google.appengine.tools.pipeline.impl.servlets.PipelineServlet</servlet-class>
+</servlet>
+<servlet-mapping>
+  <servlet-name>PipelineServlet</servlet-name>
+  <url-pattern>/_ah/pipeline/*</url-pattern>
+</servlet-mapping>
+}}}
+
+==Jobs==
+A *job* is a Java class that extends `com.google.appengine.tools.pipeline.Job` and implements a method named `run()`. Jobs are written by the user and run asynchronously by the framework. (In this document the _user_ refers to the developer of an App Engine application who is using the Pipeline framework.)
+
+==Job Phases==
+A job has two phases, the *run* phase, in which it's `run()` method is invoked, and the *finalize* phase, in which the job's final output is submitted to the framework. A job's final output may not be known at the end of its `run()` method. During the `run()` method a job may spawn one or more *child jobs* that will run asynchronously and the parent job may delegate its final output to one of its child jobs.
+
+===Values===
+`com.google.appengine.tools.pipeline.Value` is an interface that represents input to and output from a Job. There are two types of values, *ImmediateValues* and *FutureValues*. An ImmediateValue is a value that is known now, whereas a FutureValue represents an empty slot that will be filled in the future when some job finalizes.
+
+===Job Signatures===
+A job is characterized by the signature of its run method. A 
+`<T, T1, …, Tn>-job` is a job whose final output is of type `T` and that takes as input n arguments of types `T1` through `Tn`.  The job's `run()` method will take these same argument types but will return a `Value<T>`. For example a `<T, T1, T2>-job` is a job whose `run()` method has the signature
+{{{
+Value<T> run(T1 arg1, T2 arg2);
+}}}
+Recall that the final output of a job is not necessarily known when `run()` returns. That is why `run()` returns a `Value<T>` instead of a `T`. If `run()` returns an `ImmediateValue<T>` then the job is called an *immediate job* and in this case the final output of the job is known by the time `run()` returns. But `run()` may return a `FutureValue<T>` which is only an empty slot to be filled when some child job finalizes.
+
+===Generic Parameters==
+The `Job<T>` class is parametrized by the output type `T`.  The framework also includes several subclasses of `Job` named `Job0`, `Job1`, `Job2`, etc that users should use as a superclass for their jobs instead of using `Job` directly. The `Jobn` class represents a job that takes n arguments. `Jobn` defines an abstract `run` method that must be overridden and implemented in the user’s job class.  For example here are `Job0`, `Job1` and `Job2`:
+
+{{{
+public abstract class Job0<T> extends Job<T> {
+  public abstract Value<T> run();
+}
+
+public abstract class Job1<T, T1> extends Job<T> {
+  public abstract Value<T> run(T1 arg1);
+}
+
+public abstract class Job2<T, T1, T2> extends Job<T> {
+  public abstract Value<T> run(T1 arg1, T2 arg2);
+}
+}}}
+
+So if the user wishes to write a job that takes two Integers as input and returns a String then the user should write a job class the extends Job2<String, Integer, Integer>. 
+
+By convention we use `java.lang.Void` for jobs that don't have a return value. Thus a job that takes a `List` of `Strings` but doesn't return anything should be a subclass of `Job1<Void, List<String>>`. 
+
+In case the user needs to write a job class that takes more arguments
+than the greatest `n` such that the framework provides a `Jobn` class (as of this writing `n=6`) the user may write a job class that directly subclasses `Job<T>`. `Job<T>` does not define an abstract `run()` method and so the user is free to implement a `run()` method in his job class that takes as many arguments as he wishes. In this case though the user will forfeit some of the type-safety offered by the framework.
+
+===First Examples==
+In order to succinctly illustrate the concepts of the framework our examples will use trivial jobs that do simple arithmetic. 
+
+Below are two examples of immediate jobs that take two integers and compute their difference and product respectively.
+
+{{{
+public static class DiffJob extends Job2<Integer, Integer, Integer> {
+  @Override
+  public Value<Integer> run(Integer a, Integer b) {
+    return immediate(b - a);
+  }
+}
+
+
+public static class MultJob extends Job2<Integer, Integer, Integer> {
+  @Override
+  public Value<Integer> run(Integer a, Integer b) {
+    return immediate(a*b);
+  }
+}
+}}}
+
+The method `immediate()` being invoked above is simply syntactic sugar. `immediate(x)` is equivalent to `new ImmediateValue(x)`.
