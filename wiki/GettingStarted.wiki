@@ -1,7 +1,7 @@
 #summary Getting started with the Google App Engine Pipeline API (Python)
 #labels Featured
 
-=Getting started with the Google App Engine Pipeline API=
+=Getting started with the Google App Engine Pipeline API (Python)=
 
 <wiki:toc max_depth="2" />
 
