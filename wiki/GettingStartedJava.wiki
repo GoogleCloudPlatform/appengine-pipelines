@@ -89,3 +89,6 @@ public static class MultJob extends Job2<Integer, Integer, Integer> {
 }}}
 
 The method `immediate()` being invoked above is simply syntactic sugar. `immediate(x)` is equivalent to `new ImmediateValue(x)`.
+
+==Job Graphs==
+The framework allows a user to express arrangements of multiple jobs in which the output of one job becomes an input of one or more jobs. These arrangements can best be described as a type of directed graph in which a directed edge from job A to one of the input slot in job B indicates that the output of A should be directed to the input slot of B. For example, suppose we wanted to use `DiffJob` and `MultJob` to build a job which takes three integers inputs, `x, y, z`, and performs the following calculation `[ (x - y) * (x - z) ] - 2`. That calculation may be expressed as the following job graph.
