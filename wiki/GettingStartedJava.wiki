@@ -183,7 +183,7 @@ A `PromisedValue` represents a value slot that will be filled in when some async
 The following Pipeline will obtain three integers from a human, pass them as input to `ComplexJob`, return the answer to the human, ask for one more integer and then multiply the additional integer by the result of `ComplexJob`. Below the code we draw a diagram of this Pipeline.
 
 {{{
-public static class ExternalAgentJob extends Job1<Integer, String> {
+class ExternalAgentJob extends Job1<Integer, String> {
   @Override
   public Value<Integer> run(String userEmail) {
     // Invoke ComplexJob on three promised values
@@ -212,7 +212,7 @@ public static class ExternalAgentJob extends Job1<Integer, String> {
   }
 }
 
-public static class PromptJob extends Job2<Integer, Integer, String> {
+class PromptJob extends Job2<Integer, Integer, String> {
   @Override
   public Value<Integer> run(Integer intermediate, String userEmail) {
     String prompt = "The intermediate result is " + intermediate + "." + " Please give one more int";
@@ -222,3 +222,58 @@ public static class PromptJob extends Job2<Integer, Integer, String> {
   }
 }
 }}}
+
+<a href="http://appengine-pipeline.googlecode.com/svn/images/externalagentjob.png"><img border="0" src="http://appengine-pipeline.googlecode.com/svn/images/externalagentjob.png" width="700"/></a>
+
+==Serialization==
+Both jobs and job arguments are persisted to the App Engine datastore using Java serialization. This means that values can be any serializable Java data type. 
+
+It also means that job instances passed to `futureCall()` may be given state in addition to the job's arguments. For example, values known at the time that `futureCall()` is invoked may be passed to a constructor for the job instead of being passed as `ImmediateValues`.
+
+Finally it is also necessary for users to keep in mind that their job objects _must_ be serializable. Since the parent class `Job` is declared to implement `Serializable`, this is not usually much of a burden. One thing to watch out for is writing `Job` classes as anonymous inner classes. This is a fine technique, but it implies that the outer class must also be serializable.
+
+==Job Settings==
+The `futureCall()` and `startNewPipeline()` family of methods have a final vararg parameter of type `JobSetting`. For example
+{{{
+<T, T1, T2> FutureValue<T> futureCall(Job2<T, T1, T2> jobInstance, Value<T1> v1, Value<T2> v2, JobSetting... settings);
+}}}
+Currently there are two categories of `JobSettings`:
+
+===WaitFor===
+Sometimes when describing a job graph it is desirable to specify that one job should not run until another has completed, but the second job does not actually depend on the final output of the first job. Of course this problem could be solved by introducing a dummy argument which is never used. But the framework offers a more elegant solution. To specify that `JobB` should wait until `JobA` has finalized, use the following syntax:
+{{{
+class ExampleWaitForJob extends Job0<Void> {
+  public Value<Void> run() {
+    FutureValue<Void> a = futureCall(new JobA());
+    futureCall(new JobB(), waitFor(a));
+    return null;
+  }
+}
+}}}
+This tells the framework not to run `JobB` until `JobA` has finalized. In the above example `waitFor(a)` is another example of our syntactic sugar. It is equivalent to
+{{{
+new JobSetting.WaitForSetting(a)
+}}}
+
+===Retry Settings===
+The other category of `JobSetting` the framework has currently is
+settings that allow the user to customize the way a job is retried.
+There are three such settings
+  * BackoffSeconds
+  * BackoffFactor
+  * MaxAttempts
+
+When a job fails it will be retried `MaxAttempts` number of times. After each failure the wait time before the next attempt will be
+{{{
+backoffSeconds * backoffFactor ^ attemptNumber
+}}}
+
+==Testing==
+There are several ways users may test code they have written that uses the Java Pipeline framework.
+
+Firstly, like all App Engine code, user's may run their code in the local development app server.
+
+But this is not convenient for writing automated unit tests. For that reason App Engine provides a [http://code.google.com/appengine/docs/java/tools/localunittesting.html local testing framework.] Since the Pipeline framework is built on top of the App Engine Task Queue, in order to get Pipeline to work in the local testing environment it is necessary to register a
+[http://code.google.com/appengine/docs/java/tools/localunittesting/javadoc/com/google/appengine/api/taskqueue/dev/LocalTaskQueueCallback.html LocalTaskQueueCallback] that handles Pipeline tasks. The framework provides `com.google.appengine.tools.pipeline.TestingTaskQueueCallback' with our test code for this purpose.
+
+The [GettingStarted Python] version of Pipeline offers an additional feature to facilitate testing: the ability to run Pipelines in _testing mode_. This feature is not yet available in this first version of the Java framework, but will be coming soon. In testing mode, the behavior of `futureCall()` and `startNewPipeline()` will be changed so that instead of building job graphs these methods will synchronously invoke the target jobs. This will allow developers to test the logic of their code independently of the asynchrony inherent in the Pipeline framework.
