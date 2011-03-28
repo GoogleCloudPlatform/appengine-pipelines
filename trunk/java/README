@@ -1,0 +1,4 @@
+To build the library:
+$ ant
+appengine-pipeline.jar will be in dist/lib.
+

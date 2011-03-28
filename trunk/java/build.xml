@@ -1,0 +1,122 @@
+<project name="Pipeline" default="dist-framework" basedir=".">
+  <description>
+    A user space mapper library for AppEngine.
+  </description>
+  <property name="framework" location="framework" />
+  <property name="framework-src" location="${framework}/src" />
+  <property name="demo" location="demo" />
+  <property name="demo-src" location="${demo}/src" />
+  <property name="test" location="test" />
+  <property name="test-src" location="${test}/src" />
+  <property name="build" location="build" />
+  <property name="testbuild" location="test_build" />
+  <property name="lib" location="lib" />
+  <property name="testlib" location="test_lib" />
+  <property name="dist" location="dist" />
+  <property name="ui" location="../ui" />
+
+  <property name="sdk" location="sdk" />
+  <property name="version" value="1.4.2" />
+  <property name="sdkdirname" value="appengine-java-sdk-${version}" />
+  <property name="sdkfilename" value="${sdkdirname}.zip" />
+  <property name="sdklibdir" location="${sdk}/${sdkdirname}/lib" />
+
+  <path id="sdkjars">
+    <fileset dir="${sdklibdir}/user">
+      <include name="appengine-api-1.0-sdk-${version}.jar" />
+      <include name="appengine-api-labs-${version}.jar" />
+    </fileset>
+    <fileset dir="${sdklibdir}/shared">
+      <include name="servlet-api.jar" />
+    </fileset>
+  </path>
+
+  <path id="testjars">
+    <pathelement path="${testlib}/junit-4.8.2.jar" />
+    <pathelement path="${sdklibdir}/testing/appengine-testing.jar" />
+    <pathelement path="${sdklibdir}/impl/appengine-api-stubs.jar" />
+  </path>
+
+  <target name="init">
+    <mkdir dir="${build}" />
+  </target>
+
+  <target name="compile-framework" depends="init,download_sdk">
+    <javac srcdir="${framework-src}" destdir="${build}" debug="on" debuglevel="lines,source">
+      <classpath>
+        <path refid="sdkjars" />
+      </classpath>
+    </javac>
+  </target>
+
+  <target name="dist-framework" depends="compile-framework">
+    <mkdir dir="${dist}/lib" />
+    <copy todir="${build}/com/google/appengine/tools/pipeline/impl/servlets">
+      <fileset dir="${ui}">
+        <exclude name="**/.svn/**"/>
+      </fileset>
+    </copy>
+    <copy todir="${build}">
+      <fileset dir="${framework-src}" />
+    </copy>
+    <jar jarfile="${dist}/lib/appengine-pipeline.jar" basedir="${build}" />
+  </target>
+
+   <target name="copy_framework_jar_to_demo" depends="dist-framework">
+    <mkdir dir="demo/war/WEB-INF/lib" />
+    <copy todir="demo/war/WEB-INF/lib">
+      <fileset dir="${dist}/lib" />
+      <path refid="sdkjars" />
+    </copy>
+  </target>
+
+  <target name="compile-demo" depends="copy_framework_jar_to_demo">
+    <mkdir dir="${demo}/war/WEB-INF/classes" />
+    <javac srcdir="${demo-src}" destdir="${demo}/war/WEB-INF/classes" debug="on" debuglevel="lines,source">
+      <classpath>
+        <fileset dir="${demo}/war/WEB-INF/lib" />
+        <path refid="sdkjars" />
+      </classpath>
+    </javac>
+  </target>
+
+  <target name="test_init">
+    <mkdir dir="${testbuild}" />
+  </target>
+
+  <target name="compile-tests" depends="test_init,compile-demo">
+    <javac srcdir="${test-src}" destdir="${testbuild}" debug="on" debuglevel="lines,source">
+      <classpath>
+        <path refid="sdkjars" />
+        <path refid="testjars" />
+        <pathelement location="${dist}/lib/appengine-pipeline.jar" />
+        <pathelement location="${demo}/war/WEB-INF/classes" />
+      </classpath>
+    </javac>
+  </target>
+
+  <target name="clean">
+    <delete dir="${build}" />
+    <delete dir="${dist}" />
+    <delete dir="${testbuild}" />
+    <delete dir="${demo}/war/WEB-INF/classes" />
+    <delete dir="${demo}/war/WEB-INF/lib" />
+  </target>
+   
+  <target name="check_sdk_extracted">
+    <available file="${sdk}/${sdkdirname}" property="sdkextracted" />
+  </target>
+
+  <target name="download_sdk" description="Gets the AppEngine SDK" depends="check_sdk_extracted" unless="sdkextracted">
+    <mkdir dir="${sdk}" />
+    <get src="http://googleappengine.googlecode.com/files/${sdkfilename}" dest="${sdk}/${sdkfilename}" />
+    <unzip src="${sdk}/${sdkfilename}" dest="${sdk}" />
+  </target>
+
+  <!-- Separate target because downloading the SDK can be expensive and
+       usually only needs to be done once. -->
+  <target name="clean_sdk">
+    <delete dir="${sdk}" />
+  </target>
+
+</project>
