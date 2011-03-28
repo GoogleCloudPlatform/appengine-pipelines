@@ -1,0 +1,34 @@
+body {
+  background-color: #ffffff;
+  color: black;
+  margin-left: 0.5in;
+  margin-right: 0.25in;
+  font-family: "Gill Sans", sans-serif;
+}
+
+span.h1 {    
+  color: #003366;
+  font-family: "Gill Sans", sans-serif;
+  font-size: 14pt;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: #003366;
+  font-family: "Gill Sans", sans-serif;
+}
+
+h1 { 
+  font-size: 14pt;
+  margin-left: -0.25in;
+}
+h2 {
+  font-size: 12pt;
+  margin-left: -0.25in;
+  font-style: normal;
+}
+h3 {
+  margin-left: -0.25in;
+}
+h4 {
+  margin-left: -0.125in;
+}

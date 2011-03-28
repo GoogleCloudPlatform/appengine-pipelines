@@ -1,0 +1,73 @@
+// Copyright 2011 Google Inc. All Rights Reserved.
+
+package com.google.appengine.tools.pipeline;
+
+import com.google.appengine.api.taskqueue.dev.LocalTaskQueueCallback;
+import com.google.appengine.api.urlfetch.URLFetchServicePb;
+import com.google.appengine.api.urlfetch.URLFetchServicePb.URLFetchRequest;
+import com.google.appengine.tools.pipeline.impl.PipelineManager;
+import com.google.appengine.tools.pipeline.impl.servlets.TaskHandler;
+import com.google.appengine.tools.pipeline.impl.tasks.Task;
+import com.google.appengine.tools.pipeline.impl.util.StringUtils;
+
+import java.net.URLDecoder;
+import java.util.Properties;
+import java.util.logging.Logger;
+
+/**
+ * A {@code LocalTaskQueueCallback} for use in tests that make
+ * use of the Pipeline framework.
+ * 
+ * @author rudominer@google.com (Mitch Rudominer)
+ */
+public class TestingTaskQueueCallback implements LocalTaskQueueCallback {
+  Logger logger = Logger.getLogger(TestingTaskQueueCallback.class.getName());
+
+  /**
+   * Execute the provided url fetch request.
+   *
+   * @param req The url fetch request
+   * @return The HTTP status code of the fetch.
+   */
+  public int execute(URLFetchServicePb.URLFetchRequest req) {
+    String taskName = null;
+    int retryCount = -1;
+    for (URLFetchRequest.Header pbHeader : req.getHeaderList()) {
+      String headerName = pbHeader.getKey();
+      String headerValue = pbHeader.getValue();
+      if (TaskHandler.TASK_NAME_REQUEST_HEADER.equalsIgnoreCase(headerName)) {
+        taskName = headerValue;
+      }
+      if (TaskHandler.TASK_RETRY_COUNT_HEADER.equalsIgnoreCase(headerName)) {
+        try {
+          retryCount = Integer.parseInt(headerValue);
+        } catch (Exception e) {
+          // ignore
+        }
+      }
+    }
+    String requestBody = req.getPayload().toStringUtf8();
+    String[] params = requestBody.split("&");
+    Properties properties = new Properties();
+    Task task = null;
+    try {
+      for (String param : params) {
+        String[] pair = param.split("=");
+        String name = pair[0];
+        String value = pair[1];
+        String decodedValue = URLDecoder.decode(value, "UTF8");
+        properties.put(name, decodedValue);
+      }
+      task = Task.fromProperties(properties);
+      if (null != taskName) {
+        task.setName(taskName);
+      }
+      PipelineManager.processTask(task);
+
+    } catch (Exception e) {
+      StringUtils.logRetryMessage(logger, task, retryCount, e);
+      return 500;
+    }
+    return 200;
+  }
+}
