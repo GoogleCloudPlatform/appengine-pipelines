@@ -404,7 +404,7 @@ class Pipeline(object):
     self._pipeline_key = None
     self._context = None
     self._result_status = None
-    self.__class__._set_class_path()
+    self._set_class_path()
 
     if _TEST_MODE:
       self._context = _PipelineContext('', 'default', '')
@@ -871,6 +871,13 @@ The Pipeline API
       module_dict: Used for testing.
     """
     if cls._class_path is not None:
+      return
+
+    # Do not set the _class_path for the base-class, otherwise all children's
+    # lookups for _class_path will fall through and return 'Pipeline' above.
+    # This situation can happen if users call the generic Pipeline.from_id
+    # to get the result of a Pipeline without knowing its specific class.
+    if cls is Pipeline:
       return
 
     # This is a brute-force approach to solving the module reverse-lookup
