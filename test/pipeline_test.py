@@ -309,8 +309,12 @@ class PipelineTest(TestBase):
 
   def testClassPath(self):
     """Tests the class path resolution class method."""
-    NothingPipeline._class_path = None
     module_dict = {}
+    self.assertEquals(None, pipeline.Pipeline._class_path)
+    pipeline.Pipeline._set_class_path(module_dict)
+    self.assertEquals(None, pipeline.Pipeline._class_path)
+
+    NothingPipeline._class_path = None
     self.assertRaises(ImportError, NothingPipeline._set_class_path,
                       module_dict=module_dict)
     self.assertEquals(None, NothingPipeline._class_path)
