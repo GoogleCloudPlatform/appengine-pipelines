@@ -1034,6 +1034,7 @@ class PipelineContextTest(TestBase):
     self.slot1_key = db.Key.from_path(_SlotRecord.kind(), 'one')
     self.slot2_key = db.Key.from_path(_SlotRecord.kind(), 'missing')
     self.slot3_key = db.Key.from_path(_SlotRecord.kind(), 'three')
+    self.slot4_key = db.Key.from_path(_SlotRecord.kind(), 'four')
 
     self.slot1 = _SlotRecord(
         key=self.slot1_key,
@@ -1041,6 +1042,9 @@ class PipelineContextTest(TestBase):
     self.slot3 = _SlotRecord(
         key=self.slot3_key,
         status=_SlotRecord.WAITING)
+    self.slot4 = _SlotRecord(
+        key=self.slot4_key,
+        status=_SlotRecord.FILLED)
 
     self.barrier1 = _BarrierRecord(
         parent=self.pipeline1_key,
@@ -1059,7 +1063,7 @@ class PipelineContextTest(TestBase):
         key_name=_BarrierRecord.START,
         root_pipeline=self.pipeline3_key,
         target=self.pipeline3_key,
-        blocking_slots=[self.slot1_key],
+        blocking_slots=[self.slot1_key, self.slot4_key],
         status=_BarrierRecord.FIRED)
     self.barrier4 = _BarrierRecord(
         parent=self.pipeline4_key,
@@ -1087,8 +1091,8 @@ class PipelineContextTest(TestBase):
     self.assertEquals(_BarrierRecord.FIRED, self.barrier4.status)
     self.assertEquals(_BarrierRecord.WAITING, self.barrier5.status)
 
-    db.put([self.barrier1, self.barrier2, self.barrier3,
-            self.barrier4, self.barrier5, self.slot1, self.slot3])
+    db.put([self.barrier1, self.barrier2, self.barrier3, self.barrier4,
+            self.barrier5, self.slot1, self.slot3, self.slot4])
     self.context.notify_barriers(
         self.slot1_key,
         None,
@@ -1127,6 +1131,10 @@ class PipelineContextTest(TestBase):
     self.assertEquals(_BarrierRecord.WAITING, barrier2.status)
     self.assertTrue(barrier2.trigger_time is None)
 
+    # NOTE: This barrier relies on slots 1 and 4, to force the "blocking slots"
+    # inner loop to be excerised. By putting slot4 last on the last barrier
+    # tested in the loop, we ensure that any inner-loop variables do not pollute
+    # the outer function context.
     self.assertEquals(_BarrierRecord.FIRED, barrier3.status)
     # Show that if the _BarrierRecord was already in the FIRED state that it
     # will not be overwritten again and have its trigger_time changed.
@@ -2656,7 +2664,7 @@ class EchoAsync(pipeline.Pipeline):
         params=dict(return_value=pickle.dumps(args))).add()
 
   def callback(self, return_value):
-    args = pickle.loads(return_value)
+    args = pickle.loads(str(return_value))
     if not args:
       self.complete(None)
     elif len(args) == 1:

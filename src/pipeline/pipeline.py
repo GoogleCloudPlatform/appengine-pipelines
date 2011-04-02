@@ -1282,11 +1282,11 @@ class _PipelineContext(object):
     updated_barriers = []
     for barrier in results:
       all_ready = True
-      for slot_key in barrier.blocking_slots:
-        slot_record = blocking_slot_dict.get(slot_key)
+      for blocking_slot_key in barrier.blocking_slots:
+        slot_record = blocking_slot_dict.get(blocking_slot_key)
         if slot_record is None:
           logging.error('Barrier "%s" relies on Slot "%s" which is missing.',
-                        barrier.key(), slot_key)
+                        barrier.key(), blocking_slot_key)
           all_ready = False
           break
         if slot_record.status != _SlotRecord.FILLED:
