@@ -29,6 +29,7 @@ function adjustStatusConsole() {
   var statusConsole = $('#status-console');
   var detail = $('#detail');
   var sidebar = $('#sidebar');
+  var control = $('#control');
 
   if (statusConsole.css('display') == 'none') {
     var paddingAndMargin = detail.outerHeight() - detail.height();
@@ -37,8 +38,12 @@ function adjustStatusConsole() {
     detail.css('max-height', '200px');
     statusConsole.width(
         $(window).width() - sidebar.outerWidth());
+    // NOTE: 16 px here is the height of the resize grip in most browsers.
+    // Need to specify this explicitly because some browsers (eg, Firefox)
+    // cause the overflow scrollbars to bounce around the page randomly when
+    // they accidentally overlap the resize grip.
     statusConsole.height(
-        $(window).height() - detail.outerHeight() - 1);
+        $(window).height() - (statusConsole.offset().top + 16));
   }
 }
 

@@ -31,10 +31,13 @@ html, body {
   padding: 0 5px 0 5px;
   top: 0;
   right: 0;
-  height: 1.5em;
+  height: 25px;
+  width: 100%;
+  border-bottom: 1px solid grey;
+}
+.control-cell {
   text-align: right;
   vertical-align: middle;
-  border-bottom: 1px solid grey;
 }
 #status-console {
   border-top: 1px solid grey;
