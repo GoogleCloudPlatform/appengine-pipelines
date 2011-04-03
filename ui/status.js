@@ -633,10 +633,22 @@ function handleAutoRefreshClick(event) {
   }
 
   if (newSearch != null) {
-    loc.href =
+    loc.replace(
         loc.protocol + '//' + loc.host + loc.pathname +
-        newSearch + loc.hash;
+        newSearch + loc.hash);
   }
+}
+
+
+function handleRefreshClick(event) {
+  var loc = window.location;
+  if (AUTO_REFRESH) {
+    newSearch = '?root=' + ROOT_PIPELINE_ID;
+  } else {
+    newSearch = '?root=' + ROOT_PIPELINE_ID + '&auto=false';
+  }
+  loc.href = loc.protocol + '//' + loc.host + loc.pathname + newSearch;
+  return false;
 }
 
 
@@ -692,7 +704,7 @@ function initStatusDone() {
   });
   $('#sidebar').show();
 
-  // Init the auto-refresh behavior
+  // Init the control panel.
   $('#auto-refresh').click(handleAutoRefreshClick);
   if (!AUTO_REFRESH) {
     $('#auto-refresh').attr('checked', '');
@@ -702,6 +714,7 @@ function initStatusDone() {
       window.location.replace('');
     }, 30 * 1000);
   }
+  $('.refresh-link').click(handleRefreshClick);
   $('#control').show();
 
   // Properly adjust the console iframe to match the window size.

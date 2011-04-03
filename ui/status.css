@@ -28,16 +28,22 @@ html, body {
   overflow-y: auto;
 }
 #control {
-  padding: 0 5px 0 5px;
+  padding: 0;
+  margin: 0;
   top: 0;
   right: 0;
   height: 25px;
   width: 100%;
   border-bottom: 1px solid grey;
 }
+#control-table {
+  height: 100%;
+  float: right;
+}
 .control-cell {
-  text-align: right;
+  text-align: center;
   vertical-align: middle;
+  padding: 0 4px;
 }
 #status-console {
   border-top: 1px solid grey;

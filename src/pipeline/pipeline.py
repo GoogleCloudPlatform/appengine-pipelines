@@ -2742,7 +2742,7 @@ class _StatusUiHandler(webapp.RequestHandler):
     relative_path, content_type = self._RESOURCE_MAP[resource]
     path = os.path.join(os.path.dirname(__file__), relative_path)
     if not _DEBUG:
-      self.response.headers["Cache-Control"] = "public; max-age=300"
+      self.response.headers["Cache-Control"] = "public, max-age=300"
     self.response.headers["Content-Type"] = content_type
     self.response.out.write(open(path, 'rb').read())
 
