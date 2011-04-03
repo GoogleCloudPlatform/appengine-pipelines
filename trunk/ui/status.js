@@ -671,6 +671,7 @@ function initStatus() {
     });
   }
 
+  setButter('Loading... #' + ROOT_PIPELINE_ID);
   $.ajax({
     type: 'GET',
     url: 'rpc/tree?root_pipeline_id=' + ROOT_PIPELINE_ID,
@@ -681,6 +682,7 @@ function initStatus() {
     success: function(data, textStatus, request) {
       var response = getResponseDataJson(null, data);
       if (response) {
+        clearButter();
         STATUS_MAP = response;
         initStatusDone();
       }

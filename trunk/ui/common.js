@@ -84,6 +84,12 @@ function getElapsedTimeString(startTimestampMs, updatedTimestampMs) {
 }
 
 
+// Clears the status butter.
+function clearButter() {
+  $("#butter").css('display', 'none');
+}
+
+
 // Sets the status butter, optionally indicating if it's an error message.
 function setButter(message, error, traceback) {
   var butter = $("#butter");
