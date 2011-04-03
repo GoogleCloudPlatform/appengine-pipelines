@@ -1868,6 +1868,7 @@ class _PipelineContext(object):
     last_sub_stage = None
     sub_stage = None
     sub_stage_dict = {}
+    sub_stage_ordering = []
 
     while True:
       try:
@@ -1891,6 +1892,7 @@ class _PipelineContext(object):
         next_value._after_all_pipelines.update(After._local._after_all_futures)
         next_value._after_all_pipelines.update(InOrder._local._in_order_futures)
         sub_stage_dict[yielded] = next_value
+        sub_stage_ordering.append(yielded)
         InOrder._add_future(next_value)
 
         # To aid local testing, the task_retry flag (which instructs the
@@ -1938,15 +1940,16 @@ class _PipelineContext(object):
 
     # Allocate PipelineRecords and BarrierRecords for generator-run Pipelines.
     pipelines_to_run = set()
-    all_children = set()
+    all_children_keys = []
     all_output_slots = set()
-    for sub_stage, future in sub_stage_dict.iteritems():
+    for sub_stage in sub_stage_ordering:
+      future = sub_stage_dict[sub_stage]
       dependent_slots, output_slots, params = _generate_args(
           sub_stage, future, self.queue_name, self.base_path)
       child_pipeline_key = db.Key.from_path(
           _PipelineRecord.kind(), uuid.uuid1().hex)
       all_output_slots.update(output_slots)
-      all_children.add(child_pipeline_key)
+      all_children_keys.append(child_pipeline_key)
 
       child_pipeline = _PipelineRecord(
           key=child_pipeline_key,
@@ -1978,7 +1981,7 @@ class _PipelineContext(object):
     db.put(entities_to_put)
     self.transition_run(pipeline_key,
                         blocking_slot_keys=all_output_slots,
-                        fanned_out_pipelines=all_children,
+                        fanned_out_pipelines=all_children_keys,
                         pipelines_to_run=pipelines_to_run)
 
   def handle_run_exception(self, pipeline_key, pipeline_func, e):

@@ -454,29 +454,6 @@ function constructStageNode(pipelineId, infoMap, sidebar) {
 }
 
 
-// Compares two children pipelines for ordering purposes.
-function compareChildren(infoMapA, infoMapB) {
-  var statusOrder = [
-      'done', 'run', 'finalizing', 'aborted', 'retry', 'waiting'];
-
-  var priorityOrder = $.inArray(infoMapA.status, statusOrder) -
-      $.inArray(infoMapB.status, statusOrder);
-
-  if (priorityOrder != 0) {
-    // They are different priorities, so use that for ordering.
-    return priorityOrder;
-  }
-
-  // Order pipelines by end time, start time, and finally classPath.
-  var compareA =
-      infoMapA.startTimeMs || infoMapA.endTimeMs || infoMapA.classPath;
-  var compareB =
-      infoMapB.startTimeMs || infoMapB.endTimeMs || infoMapB.classPath;
-
-  return compareA - compareB;
-}
-
-
 // Recursively creates the sidebar. Use null nextPipelineId to create from root.
 function generateSidebar(statusMap, nextPipelineId, rootElement) {
   var currentElement = null;
@@ -496,10 +473,6 @@ function generateSidebar(statusMap, nextPipelineId, rootElement) {
 
   var children = statusMap.pipelines[nextPipelineId].children;
   if (children.length > 0) {
-    children.sort(function(a, b) {
-      return compareChildren(statusMap.pipelines[a], statusMap.pipelines[b]);
-    });
-
     var treeElement = null;
     if (rootElement) {
       treeElement =

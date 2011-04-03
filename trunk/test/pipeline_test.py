@@ -1705,10 +1705,10 @@ class DumbGeneratorYields(pipeline.Pipeline):
   """A dumb pipeline that's a generator that yields something."""
 
   def run(self, block=False):
-    yield DumbSync()
-    result = yield DumbSync()
+    yield DumbSync(1)
+    result = yield DumbSync(2)
     if block:
-      yield DumbSync(result)
+      yield DumbSync(3, result)
 
 
 class DiesOnCreation(pipeline.Pipeline):
@@ -1936,6 +1936,29 @@ class TaskRunningTest(test_shared.TaskRunningMixin, TestBase):
     self.assertTrue(db.get(
         db.Key.from_path(_BarrierRecord.kind(), _BarrierRecord.FINALIZE,
                          parent=other_child_key)) is not None)
+
+  def testFannedOutOrdering(self):
+    """Tests that the fanned_out property lists children in code order."""
+    self.pipeline_record.class_path = '__main__.DumbGeneratorYields'
+    self.pipeline_record.params.update({
+        'output_slots': {'default': str(self.slot_key)},
+        'args': [{'type': 'value', 'value': True}],
+        'kwargs': {},
+    })
+    db.put([self.pipeline_record, self.slot_record, self.barrier_record])
+
+    before_record = db.get(self.pipeline_key)
+    self.assertEquals([], before_record.fanned_out)
+
+    self.context.evaluate(self.pipeline_key)
+
+    after_record = db.get(self.pipeline_key)
+    self.assertEquals(3, len(after_record.fanned_out))
+
+    children = db.get(after_record.fanned_out)
+    self.assertEquals(1, children[0].params['args'][0]['value'])
+    self.assertEquals(2, children[1].params['args'][0]['value'])
+    self.assertEquals(3, children[2].params['args'][0]['value'])
 
   def testSyncWaitingStartRerun(self):
     """Tests a waiting, sync pipeline being re-run after it already output."""
@@ -2640,7 +2663,7 @@ class CallbackHandlerTest(TestBase):
     self.assertEquals('text/plain', handler.response.headers['Content-Type'])
 
 
-class _CleanupHandlerTest(test_shared.TaskRunningMixin, TestBase):
+class CleanupHandlerTest(test_shared.TaskRunningMixin, TestBase):
   """Tests for the _CleanupHandler class."""
 
   def testSuccess(self):
