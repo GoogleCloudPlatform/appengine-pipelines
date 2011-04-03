@@ -24,6 +24,7 @@ import os
 import pickle
 import sys
 import unittest
+import urllib
 
 # Fix up paths for running tests.
 sys.path.insert(0, '../src/')
@@ -857,6 +858,25 @@ class PipelineTest(TestBase):
       self.assertTrue(stage.test_mode)
     finally:
       local_pipeline._TEST_MODE = False
+
+  def testCleanup(self):
+    """Tests the cleanup method of Pipelines."""
+    stage = OutputlessPipeline()
+    self.assertRaises(pipeline.UnexpectedPipelineError, stage.cleanup)
+    stage.start(idempotence_key='banana')
+    stage.cleanup()
+    task_list = test_shared.get_tasks('default')
+    self.assertEquals(2, len(task_list))
+    start_task, cleanup_task = task_list
+    self.assertEquals('/_ah/pipeline/run', start_task['url'])
+
+    self.assertEquals('/_ah/pipeline/cleanup', cleanup_task['url'])
+    self.assertEquals(
+        'aglteS1hcHAtaWRyHwsSE19BRV9QaXBlbGluZV9SZWNvcmQiBmJhbmFuYQw',
+        dict(cleanup_task['headers'])['X-Ae-Pipeline-Key'])
+    self.assertEquals(
+        ['aglteS1hcHAtaWRyHwsSE19BRV9QaXBlbGluZV9SZWNvcmQiBmJhbmFuYQw'],
+        cleanup_task['params']['root_pipeline_key'])
 
 
 class OrderingTest(TestBase):
@@ -2485,6 +2505,12 @@ class HandlersPrivateTest(TestBase):
     handler.post()
     self.assertEquals((403, 'Forbidden'), handler.response._Response__status)
 
+  def testCleanupHandler(self):
+    """Tests the _CleanupHandler."""
+    handler = test_shared.create_handler(pipeline._CleanupHandler, 'POST', '/')
+    handler.post()
+    self.assertEquals((403, 'Forbidden'), handler.response._Response__status)
+
 
 class InternalOnlyPipeline(pipeline.Pipeline):
   """Pipeline with internal-only callbacks."""
@@ -2612,6 +2638,35 @@ class CallbackHandlerTest(TestBase):
         "{'blue': u'two', 'red': u'one'}",
         handler.response.out.getvalue())
     self.assertEquals('text/plain', handler.response.headers['Content-Type'])
+
+
+class _CleanupHandlerTest(test_shared.TaskRunningMixin, TestBase):
+  """Tests for the _CleanupHandler class."""
+
+  def testSuccess(self):
+    """Tests successfully deleting all child pipeline elements."""
+    self.assertEquals(0, len(list(_PipelineRecord.all())))
+    self.assertEquals(0, len(list(_SlotRecord.all())))
+    self.assertEquals(0, len(list(_BarrierRecord.all())))
+    self.assertEquals(0, len(list(_StatusRecord.all())))
+
+    stage = OutputlessPipeline()
+    stage.start(idempotence_key='banana')
+    stage.set_status('My status here!')
+    self.assertEquals(1, len(list(_PipelineRecord.all())))
+    self.assertEquals(1, len(list(_SlotRecord.all())))
+    self.assertEquals(1, len(list(_BarrierRecord.all())))
+    self.assertEquals(1, len(list(_StatusRecord.all())))
+
+    stage.cleanup()
+    task_list = test_shared.get_tasks('default')
+    self.assertEquals(2, len(task_list))
+    self.run_task(task_list[1])
+
+    self.assertEquals(0, len(list(_PipelineRecord.all())))
+    self.assertEquals(0, len(list(_SlotRecord.all())))
+    self.assertEquals(0, len(list(_BarrierRecord.all())))
+    self.assertEquals(0, len(list(_StatusRecord.all())))
 
 ################################################################################
 # Begin functional test section!

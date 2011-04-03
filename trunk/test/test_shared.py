@@ -83,12 +83,15 @@ def create_handler(handler_class, method, url, headers={}, input_body=''):
       'REQUEST_METHOD': method,
       'SCRIPT_NAME': '',
       'PATH_INFO': url,
-      'CONTENT_TYPE': headers.get('content-type', ''),
-      'CONTENT_LENGTH': headers.get('content-length', ''),
+      'CONTENT_TYPE': headers.pop('content-type', ''),
+      'CONTENT_LENGTH': headers.pop('content-length', ''),
   }
   if method == 'GET':
     environ['PATH_INFO'], environ['QUERY_STRING'] = (
         (url.split('?', 1) + [''])[:2])
+  for name, value in headers.iteritems():
+    fixed_name = name.replace('-', '_').upper()
+    environ['HTTP_' + fixed_name] = value
 
   handler = handler_class()
   request = webapp.Request(environ)

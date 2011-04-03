@@ -26,8 +26,8 @@ __all__ = [
     # For testing or internal imports.
     '_HANDLERS', '_dereference_args', '_generate_args', '_PipelineContext',
     '_CallbackHandler', '_FanoutHandler', '_PipelineHandler', '_BarrierHandler',
-    '_FanoutAbortHandler', '_get_timestamp_ms', '_get_internal_status',
-    '_get_internal_slot', '_TEST_MODE',
+    '_FanoutAbortHandler', '_CleanupHandler', '_get_timestamp_ms',
+    '_get_internal_status', '_get_internal_slot', '_TEST_MODE',
 ]
 
 import datetime
@@ -63,8 +63,6 @@ _StatusRecord = models._StatusRecord
 
 # Soon TODO:
 # - Add a human readable name for start()
-# - Add a cleanup() method for root pipelines that asynchronously deletes
-#   all slots, pipelines, and barriers.
 # - Consider using sha1 of the UUID for user-supplied pipeline keys to ensure
 #   that they keys are definitely not sequential or guessable (Python's uuid1
 #   method generates roughly sequential IDs).
@@ -814,6 +812,22 @@ The Pipeline API
                         'root pipeline ID "%s" from sender "%s"',
                         self.root_pipeline_id, sender)
 
+  def cleanup(self):
+    """Clean up this Pipeline and all Datastore records used for coordination.
+
+    After this method is called, Pipeline.from_id() and related status
+    methods will return inconsistent or missing results. This method is
+    fire-and-forget and asynchronous.
+    """
+    if self._root_pipeline_key is None:
+      raise UnexpectedPipelineError(
+          'Could not cleanup Pipeline with unknown root pipeline ID.')
+    task = taskqueue.Task(
+        params=dict(root_pipeline_key=self._root_pipeline_key),
+        url=self.base_path + '/cleanup',
+        headers={'X-Ae-Pipeline-Key': self._root_pipeline_key})
+    taskqueue.Queue(self.queue_name).add(task)
+
   # Methods implemented by developers for lifecycle management. These
   # must be idempotent under all circumstances.
   def run(self, *args, **kwargs):
@@ -1270,6 +1284,11 @@ class _PipelineContext(object):
     """
     if not isinstance(slot_key, db.Key):
       slot_key = db.Key(slot_key)
+    # TODO: This query may suffer from lag in the high-replication Datastore.
+    # Consider re-running notify_barriers a second time 10 seconds in the
+    # future to pick up the stragglers, or add child entities to the
+    # _SlotRecords that point back at dependent _BarrierRecord within a
+    # single entity group.
     query = (
         _BarrierRecord.all(cursor=cursor)
         .filter('blocking_slots =', slot_key))
@@ -2260,6 +2279,35 @@ class _FanoutHandler(webapp.RequestHandler):
         pass
 
 
+class _CleanupHandler(webapp.RequestHandler):
+  """Request handler for cleaning up a Pipeline."""
+
+  def post(self):
+    if 'HTTP_X_APPENGINE_TASKNAME' not in self.request.environ:
+      self.response.set_status(403)
+      return
+
+    root_pipeline_key = db.Key(self.request.get('root_pipeline_key'))
+    logging.debug('Cleaning up root_pipeline_key=%r', root_pipeline_key)
+
+    pipeline_keys = (
+        _PipelineRecord.all(keys_only=True)
+        .filter('root_pipeline =', root_pipeline_key))
+    db.delete(pipeline_keys)
+    slot_keys = (
+        _SlotRecord.all(keys_only=True)
+        .filter('root_pipeline =', root_pipeline_key))
+    db.delete(slot_keys)
+    barrier_keys = (
+        _BarrierRecord.all(keys_only=True)
+        .filter('root_pipeline =', root_pipeline_key))
+    db.delete(barrier_keys)
+    status_keys = (
+        _StatusRecord.all(keys_only=True)
+        .filter('root_pipeline =', root_pipeline_key))
+    db.delete(status_keys)
+
+
 class _CallbackHandler(webapp.RequestHandler):
   """Receives asynchronous callback requests from humans or tasks."""
 
@@ -2750,6 +2798,7 @@ _HANDLERS = [
     (r'.*/output', _BarrierHandler),
     (r'.*/run', _PipelineHandler),
     (r'.*/finalized', _PipelineHandler),
+    (r'.*/cleanup', _CleanupHandler),
     (r'.*/abort', _PipelineHandler),
     (r'.*/fanout', _FanoutHandler),
     (r'.*/fanout_abort', _FanoutAbortHandler),
