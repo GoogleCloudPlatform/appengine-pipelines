@@ -185,7 +185,7 @@ class EuclidGCD(pipeline.Pipeline):
 # To run using the test framework
 stage = EuclidGCD(1071, 462)
 stage.start_test()
-assert stage.outputs.gcd == 21
+assert stage.outputs.gcd.value == 21
 }}}
 
 You'll also notice that this solution uses pipelines in a recursive way. The pipeline library allows for tail-recursive-like execution with no limitation of the stack size (though in test mode you are still limited to Python's stack). The stage yielded last from a generator pipeline will inherit all outputs (default and named) that have not yet been filled by the parent.
