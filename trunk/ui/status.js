@@ -508,7 +508,9 @@ function findActivePipeline(pipelineId, isRoot) {
   if (!infoMap) {
     return null;
   }
-  if (!isRoot && infoMap.status != 'done') {
+
+  // This is an active leaf node.
+  if (infoMap.children.length == 0 && infoMap.status != 'done') {
     return pipelineId;
   }
 
