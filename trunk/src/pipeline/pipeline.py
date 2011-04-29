@@ -2541,7 +2541,8 @@ def _get_internal_status(pipeline_key=None,
   if pipeline_record.status in (_PipelineRecord.WAITING, _PipelineRecord.RUN):
     if default_slot.status == _SlotRecord.FILLED:
       status = 'finalizing'
-    elif pipeline_record.next_retry_time is not None:
+    elif (pipeline_record.status == _PipelineRecord.WAITING and
+          pipeline_record.next_retry_time is not None):
       status = 'retry'
     elif start_barrier and start_barrier.status == _BarrierRecord.WAITING:
       # start_barrier will be missing for root pipelines
