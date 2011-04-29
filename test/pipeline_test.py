@@ -18,6 +18,7 @@
 
 from __future__ import with_statement
 
+import base64
 import datetime
 import logging
 import os
@@ -1870,8 +1871,11 @@ class TaskRunningTest(test_shared.TaskRunningMixin, TestBase):
 
     # One fan-out task with both children.
     self.assertEquals(
-        set([str(child1_key), str(child2_key)]),
-        set(fanout_task['params']['pipeline_key']))
+        [str(self.pipeline_key)],
+        fanout_task['params']['parent_key'])
+    self.assertEquals(
+        ['0', '1'],
+        fanout_task['params']['child_indexes'])
     self.assertEquals('/base-path/fanout', fanout_task['url'])
 
     # Only finalization barriers present.
@@ -1911,8 +1915,16 @@ class TaskRunningTest(test_shared.TaskRunningMixin, TestBase):
     fanout_task = task_list[0]
 
     # Only two children should start.
-    run_children = set(db.Key(s) for s in fanout_task['params']['pipeline_key'])
     self.assertEquals('/base-path/fanout', fanout_task['url'])
+    self.assertEquals(
+        [str(self.pipeline_key)],
+        fanout_task['params']['parent_key'])
+    self.assertEquals(
+        ['0', '1'],
+        fanout_task['params']['child_indexes'])
+
+    run_children = set(after_record.fanned_out[int(i)]
+                       for i in fanout_task['params']['child_indexes'])
     self.assertEquals(2, len(run_children))
     child1_key, child2_key = run_children
     other_child_key = list(set(after_record.fanned_out) - run_children)[0]
@@ -2682,7 +2694,7 @@ class CleanupHandlerTest(test_shared.TaskRunningMixin, TestBase):
     self.assertEquals(1, len(list(_StatusRecord.all())))
 
     stage.cleanup()
-    task_list = test_shared.get_tasks('default')
+    task_list = self.get_tasks()
     self.assertEquals(2, len(task_list))
     self.run_task(task_list[1])
 
@@ -2690,6 +2702,43 @@ class CleanupHandlerTest(test_shared.TaskRunningMixin, TestBase):
     self.assertEquals(0, len(list(_SlotRecord.all())))
     self.assertEquals(0, len(list(_BarrierRecord.all())))
     self.assertEquals(0, len(list(_StatusRecord.all())))
+
+
+class FanoutHandlerTest(test_shared.TaskRunningMixin, TestBase):
+  """Tests for the _FanoutHandler class."""
+
+  def testOldStyle(self):
+    """Tests the old fanout parameter style for backwards compatibility."""
+    stage = DumbGeneratorYields()
+    stage.start(idempotence_key='banana')
+    task_list = self.get_tasks()
+    test_shared.delete_tasks(task_list)
+    self.run_task(task_list[0])
+
+    task_list = self.get_tasks()
+    self.assertEquals(1, len(task_list))
+    fanout_task = task_list[0]
+    self.assertEquals('/_ah/pipeline/fanout', fanout_task['url'])
+
+    after_record = db.get(stage._pipeline_key)
+
+    fanout_task['body'] = base64.b64encode(urllib.urlencode(
+        [('pipeline_key', str(after_record.fanned_out[0])),
+         ('pipeline_key', str(after_record.fanned_out[1]))]))
+    test_shared.delete_tasks(task_list)
+    self.run_task(fanout_task)
+
+    task_list = self.get_tasks()
+    test_shared.delete_tasks(task_list)
+
+    self.assertEquals(2, len(task_list))
+    for task in task_list:
+      self.assertEquals('/_ah/pipeline/run', task['url'])
+    children_keys = [
+        db.Key(t['params']['pipeline_key'][0]) for t in task_list]
+
+    self.assertEquals(set(children_keys), set(after_record.fanned_out))
+
 
 ################################################################################
 # Begin functional test section!
