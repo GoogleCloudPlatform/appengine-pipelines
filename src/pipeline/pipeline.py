@@ -1441,12 +1441,17 @@ class _PipelineContext(object):
     # have been called instead of just one. The saving grace here is that
     # finalize must be idempotent, so this *should* be harmless.
     query = (
-        _PipelineRecord.all(cursor=cursor, keys_only=True)
+        _PipelineRecord.all(cursor=cursor)
         .filter('root_pipeline =', root_pipeline_key))
     results = query.fetch(max_to_notify)
 
     task_list = []
-    for pipeline_key in results:
+    for pipeline_record in results:
+      if pipeline_record.status not in (
+          _PipelineRecord.RUN, _PipelineRecord.WAITING):
+        continue
+
+      pipeline_key = pipeline_record.key()
       task_list.append(taskqueue.Task(
           name='%s-%s-abort' % (self.task_name, pipeline_key.name()),
           url=self.abort_handler_path,
