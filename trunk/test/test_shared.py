@@ -104,10 +104,15 @@ class TaskRunningMixin(object):
   """A mix-in that runs a Pipeline using tasks."""
 
   def setUp(self):
+    """Sets up the test harness."""
     super(TaskRunningMixin, self).setUp()
     self.taskqueue_stub = apiproxy_stub_map.apiproxy.GetStub('taskqueue')
     self.queue_name = 'default'
     self.test_mode = False
+
+  def tearDown(self):
+    """Make sure all tasks are deleted."""
+    delete_tasks(self.get_tasks())
 
   def get_tasks(self):
     """Gets pending tasks, adding a 'params' dictionary to them."""
