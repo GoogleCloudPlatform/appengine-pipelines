@@ -1478,8 +1478,19 @@ class PipelineContextTest(TestBase):
         key=self.pipeline3_key,
         params=params,
         root_pipeline=self.pipeline1_key)
+    pipeline_record4 = _PipelineRecord(
+        status=_PipelineRecord.ABORTED,
+        key=self.pipeline4_key,
+        params=params,
+        root_pipeline=self.pipeline1_key)
+    pipeline_record5 = _PipelineRecord(
+        status=_PipelineRecord.DONE,
+        key=self.pipeline5_key,
+        params=params,
+        root_pipeline=self.pipeline1_key)
 
-    db.put([pipeline_record1, pipeline_record2, pipeline_record3])
+    db.put([pipeline_record1, pipeline_record2, pipeline_record3,
+            pipeline_record4, pipeline_record5])
 
     self.context.continue_abort(self.pipeline1_key, max_to_notify=2)
 
@@ -1546,7 +1557,29 @@ class PipelineContextTest(TestBase):
     # Now run another continuation task.
     self.context.task_name = second_continuation_task['name']
     self.context.continue_abort(
-        self.pipeline1_key, cursor=cursor2, max_to_notify=1)
+        self.pipeline1_key, cursor=cursor2, max_to_notify=2)
+
+    # This task will find two pipelines that are already in terminal states,
+    # and skip then.
+    task_list = test_shared.get_tasks()
+    test_shared.delete_tasks(task_list)
+    self.assertEquals(1, len(task_list))
+    third_continuation_task = task_list[0]
+
+    self.assertEquals('/base-path/fanout_abort',
+                      third_continuation_task['url'])
+    self.assertEquals(set(['cursor', 'root_pipeline_key']),
+                      set(third_continuation_task['params'].keys()))
+    self.assertEquals(
+        str(self.pipeline1_key),
+        third_continuation_task['params']['root_pipeline_key'][0])
+    self.assertTrue(third_continuation_task['name'].endswith('-2'))
+    cursor3 = third_continuation_task['params']['cursor'][0]
+
+    # Run the third continuation task, which will do nothing.
+    self.context.task_name = second_continuation_task['name']
+    self.context.continue_abort(
+        self.pipeline1_key, cursor=cursor3, max_to_notify=2)
 
     # Nothing left to do.
     task_list = test_shared.get_tasks()
