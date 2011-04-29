@@ -1700,7 +1700,7 @@ class _PipelineContext(object):
       return
     if pipeline_record.status not in (
         _PipelineRecord.WAITING, _PipelineRecord.RUN):
-      logging.error('Cascde ID "%s" in bad state for purpose "%s": "%s"',
+      logging.error('Pipeline ID "%s" in bad state for purpose "%s": "%s"',
                     pipeline_key.name(), purpose or _BarrierRecord.START,
                     pipeline_record.status)
       return
@@ -2029,14 +2029,15 @@ class _PipelineContext(object):
         finalization barrier should wait on in addition to the existing one.
         This is used to update the barrier to include all child outputs. When
         None, the barrier will not be updated.
-      fanned_out_pipelines: List of db.Key or stringified instances of
-        _PipelineRecords that were fanned out by this generator pipeline. This
-        is distinct from the 'pipelines_to_run' list because not all of
-        the pipelines listed here will be immediately ready to execute. When
-        None, then this generator yielded no children.
-      pipelines_to_run: List of db.Key or stringified key instances of
-        _PipelineRecords that should be kicked off (fan-out) transactionally as
-        part of this transition. When None, no child pipelines will run.
+      fanned_out_pipelines: List of db.Key instances of _PipelineRecords that
+        were fanned out by this generator pipeline. This is distinct from the
+        'pipelines_to_run' list because not all of the pipelines listed here
+        will be immediately ready to execute. When None, then this generator
+        yielded no children.
+      pipelines_to_run: List of db.Key instances of _PipelineRecords that should
+        be kicked off (fan-out) transactionally as part of this transition.
+        When None, no child pipelines will run. All db.Keys in this list must
+        also be present in the fanned_out_pipelines list.
 
     Raises:
       UnexpectedPipelineError if blocking_slot_keys was not empty and the
@@ -2064,13 +2065,18 @@ class _PipelineContext(object):
         # are valid is by traversing the graph from the root, where the
         # fanned_out property refers to those pipelines that were run using a
         # transactional task.
-        pipeline_record.fanned_out = list(fanned_out_pipelines)
+        child_pipeline_list = list(fanned_out_pipelines)
+        pipeline_record.fanned_out = child_pipeline_list
 
-      if pipelines_to_run:
-        task = taskqueue.Task(
-            url=self.fanout_handler_path,
-            params=dict(pipeline_key=[str(key) for key in pipelines_to_run]))
-        task.add(queue_name=self.queue_name, transactional=True)
+        if pipelines_to_run:
+          child_indexes = [
+              child_pipeline_list.index(p) for p in pipelines_to_run]
+          child_indexes.sort()
+          task = taskqueue.Task(
+              url=self.fanout_handler_path,
+              params=dict(parent_key=str(pipeline_key),
+                          child_indexes=child_indexes))
+          task.add(queue_name=self.queue_name, transactional=True)
 
       pipeline_record.put()
 
@@ -2265,8 +2271,27 @@ class _FanoutHandler(webapp.RequestHandler):
       return
 
     context = _PipelineContext.from_environ(self.request.environ)
+
+    # Set of stringified db.Keys of children to run.
+    all_pipeline_keys = set()
+
+    # For backwards compatibility with the old style of fan-out requests.
+    all_pipeline_keys.update(self.request.get_all('pipeline_key'))
+
+    # Fetch the child pipelines from the parent. This works around the 10KB
+    # task payload limit. This get() is consistent-on-read and the fan-out
+    # task is enqueued in the transaction that updates the parent, so the
+    # fanned_out property is consistent here.
+    parent_key = self.request.get('parent_key')
+    child_indexes = [int(x) for x in self.request.get_all('child_indexes')]
+    if parent_key:
+      parent_key = db.Key(parent_key)
+      parent = db.get(parent_key)
+      for index in child_indexes:
+        all_pipeline_keys.add(str(parent.fanned_out[index]))
+
     all_tasks = []
-    for pipeline_key in self.request.get_all('pipeline_key'):
+    for pipeline_key in all_pipeline_keys:
       all_tasks.append(taskqueue.Task(
           url=context.pipeline_handler_path,
           params=dict(pipeline_key=pipeline_key),
