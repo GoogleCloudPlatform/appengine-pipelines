@@ -3871,6 +3871,38 @@ class StatusTest(TestBase):
         slot_dict={self.slot1_key: self.slot1_record},
         barrier_dict={self.barrier1_record.key(): self.barrier1_record}))
 
+  def testGetInternalStatus_RunAfterRetry(self):
+    """Tests _get_internal_status when a stage is re-run on retrying."""
+    self.pipeline1_record.start_time = self.fill_time
+    self.pipeline1_record.next_retry_time = self.fill_time
+    self.pipeline1_record.retry_message = 'My retry message'
+    self.pipeline1_record.current_attempt = 1
+
+    expected = {
+      'status': 'run',
+      'currentAttempt': 2,
+      'lastRetryMessage': 'My retry message',
+      'afterSlotKeys': [],
+      'startTimeMs': 1291989316416L,
+      'outputs': {
+        'default': str(self.slot1_key)
+      },
+      'args': [],
+      'classPath': 'does.not.exist1',
+      'children': [],
+      'maxAttempts': 4,
+      'kwargs': {},
+      'backoffFactor': 2,
+      'backoffSeconds': 1,
+      'queueName': 'default'
+    }
+
+    self.assertEquals(expected, pipeline._get_internal_status(
+        pipeline_key=self.pipeline1_key,
+        pipeline_dict={self.pipeline1_key: self.pipeline1_record},
+        slot_dict={self.slot1_key: self.slot1_record},
+        barrier_dict={self.barrier1_record.key(): self.barrier1_record}))
+
   def testGetInternalStatus_Aborted(self):
     """Tests for _get_internal_status when the status is aborted."""
     self.pipeline1_record.status = _PipelineRecord.ABORTED
