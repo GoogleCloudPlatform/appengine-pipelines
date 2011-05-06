@@ -30,7 +30,7 @@ from google.appengine.api import apiproxy_stub_map
 from google.appengine.ext import webapp
 
 import pipeline
-import pipeline.models
+from pipeline import models
 
 # For convenience.
 _PipelineRecord = pipeline.models._PipelineRecord
@@ -146,7 +146,7 @@ class TaskRunningMixin(object):
       match_url = environ['PATH_INFO']
 
     logging.debug('Executing "%s %s" name="%s"', method, url, name)
-    for pattern, handler_class in pipeline._HANDLERS:
+    for pattern, handler_class in pipeline.create_handlers_map():
       the_match = re.match('^%s$' % pattern, match_url)
       if the_match:
         break

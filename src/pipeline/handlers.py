@@ -27,7 +27,7 @@ from google.appengine.ext.webapp import util as webapp_util
 import pipeline
 
 
-_APP = webapp.WSGIApplication(pipeline._HANDLERS, debug=True)
+_APP = webapp.WSGIApplication(pipeline.create_handlers_map(), debug=True)
 
 
 def _main():

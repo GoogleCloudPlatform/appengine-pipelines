@@ -1,3 +1,4 @@
+#!/usr/bin/python2.5
 r"""Command-line tool to validate and pretty-print JSON
 
 Usage::

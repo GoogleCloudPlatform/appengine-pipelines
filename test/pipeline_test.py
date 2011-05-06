@@ -29,10 +29,12 @@ import urllib
 
 # Fix up paths for running tests.
 sys.path.insert(0, '../src/')
+
+
 from pipeline import testutil
 import pipeline
-import pipeline.common
-import pipeline.models
+from pipeline import common
+from pipeline import models
 import test_shared
 
 from google.appengine.api import mail
@@ -722,7 +724,7 @@ class PipelineTest(TestBase):
     other = OutputlessPipeline.from_id(stage.pipeline_id)
 
     result = []
-    def fake_mail(sender, subject, body, html=None):
+    def fake_mail(self, sender, subject, body, html=None):
       result.append((sender, subject, body, html))
 
     old_sendmail = pipeline.Pipeline._send_mail
@@ -760,7 +762,7 @@ class PipelineTest(TestBase):
     other = OutputlessPipeline.from_id(stage.pipeline_id)
 
     result = []
-    def fake_mail(sender, subject, body, html=None):
+    def fake_mail(self, sender, subject, body, html=None):
       result.append((sender, subject, body, html))
 
     old_sendmail = pipeline.Pipeline._send_mail
