@@ -22,9 +22,10 @@ __all__ = [
     'PipelineRuntimeError', 'SlotNotFilledError', 'SlotNotDeclaredError',
     'UnexpectedPipelineError', 'PipelineStatusError', 'Slot', 'Pipeline',
     'PipelineFuture', 'After', 'InOrder', 'Retry', 'Abort', 'get_status_tree',
+    'create_handlers_map',
 
     # For testing or internal imports.
-    '_HANDLERS', '_dereference_args', '_generate_args', '_PipelineContext',
+    '_dereference_args', '_generate_args', '_PipelineContext',
     '_CallbackHandler', '_FanoutHandler', '_PipelineHandler', '_BarrierHandler',
     '_FanoutAbortHandler', '_CleanupHandler', '_get_timestamp_ms',
     '_get_internal_status', '_get_internal_slot', '_TEST_MODE',
@@ -44,7 +45,7 @@ import uuid
 
 from google.appengine.api import mail
 from google.appengine.api import users
-from google.appengine.api.labs import taskqueue
+from google.appengine.api import taskqueue
 from google.appengine.ext import db
 from google.appengine.ext import webapp
 
@@ -805,8 +806,7 @@ The Pipeline API
     sender = '%s@%s.appspotmail.com' % (os.environ['APPLICATION_ID'],
                                         os.environ['APPLICATION_ID'])
     try:
-      self._send_mail.im_func(
-          sender, subject, body, html=html)
+      self._send_mail(sender, subject, body, html=html)
     except (mail.InvalidSenderError, mail.InvalidEmailError):
       logging.exception('Could not send result email for '
                         'root pipeline ID "%s" from sender "%s"',
@@ -2828,15 +2828,25 @@ class _TreeStatusHandler(_BaseRpcHandler):
 
 ################################################################################
 
-_HANDLERS = [
-    (r'.*/output', _BarrierHandler),
-    (r'.*/run', _PipelineHandler),
-    (r'.*/finalized', _PipelineHandler),
-    (r'.*/cleanup', _CleanupHandler),
-    (r'.*/abort', _PipelineHandler),
-    (r'.*/fanout', _FanoutHandler),
-    (r'.*/fanout_abort', _FanoutAbortHandler),
-    (r'.*/callback', _CallbackHandler),
-    (r'.*/rpc/tree', _TreeStatusHandler),
-    (r'.*(/.+)', _StatusUiHandler),
-]
+
+def create_handlers_map(prefix='.*'):
+  """Create new handlers map.
+
+  Args:
+    prefix: url prefix to use.
+
+  Returns:
+    list of (regexp, handler) pairs for WSGIApplication constructor.
+  """
+  return [
+      (prefix + '/output', _BarrierHandler),
+      (prefix + '/run', _PipelineHandler),
+      (prefix + '/finalized', _PipelineHandler),
+      (prefix + '/cleanup', _CleanupHandler),
+      (prefix + '/abort', _PipelineHandler),
+      (prefix + '/fanout', _FanoutHandler),
+      (prefix + '/fanout_abort', _FanoutAbortHandler),
+      (prefix + '/callback', _CallbackHandler),
+      (prefix + '/rpc/tree', _TreeStatusHandler),
+      (prefix + '(/.+)', _StatusUiHandler),
+      ]

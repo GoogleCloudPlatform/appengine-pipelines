@@ -22,9 +22,11 @@ import unittest
 
 # Fix up paths for running tests.
 sys.path.insert(0, '../src/')
+
+
 from pipeline import testutil
 from pipeline import common
-import pipeline
+from pipeline import pipeline
 import test_shared
 
 

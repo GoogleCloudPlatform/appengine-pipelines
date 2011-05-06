@@ -22,7 +22,6 @@ import simplejson
 from google.appengine.ext import db
 
 
-# Based on code from http://code.google.com/p/appengine-mapreduce
 class JsonProperty(db.UnindexedProperty):
   """Property type for storing JSON-serialized data."""
 
