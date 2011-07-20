@@ -9,7 +9,7 @@
 
 The purpose of the Pipeline API is to connect together complex, time-consuming workflows (including human tasks). The goals are flexibility, workflow reuse, and testability. Importantly, no tasks or CPU are consumed while workflows block on external events, meaning many, many workflows can be in flight at the same time with minimal resource usage.
 
-The Pipeline API is *not* a data or stream processing engine. The overall throughput of a single pipeline is limited. There is no fast-path for executing very short stages (though one may be added in the future). There is also no data translation layer, which means pipelines much operate on existing data sources (Blobstore, Datastore).
+The Pipeline API is *not* a data or stream processing engine. The overall throughput of a single pipeline is limited. There is no fast-path for executing very short stages (though one may be added in the future). There is also no data translation layer, which means pipelines much operate on existing data sources (Blobstore, Datastore, memcache).
 
 ==What is a Pipeline?==
 
@@ -291,3 +291,39 @@ from __future__ import with_statement
 }}}
 
 _TODO: Talk about explicit abort and retry_
+
+
+==Achieving parallelism==
+
+_Contributed by Craig Quiter_
+
+One of the most powerful aspects of the Pipeline API is the ability to achieve parallelism in a simple, succinct, and elegant syntax.
+
+Let's look at the example of a search engine described by Brett Slatkin [http://www.youtube.com/watch?v=Rsfy_TYA2ZY&t=35m13s here (35:13)]:
+
+{{{
+class WordCountUrl(pipeline.Pipeline):
+  def run(self, url):
+    r = urlfetch.fetch(url)
+    return len(r.data.split())
+
+class Sum(pipeline.Pipeline):
+  def run(self, *values):
+    return sum(values)
+
+class MySearchEnginePipeline(pipeline.Pipeline):
+  def run(self, *urls):
+    results = []
+    for u in urls:
+      results.append( (yield WordCountUrl(u)) )
+    yield Sum(*results) # Barrier waits
+}}}
+
+This simple code has the effect of starting [http://code.google.com/appengine/docs/python/taskqueue/overview.html taskqueue tasks] for each url in _urls_. These tasks will tend to execute in parallel and App Engine will start allocating additional [http://code.google.com/appengine/docs/adminconsole/instances.html instances] of the app in order to accomodate the size of the job. You can define the rate and manner that these tasks execute [http://code.google.com/appengine/docs/python/config/queue.html in your queue configuration]. If you want to use a queue other than default, then call the pipeline _start_ method with the queue_name argument like so:
+
+{{{
+stage = MySearchEnginePipeline(15)
+stage.start(queue_name='pipelinequeue')
+}}}
+
+Once all the tasks processing word counts complete, each argument to _Sum_ will be ready. In other words, the barriers to _Sum_'s execution will be gone. _Sum_ will then execute and the result will be yielded by _MySearchEnginePipeline_.
