@@ -14,7 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * @author rudominer@google.com (Your Name Here)
+ * @author rudominer@google.com (Mitch Rudominer)
  *
  */
 public class BarrierTest extends TestCase {

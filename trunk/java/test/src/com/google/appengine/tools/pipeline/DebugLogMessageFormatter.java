@@ -8,7 +8,7 @@ import java.util.logging.Formatter;
 import java.util.logging.LogRecord;
 
 /**
- * @author rudominer@google.com (Your Name Here)
+ * @author rudominer@google.com (Mitch Rudominer)
  *
  */
 public class DebugLogMessageFormatter extends Formatter{
