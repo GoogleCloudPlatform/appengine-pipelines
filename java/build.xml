@@ -1,6 +1,6 @@
 <project name="Pipeline" default="dist-framework" basedir=".">
   <description>
-    A user space mapper library for AppEngine.
+  	Pipeline is a framework for building dynamic, complex workflows on Google App Engine.
   </description>
   <property name="framework" location="framework" />
   <property name="framework-src" location="${framework}/src" />
@@ -13,10 +13,10 @@
   <property name="lib" location="lib" />
   <property name="testlib" location="test_lib" />
   <property name="dist" location="dist" />
-  <property name="ui" location="../src/python/ui" />
+  <property name="ui" location="../src/pipeline/ui" />
 
   <property name="sdk" location="sdk" />
-  <property name="version" value="1.4.2" />
+  <property name="version" value="1.5.1" />
   <property name="sdkdirname" value="appengine-java-sdk-${version}" />
   <property name="sdkfilename" value="${sdkdirname}.zip" />
   <property name="sdklibdir" location="${sdk}/${sdkdirname}/lib" />
@@ -53,16 +53,13 @@
     <mkdir dir="${dist}/lib" />
     <copy todir="${build}/com/google/appengine/tools/pipeline/impl/servlets">
       <fileset dir="${ui}">
-        <exclude name="**/.svn/**"/>
+        <exclude name="**/.svn/**" />
       </fileset>
-    </copy>
-    <copy todir="${build}">
-      <fileset dir="${framework-src}" />
     </copy>
     <jar jarfile="${dist}/lib/appengine-pipeline.jar" basedir="${build}" />
   </target>
 
-   <target name="copy_framework_jar_to_demo" depends="dist-framework">
+  <target name="copy_framework_jar_to_demo" depends="dist-framework">
     <mkdir dir="demo/war/WEB-INF/lib" />
     <copy todir="demo/war/WEB-INF/lib">
       <fileset dir="${dist}/lib" />
@@ -95,6 +92,35 @@
     </javac>
   </target>
 
+  <target name="small-tests" depends="compile-tests">
+    <junit printsummary="yes" showoutput="yes">
+      <classpath>
+        <path refid="sdkjars" />
+        <path refid="testjars" />
+        <pathelement location="${dist}/lib/appengine-pipeline.jar" />
+        <pathelement location="${demo}/war/WEB-INF/classes" />
+        <pathelement location="${testbuild}" />
+      </classpath>
+      <test name="com.google.appengine.tools.pipeline.BarrierTest" />
+      <test name="com.google.appengine.tools.pipeline.FanoutTaskTest" />
+      <test name="com.google.appengine.tools.pipeline.UserGuideTest" />
+    </junit>
+  </target>
+
+  <target name="all-tests" depends="small-tests">
+    <junit printsummary="yes" showoutput="yes">
+      <classpath>
+        <path refid="sdkjars" />
+        <path refid="testjars" />
+        <pathelement location="${dist}/lib/appengine-pipeline.jar" />
+        <pathelement location="${demo}/war/WEB-INF/classes" />
+        <pathelement location="${testbuild}" />
+      </classpath>
+      <test name="com.google.appengine.tools.pipeline.PipelineTest" />
+      <test name="com.google.appengine.tools.pipeline.RetryTest" />
+    </junit>
+  </target>
+
   <target name="clean">
     <delete dir="${build}" />
     <delete dir="${dist}" />
@@ -102,7 +128,7 @@
     <delete dir="${demo}/war/WEB-INF/classes" />
     <delete dir="${demo}/war/WEB-INF/lib" />
   </target>
-   
+
   <target name="check_sdk_extracted">
     <available file="${sdk}/${sdkdirname}" property="sdkextracted" />
   </target>

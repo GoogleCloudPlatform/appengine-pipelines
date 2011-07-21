@@ -39,7 +39,7 @@ public class PipelineTest extends TestCase implements Serializable {
     LocalTaskQueueTestConfig taskQueueConfig = new LocalTaskQueueTestConfig();
     taskQueueConfig.setCallbackClass(TestingTaskQueueCallback.class);
     taskQueueConfig.setDisableAutoTaskExecution(false);
-    taskQueueConfig.setShouldPushApiProxyEnvironment(true);
+    taskQueueConfig.setShouldCopyApiProxyEnvironment(true);
     helper = new LocalServiceTestHelper(new LocalDatastoreServiceTestConfig(), taskQueueConfig);
 
   }

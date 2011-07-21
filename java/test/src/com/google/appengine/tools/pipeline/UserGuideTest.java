@@ -12,7 +12,7 @@ import junit.framework.TestCase;
 /**
  * Tests for the sample code in the User Guide
  *
- * @author rudominer@google.com (Mitch Rudominer
+ * @author rudominer@google.com (Mitch Rudominer)
  */
 public class UserGuideTest extends TestCase {
 
@@ -22,7 +22,7 @@ public class UserGuideTest extends TestCase {
     LocalTaskQueueTestConfig taskQueueConfig = new LocalTaskQueueTestConfig();
     taskQueueConfig.setCallbackClass(TestingTaskQueueCallback.class);
     taskQueueConfig.setDisableAutoTaskExecution(false);
-    taskQueueConfig.setShouldPushApiProxyEnvironment(true);
+    taskQueueConfig.setShouldCopyApiProxyEnvironment(true);
     helper = new LocalServiceTestHelper(new LocalDatastoreServiceTestConfig(), taskQueueConfig);
 
   }

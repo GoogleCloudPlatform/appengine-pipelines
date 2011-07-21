@@ -11,6 +11,7 @@ import com.google.appengine.tools.pipeline.impl.tasks.Task;
 import com.google.appengine.tools.pipeline.impl.util.StringUtils;
 
 import java.net.URLDecoder;
+import java.util.Map;
 import java.util.Properties;
 import java.util.logging.Logger;
 
@@ -70,4 +71,8 @@ public class TestingTaskQueueCallback implements LocalTaskQueueCallback {
     }
     return 200;
   }
+
+	@Override
+	public void initialize(Map<String, String> arg0) {
+	}
 }
