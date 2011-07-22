@@ -8,6 +8,7 @@ import com.google.appengine.tools.pipeline.impl.backend.UpdateSpec;
 import com.google.appengine.tools.pipeline.impl.model.Barrier;
 import com.google.appengine.tools.pipeline.impl.model.JobRecord;
 import com.google.appengine.tools.pipeline.impl.model.Slot;
+import com.google.appengine.tools.pipeline.impl.model.SlotDescriptor;
 
 import java.io.Serializable;
 import java.util.List;
@@ -83,39 +84,40 @@ public abstract class Job<E> implements Serializable {
   // This method will be invoked by reflection from PipelineManager
   @SuppressWarnings("unused")
   private final void registerReturnValue(Value<E> value) {
-    if (null == value || value instanceof ImmediateValue<?>) {
-      Object concreteValue = null;
-      if (null != value) {
-        ImmediateValue<E> iv = (ImmediateValue<E>) value;
-        concreteValue = iv.getValue();
-      }
-      Slot slot = new Slot(getPipelineKey());
-      PipelineManager.registerSlotFilled(updateSpec, slot, concreteValue);
-      registerFinalizeSlot(slot);
-    } else if (value instanceof FutureValueImpl<?>) {
-      FutureValueImpl<E> impl = (FutureValueImpl<E>) value;
-      registerFinalizeSlot(impl.getSlot());
-    } else {
-      throw new RuntimeException("Unrecognized type of Value: " + value.getClass());
-    }
-  }
-
-  private void registerFinalizeSlot(Slot slot) {
-    Barrier barrier = thisJobRecord.getFinalizeBarrierInflated();
-    if (null == barrier) {
+    Barrier finalizeBarrier = thisJobRecord.getFinalizeBarrierInflated();
+    if (null == finalizeBarrier) {
       throw new RuntimeException(
           "Internal logic error: finalize barrier not inflated in " + thisJobRecord);
     }
-    barrier.addRegularArgumentSlot(slot);
-    Key fillerJobKey = slot.getSourceJobKey();
+    PipelineManager.registerSlotsWithBarrier(updateSpec, value, getPipelineKey(), finalizeBarrier);
+    updateSpec.includeBarrier(finalizeBarrier);
+    // Propagate the filler of the finalize slot to also be the filler of the 
+    // output slot. This is tricky in the case that there is more than one finalize
+    // slot (i.e. the return value is a FutureList.) If there are two different
+    // finalize slots and they have different fillerJobKeys, then we resort to
+    // assigning this job as the filler job.
+    Key fillerJobKey = null;
+    for(SlotDescriptor slotDescriptor : finalizeBarrier.getWaitingOnInflated()) {
+      Key key = slotDescriptor.slot.getSourceJobKey();
+      if (null != key) {
+        if (null == fillerJobKey) {
+          fillerJobKey = key;
+        }
+        else {
+          if (!fillerJobKey.toString().equals(key.toString())) {
+            fillerJobKey = this.getJobKey();
+            break;
+          }
+        }
+      }
+    }
     if (null != fillerJobKey) {
       Slot outputSlot = thisJobRecord.getOutputSlotInflated();
       outputSlot.setSourceJobKey(fillerJobKey);
       updateSpec.includeSlot(outputSlot);
     }
-    updateSpec.includeBarrier(barrier);
-    updateSpec.includeSlot(slot);
   }
+  
 
   /**
    * This is the non-type-safe version of the {@code futureCall()} family of
