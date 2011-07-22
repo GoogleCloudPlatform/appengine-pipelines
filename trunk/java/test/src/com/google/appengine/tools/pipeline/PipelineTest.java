@@ -2,27 +2,15 @@
 
 package com.google.appengine.tools.pipeline;
 
-import com.google.appengine.tools.development.testing.LocalDatastoreServiceTestConfig;
-import com.google.appengine.tools.development.testing.LocalServiceTestHelper;
-import com.google.appengine.tools.development.testing.LocalTaskQueueTestConfig;
-import com.google.appengine.tools.pipeline.demo.AsyncGCDExample;
-import com.google.appengine.tools.pipeline.demo.AsyncGCDExample.PrintGCDJob;
-import com.google.appengine.tools.pipeline.demo.GCDExample.GCDJob;
-import com.google.appengine.tools.pipeline.demo.LetterCountExample;
-import com.google.appengine.tools.pipeline.demo.LetterCountExample.LetterCounter;
-import com.google.apphosting.api.ApiProxy;
+import java.io.Serializable;
+import java.util.logging.Logger;
 
 import junit.framework.TestCase;
 
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map.Entry;
-import java.util.SortedMap;
-import java.util.TreeMap;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.logging.Logger;
+import com.google.appengine.tools.development.testing.LocalDatastoreServiceTestConfig;
+import com.google.appengine.tools.development.testing.LocalServiceTestHelper;
+import com.google.appengine.tools.development.testing.LocalTaskQueueTestConfig;
+import com.google.apphosting.api.ApiProxy;
 
 /**
  * @author rudominer@google.com (Mitch Rudominer)

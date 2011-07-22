@@ -4,8 +4,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
-import com.google.appengine.tools.pipeline.demo.AsyncGCDExample;
-import com.google.appengine.tools.pipeline.demo.AsyncGCDExample.PrintGCDJob;
+import com.google.appengine.tools.pipeline.AsyncGCDExample.PrintGCDJob;
 import com.google.appengine.tools.pipeline.demo.GCDExample.GCDJob;
 import com.google.apphosting.api.ApiProxy;
 
