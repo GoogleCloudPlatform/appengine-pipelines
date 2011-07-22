@@ -16,6 +16,8 @@ import com.google.appengine.tools.pipeline.JobSetting.MaxAttempts;
 import com.google.appengine.tools.pipeline.JobSetting.WaitForSetting;
 import com.google.appengine.tools.pipeline.Value;
 import com.google.appengine.tools.pipeline.impl.FutureValueImpl;
+import com.google.appengine.tools.pipeline.impl.PipelineManager;
+import com.google.appengine.tools.pipeline.impl.backend.UpdateSpec;
 
 import java.util.ArrayList;
 import java.util.Date;
@@ -122,7 +124,7 @@ public class JobRecord extends CascadeModelObject implements JobInfo {
   }
 
   @SuppressWarnings("unchecked")
-  public JobRecord(JobSetting[] jobSettings, Key rootJobKey, Job<?> jobInstance, Object... params) {
+  public JobRecord(JobSetting[] jobSettings, Key rootJobKey, Job<?> jobInstance, UpdateSpec updateSpec, Object... params) {
     super(rootJobKey);
     rootJobKey = this.rootJobKey;
     this.jobInstanceRecordInflated = new JobInstanceRecord(this, jobInstance);
@@ -131,43 +133,14 @@ public class JobRecord extends CascadeModelObject implements JobInfo {
     runBarrierInflated = new Barrier(Barrier.Type.RUN, this);
     runBarrierKey = runBarrierInflated.key;
     for (Object param : params) {
-      if (null == param || !(param instanceof Value<?>)) {
-        param = new ImmediateValue(param);
+      Value<?> value;
+      if (null != param && param instanceof Value<?>) {
+        value = (Value<?>) param;
       }
-      if (param instanceof ImmediateValue<?>) {
-        ImmediateValue<?> iv = (ImmediateValue<?>) param;
-
-        Slot slot = new Slot(rootJobKey);
-        slot.fill(iv.getValue());
-        runBarrierInflated.addRegularArgumentSlot(slot);
-      } else if (param instanceof FutureList<?>) {
-        FutureList<?> futureList = (FutureList<?>) param;
-        List<Slot> slotList = new ArrayList<Slot>(futureList.getListOfValues().size());
-        for (Value<?> val : futureList.getListOfValues()) {
-          Slot slot = null;
-          if (val instanceof FutureValueImpl){
-            FutureValueImpl<?> futureParam = (FutureValueImpl<?>) val;
-            slot = futureParam.getSlot();
-          }
-          else if (val instanceof ImmediateValue){
-            ImmediateValue<?> iv = (ImmediateValue<?>) val;
-            slot = new Slot(rootJobKey);
-            slot.fill(iv.getValue());
-          }
-          else{
-            throw new RuntimeException("Unrecognized implementation of Value interface: " + val.getClass());
-          }
-          slotList.add(slot);
-        }
-        runBarrierInflated.addListArgumentSlots(slotList);
-      } else if (param instanceof FutureValue<?>) {
-        FutureValueImpl<?> futureParam = (FutureValueImpl<?>) param;
-        Slot slot = futureParam.getSlot();
-        runBarrierInflated.addRegularArgumentSlot(slot);
-      } else {
-        throw new RuntimeException(
-            "Internal logic error. param class=" + param.getClass().getName());
+      else {
+        value = new ImmediateValue(param);
       }
+      PipelineManager.registerSlotsWithBarrier(updateSpec, value, rootJobKey, runBarrierInflated);
     }
     for (JobSetting setting : jobSettings) {
       if (setting instanceof WaitForSetting) {
@@ -199,6 +172,7 @@ public class JobRecord extends CascadeModelObject implements JobInfo {
       Slot slot = new Slot(rootJobKey);
       slot.fill(null);
       runBarrierInflated.addPhantomArgumentSlot(slot);
+      PipelineManager.registerSlotFilledTask(updateSpec, slot);
     }
     finalizeBarrierInflated = new Barrier(Barrier.Type.FINALIZE, this);
     finalizeBarrierKey = finalizeBarrierInflated.key;

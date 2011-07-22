@@ -93,7 +93,7 @@
   </target>
 
   <target name="small-tests" depends="compile-tests">
-    <junit printsummary="yes" showoutput="yes">
+    <junit printsummary="yes" showoutput="no">
       <classpath>
         <path refid="sdkjars" />
         <path refid="testjars" />
@@ -103,12 +103,14 @@
       </classpath>
       <test name="com.google.appengine.tools.pipeline.BarrierTest" />
       <test name="com.google.appengine.tools.pipeline.FanoutTaskTest" />
+      <test name="com.google.appengine.tools.pipeline.FutureListTest" />
       <test name="com.google.appengine.tools.pipeline.UserGuideTest" />
+      <test name="com.google.appengine.tools.pipeline.MiscPipelineTest" />
     </junit>
   </target>
 
   <target name="all-tests" depends="small-tests">
-    <junit printsummary="yes" showoutput="yes">
+    <junit printsummary="yes" showoutput="no">
       <classpath>
         <path refid="sdkjars" />
         <path refid="testjars" />
@@ -116,7 +118,8 @@
         <pathelement location="${demo}/war/WEB-INF/classes" />
         <pathelement location="${testbuild}" />
       </classpath>
-      <test name="com.google.appengine.tools.pipeline.PipelineTest" />
+      <test name="com.google.appengine.tools.pipeline.LetterCounterTest" />
+      <test name="com.google.appengine.tools.pipeline.GCDTest" />
       <test name="com.google.appengine.tools.pipeline.RetryTest" />
     </junit>
   </target>
