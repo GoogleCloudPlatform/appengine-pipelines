@@ -1,4 +1,4 @@
-package com.google.appengine.tools.pipeline.demo;
+package com.google.appengine.tools.pipeline;
 
 
 import com.google.appengine.tools.pipeline.PipelineService;
