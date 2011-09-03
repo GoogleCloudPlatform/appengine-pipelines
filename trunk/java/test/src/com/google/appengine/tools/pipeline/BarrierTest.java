@@ -1,4 +1,16 @@
-// Copyright 2011 Google Inc. All Rights Reserved.
+// Copyright 2011 Google Inc.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not
+// use this file except in compliance with the License. You may obtain a copy of
+// the License at
+// 
+// http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+// License for the specific language governing permissions and limitations under
+// the License.
 
 package com.google.appengine.tools.pipeline;
 
@@ -15,7 +27,7 @@ import java.util.List;
 
 /**
  * @author rudominer@google.com (Mitch Rudominer)
- *
+ * 
  */
 public class BarrierTest extends TestCase {
 
@@ -26,7 +38,8 @@ public class BarrierTest extends TestCase {
   public void setUp() throws Exception {
     super.setUp();
     helper.setUp();
-    System.setProperty("com.google.appengine.api.pipeline.use-simple-guids-for-debugging", "true");
+    System
+        .setProperty("com.google.appengine.api.pipeline.use-simple-guids-for-debugging", "true");
   }
 
   @Override
@@ -42,28 +55,16 @@ public class BarrierTest extends TestCase {
     doArgumentBuildingTest(new Object[] {"hello", 5, null}, "hello", 5, null);
     doArgumentBuildingTest(new Object[] {6, 8}, new PhantomMarker(5), 6, new PhantomMarker(7), 8);
     doArgumentBuildingTest(new Object[] {Lists.newArrayList(1, 2, 3)}, new ListMarker(1, 2, 3));
-    doArgumentBuildingTest(new Object[] {Lists.newArrayList(1, 2, 3)}, Lists.newArrayList(1, 2, 3));
-    doArgumentBuildingTest(
-        new Object[] {Lists.newArrayList(1, 2, 3), Lists.newArrayList("red", "blue")},
-        Lists.newArrayList(1, 2, 3), Lists.newArrayList("red", "blue"));
-    doArgumentBuildingTest(new Object[] {"hello",
-        5,
-        Lists.newArrayList(1, 2, 3),
-        "apple",
-        Lists.newArrayList(2, 3, 4),
-        Lists.newArrayList(4, 5, 6),
-        Lists.newArrayList(7),
-        Lists.newArrayList("red", "blue")},
-        "hello",
-        5,
-        new PhantomMarker("goodbye"),
-        new ListMarker(1, 2, 3),
-        "apple",
-        new ListMarker(2, 3, 4),
-        new ListMarker(4, 5, 6),
-        new PhantomMarker("banana"),
-        new ListMarker(7),
-        Lists.newArrayList("red", "blue"));
+    doArgumentBuildingTest(new Object[] {Lists.newArrayList(1, 2, 3)}, Lists
+        .newArrayList(1, 2, 3));
+    doArgumentBuildingTest(new Object[] {Lists.newArrayList(1, 2, 3),
+        Lists.newArrayList("red", "blue")}, Lists.newArrayList(1, 2, 3), Lists.newArrayList(
+        "red", "blue"));
+    doArgumentBuildingTest(new Object[] {"hello", 5, Lists.newArrayList(1, 2, 3), "apple",
+        Lists.newArrayList(2, 3, 4), Lists.newArrayList(4, 5, 6), Lists.newArrayList(7),
+        Lists.newArrayList("red", "blue")}, "hello", 5, new PhantomMarker("goodbye"),
+        new ListMarker(1, 2, 3), "apple", new ListMarker(2, 3, 4), new ListMarker(4, 5, 6),
+        new PhantomMarker("banana"), new ListMarker(7), Lists.newArrayList("red", "blue"));
   }
 
   private static class ListMarker {

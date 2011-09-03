@@ -1,28 +1,28 @@
 <body>
-This is the App Engine Java Pipeline framework. 
-See the <a href=
-"http://code.google.com/p/appengine-pipeline/wiki/GettingStartedJava">
- user's guide</a> for a fuller description.
- <p>
- The user should create one or more <b>Jobs</b>, which are subclasses of of one of the
- {@code Jobn} classes, i.e.
- {@link com.google.appengine.tools.pipeline.Job0 Job0}, 
- {@link com.google.appengine.tools.pipeline.Job1 Job1}, 
- {@link com.google.appengine.tools.pipeline.Job2 Job2}, etc.
- <p>
- In the Job class the user must define a <code>run</code> method.
- From within the <code>run</code> method the user may invoke
- any of the family of 
- {@link com.google.appengine.tools.pipeline.Job#futureCall(com.google.appengine.tools.pipeline.Job2, com.google.appengine.tools.pipeline.Value, com.google.appengine.tools.pipeline.Value,com.google.appengine.tools.pipeline.JobSetting...) futureCall} methods
- passing the 
- {@link com.google.appengine.tools.pipeline.FutureValue FutureValues} returned from one call into
- other calls in order to describe a child job-graph.
- <p>
-To start a new pipeline first obtain a
-{@link com.google.appengine.tools.pipeline.PipelineService PipelineService}
-using
-{@link com.google.appengine.tools.pipeline.PipelineServiceFactory#newPipelineService()}
-and then use one of the
-{@link com.google.appengine.tools.pipeline.PipelineService#startNewPipeline(com.google.appengine.tools.pipeline.Job0, com.google.appengine.tools.pipeline.JobSetting...) PipelineService.startNewPipeline()} family of methods.
-
+This is the App Engine Java Pipeline framework. See the
+<a href="http://code.google.com/p/appengine-pipeline/wiki/GettingStartedJava">
+user's guide</a>
+for a fuller description.
+<p>The user should create one or more <b>Jobs</b>, which are subclasses of
+of one of the {@code Jobn} classes, i.e. {@link
+com.google.appengine.tools.pipeline.Job0 Job0}, {@link
+com.google.appengine.tools.pipeline.Job1 Job1}, {@link
+com.google.appengine.tools.pipeline.Job2 Job2}, etc.
+<p>In the Job class the user must define a <code>run</code> method. From
+within the <code>run</code> method the user may invoke any of the family of
+{@link
+com.google.appengine.tools.pipeline.Job#futureCall(com.google.appengine.tools.pipeline.Job2,
+com.google.appengine.tools.pipeline.Value,
+com.google.appengine.tools.pipeline.Value,com.google.appengine.tools.pipeline.JobSetting...)
+futureCall} methods passing the {@link
+com.google.appengine.tools.pipeline.FutureValue FutureValues} returned from one
+call into other calls in order to describe a child job-graph.
+<p>To start a new pipeline first obtain a {@link
+com.google.appengine.tools.pipeline.PipelineService PipelineService} using
+{@link
+com.google.appengine.tools.pipeline.PipelineServiceFactory#newPipelineService()}
+and then use one of the {@link
+com.google.appengine.tools.pipeline.PipelineService#startNewPipeline(com.google.appengine.tools.pipeline.Job0,
+com.google.appengine.tools.pipeline.JobSetting...)
+PipelineService.startNewPipeline()} family of methods.
 </body>

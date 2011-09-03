@@ -1,171 +1,170 @@
-<project name="Pipeline" default="dist-framework" basedir=".">
+﻿<project name="Pipeline" default="dist-framework" basedir=".">
   <description>
-  	Pipeline is a framework for building dynamic, complex workflows on Google App Engine.
+    Pipeline is a framework for building dynamic, complex workflows on Google App Engine.
   </description>
-  <property name="framework" location="framework" />
-  <property name="framework-src" location="${framework}/src" />
-  <property name="demo" location="demo" />
-  <property name="demo-src" location="${demo}/src" />
-  <property name="test" location="test" />
-  <property name="test-src" location="${test}/src" />
-  <property name="build" location="build" />
-  <property name="testbuild" location="test_build" />
-  <property name="lib" location="lib" />
-  <property name="testlib" location="test_lib" />
-  <property name="dist" location="dist" />
-  <property name="ui" location="../src/pipeline/ui" />
+  <property name="framework" location="framework"/>
+  <property name="framework-src" location="${framework}/src"/>
+  <property name="demo" location="demo"/>
+  <property name="demo-src" location="${demo}/src"/>
+  <property name="test" location="test"/>
+  <property name="test-src" location="${test}/src"/>
+  <property name="build" location="build"/>
+  <property name="testbuild" location="test_build"/>
+  <property name="lib" location="lib"/>
+  <property name="testlib" location="test_lib"/>
+  <property name="dist" location="dist"/>
+  <property name="ui" location="../src/pipeline/ui"/>
 
-  <property name="sdk" location="sdk" />
-  <property name="version" value="1.5.2" />
-  <property name="sdkdirname" value="appengine-java-sdk-${version}" />
-  <property name="sdkfilename" value="${sdkdirname}.zip" />
-  <property name="sdklibdir" location="${sdk}/${sdkdirname}/lib" />
+  <property name="sdk" location="sdk"/>
+  <property name="version" value="1.5.2"/>
+  <property name="sdkdirname" value="appengine-java-sdk-${version}"/>
+  <property name="sdkfilename" value="${sdkdirname}.zip"/>
+  <property name="sdklibdir" location="${sdk}/${sdkdirname}/lib"/>
 
   <path id="sdkjars">
     <fileset dir="${sdklibdir}/user">
-      <include name="appengine-api-1.0-sdk-${version}.jar" />
-      <include name="appengine-api-labs-${version}.jar" />
+      <include name="appengine-api-1.0-sdk-${version}.jar"/>
+      <include name="appengine-api-labs-${version}.jar"/>
     </fileset>
     <fileset dir="${sdklibdir}/shared">
-      <include name="servlet-api.jar" />
+      <include name="servlet-api.jar"/>
     </fileset>
   </path>
 
   <path id="testjars">
-    <pathelement path="${testlib}/junit-4.8.2.jar" />
-    <pathelement path="${sdklibdir}/testing/appengine-testing.jar" />
-    <pathelement path="${sdklibdir}/impl/appengine-api-stubs.jar" />
+    <pathelement path="${testlib}/junit-4.8.2.jar"/>
+    <pathelement path="${sdklibdir}/testing/appengine-testing.jar"/>
+    <pathelement path="${sdklibdir}/impl/appengine-api-stubs.jar"/>
   </path>
 
   <target name="init">
-    <mkdir dir="${build}" />
+    <mkdir dir="${build}"/>
   </target>
 
   <target name="compile-framework" depends="init,download_sdk">
     <javac srcdir="${framework-src}" destdir="${build}" debug="on" debuglevel="lines,source">
       <classpath>
-        <path refid="sdkjars" />
+        <path refid="sdkjars"/>
       </classpath>
     </javac>
   </target>
 
   <target name="dist-framework" depends="compile-framework">
-    <mkdir dir="${dist}/lib" />
-    <mkdir dir="${build}/com/google/appengine/tools/pipeline/impl/servlets/ui" />
+    <mkdir dir="${dist}/lib"/>
+    <mkdir dir="${build}/com/google/appengine/tools/pipeline/impl/servlets/ui"/>
     <copy todir="${build}/com/google/appengine/tools/pipeline/impl/servlets/ui">
       <fileset dir="${ui}">
-        <exclude name="**/.svn/**" />
+        <exclude name="**/.svn/**"/>
       </fileset>
     </copy>
-    <jar jarfile="${dist}/lib/appengine-pipeline.jar" basedir="${build}" />
+    <jar jarfile="${dist}/lib/appengine-pipeline.jar" basedir="${build}"/>
   </target>
 
   <target name="copy_framework_jar_to_demo" depends="dist-framework">
-    <mkdir dir="demo/war/WEB-INF/lib" />
+    <mkdir dir="demo/war/WEB-INF/lib"/>
     <copy todir="demo/war/WEB-INF/lib">
-      <fileset dir="${dist}/lib" />
-      <path refid="sdkjars" />
+      <fileset dir="${dist}/lib"/>
+      <path refid="sdkjars"/>
     </copy>
   </target>
 
   <target name="javadoc" depends="dist-framework">
-    <delete dir="demo/war/javadoc" />
-    <mkdir dir="demo/war/javadoc" />
-    <javadoc packagenames="com.google.appengine.tools.pipeline" 
-      sourcepath="framework/src" 
-      destdir="demo/war/javadoc" 
-      author="false" 
-      version="false" 
-      use="true" 
-      windowtitle="App Engine Pipeline Framework">
+    <delete dir="demo/war/javadoc"/>
+    <mkdir dir="demo/war/javadoc"/>
+    <javadoc packagenames="com.google.appengine.tools.pipeline" sourcepath="framework/src"
+             destdir="demo/war/javadoc" author="false" version="false" use="true"
+             windowtitle="App Engine Pipeline Framework">
       <doctitle>
         <![CDATA[<h1>App Engine Pipeline Framework</h1>]]>
       </doctitle>
-    <bottom>
-      <![CDATA[<i>Copyright &#169; 2011 Google Inc. All Rights Reserved.</i>]]>
-    </bottom>
+      <bottom>
+        <![CDATA[<i>Copyright &#169; 2011 Google Inc. All Rights Reserved.</i>]]>
+      </bottom>
     </javadoc>
   </target>
 
-<target name="dist-demo" depends="copy_framework_jar_to_demo,javadoc">
-<mkdir dir="${demo}/war/WEB-INF/classes" />
-<javac srcdir="${demo-src}" destdir="${demo}/war/WEB-INF/classes" debug="on" debuglevel="lines,source">
-  <classpath>
-    <fileset dir="${demo}/war/WEB-INF/lib" />
-    <path refid="sdkjars" />
-  </classpath>
-</javac>
-</target>
+  <target name="dist-demo" depends="copy_framework_jar_to_demo,javadoc">
+    <mkdir dir="${demo}/war/WEB-INF/classes"/>
+    <javac srcdir="${demo-src}" destdir="${demo}/war/WEB-INF/classes" debug="on"
+           debuglevel="lines,source">
+      <classpath>
+        <fileset dir="${demo}/war/WEB-INF/lib"/>
+        <path refid="sdkjars"/>
+      </classpath>
+    </javac>
+  </target>
 
-<target name="test_init">
-<mkdir dir="${testbuild}" />
-</target>
+  <target name="test_init">
+    <mkdir dir="${testbuild}"/>
+  </target>
 
-<target name="compile-tests" depends="test_init,dist-demo">
-<javac srcdir="${test-src}" destdir="${testbuild}" debug="on" debuglevel="lines,source">
-  <classpath>
-    <path refid="sdkjars" />
-    <path refid="testjars" />
-    <pathelement location="${dist}/lib/appengine-pipeline.jar" />
-    <pathelement location="${demo}/war/WEB-INF/classes" />
-  </classpath>
-</javac>
-</target>
+  <target name="compile-tests" depends="test_init,dist-demo">
+    <javac srcdir="${test-src}" destdir="${testbuild}" debug="on" debuglevel="lines,source">
+      <classpath>
+        <path refid="sdkjars"/>
+        <path refid="testjars"/>
+        <pathelement location="${dist}/lib/appengine-pipeline.jar"/>
+        <pathelement location="${demo}/war/WEB-INF/classes"/>
+      </classpath>
+    </javac>
+  </target>
 
-<target name="small-tests" depends="compile-tests">
-<junit printsummary="yes" showoutput="no">
-  <classpath>
-    <path refid="sdkjars" />
-    <path refid="testjars" />
-    <pathelement location="${dist}/lib/appengine-pipeline.jar" />
-    <pathelement location="${demo}/war/WEB-INF/classes" />
-    <pathelement location="${testbuild}" />
-  </classpath>
-  <test name="com.google.appengine.tools.pipeline.BarrierTest" />
-  <test name="com.google.appengine.tools.pipeline.FanoutTaskTest" />
-  <test name="com.google.appengine.tools.pipeline.FutureListTest" />
-  <test name="com.google.appengine.tools.pipeline.UserGuideTest" />
-  <test name="com.google.appengine.tools.pipeline.MiscPipelineTest" />
-</junit>
-</target>
+  <target name="small-tests" depends="compile-tests">
+    <junit printsummary="yes" showoutput="no">
+      <classpath>
+        <path refid="sdkjars"/>
+        <path refid="testjars"/>
+        <pathelement location="${dist}/lib/appengine-pipeline.jar"/>
+        <pathelement location="${demo}/war/WEB-INF/classes"/>
+        <pathelement location="${testbuild}"/>
+      </classpath>
+      <test name="com.google.appengine.tools.pipeline.BarrierTest"/>
+      <test name="com.google.appengine.tools.pipeline.FanoutTaskTest"/>
+      <test name="com.google.appengine.tools.pipeline.FutureListTest"/>
+      <test name="com.google.appengine.tools.pipeline.UserGuideTest"/>
+      <test name="com.google.appengine.tools.pipeline.MiscPipelineTest"/>
+    </junit>
+  </target>
 
-<target name="all-tests" depends="small-tests">
-<junit printsummary="yes" showoutput="no">
-  <classpath>
-    <path refid="sdkjars" />
-    <path refid="testjars" />
-    <pathelement location="${dist}/lib/appengine-pipeline.jar" />
-    <pathelement location="${demo}/war/WEB-INF/classes" />
-    <pathelement location="${testbuild}" />
-  </classpath>
-  <test name="com.google.appengine.tools.pipeline.LetterCounterTest" />
-  <test name="com.google.appengine.tools.pipeline.GCDTest" />
-  <test name="com.google.appengine.tools.pipeline.RetryTest" />
-</junit>
-</target>
+  <target name="all-tests" depends="small-tests">
+    <junit printsummary="yes" showoutput="no">
+      <classpath>
+        <path refid="sdkjars"/>
+        <path refid="testjars"/>
+        <pathelement location="${dist}/lib/appengine-pipeline.jar"/>
+        <pathelement location="${demo}/war/WEB-INF/classes"/>
+        <pathelement location="${testbuild}"/>
+      </classpath>
+      <test name="com.google.appengine.tools.pipeline.LetterCounterTest"/>
+      <test name="com.google.appengine.tools.pipeline.GCDTest"/>
+      <test name="com.google.appengine.tools.pipeline.RetryTest"/>
+    </junit>
+  </target>
 
-<target name="clean">
-<delete dir="${build}" />
-<delete dir="${dist}" />
-<delete dir="${testbuild}" />
-<delete dir="${demo}/war/WEB-INF/classes" />
-<delete dir="${demo}/war/WEB-INF/lib" />
-</target>
+  <target name="clean">
+    <delete dir="${build}"/>
+    <delete dir="${dist}"/>
+    <delete dir="${testbuild}"/>
+    <delete dir="${demo}/war/WEB-INF/classes"/>
+    <delete dir="${demo}/war/WEB-INF/lib"/>
+  </target>
 
-<target name="check_sdk_extracted">
-<available file="${sdk}/${sdkdirname}" property="sdkextracted" />
-</target>
+  <target name="check_sdk_extracted">
+    <available file="${sdk}/${sdkdirname}" property="sdkextracted"/>
+  </target>
 
-<target name="download_sdk" description="Gets the AppEngine SDK" depends="check_sdk_extracted" unless="sdkextracted">
-<mkdir dir="${sdk}" />
-<get src="http://googleappengine.googlecode.com/files/${sdkfilename}" dest="${sdk}/${sdkfilename}" />
-<unzip src="${sdk}/${sdkfilename}" dest="${sdk}" />
-</target>
+  <target name="download_sdk" description="Gets the AppEngine SDK" depends="check_sdk_extracted"
+          unless="sdkextracted">
+    <mkdir dir="${sdk}"/>
+    <get src="http://googleappengine.googlecode.com/files/${sdkfilename}"
+         dest="${sdk}/${sdkfilename}"/>
+    <unzip src="${sdk}/${sdkfilename}" dest="${sdk}"/>
+  </target>
 
-<!-- Separate target because downloading the SDK can be expensive and
-       usually only needs to be done once. -->
-<target name="clean_sdk">
-<delete dir="${sdk}" />
-</target>
+  <!-- Separate target because downloading the SDK can be expensive and
+usually only needs to be done once. -->
+  <target name="clean_sdk">
+    <delete dir="${sdk}"/>
+  </target>
 
 </project>

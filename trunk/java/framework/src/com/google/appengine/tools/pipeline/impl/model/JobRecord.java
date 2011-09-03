@@ -1,39 +1,56 @@
+// Copyright 2011 Google Inc.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not
+// use this file except in compliance with the License. You may obtain a copy of
+// the License at
+// 
+// http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+// License for the specific language governing permissions and limitations under
+// the License.
+
 package com.google.appengine.tools.pipeline.impl.model;
 
 import com.google.appengine.api.datastore.Entity;
 import com.google.appengine.api.datastore.Key;
 import com.google.appengine.api.datastore.Text;
-import com.google.appengine.tools.pipeline.FutureList;
-import com.google.appengine.tools.pipeline.FutureValue;
 import com.google.appengine.tools.pipeline.ImmediateValue;
 import com.google.appengine.tools.pipeline.Job;
 import com.google.appengine.tools.pipeline.JobInfo;
 import com.google.appengine.tools.pipeline.JobSetting;
+import com.google.appengine.tools.pipeline.Value;
 import com.google.appengine.tools.pipeline.JobSetting.BackoffFactor;
 import com.google.appengine.tools.pipeline.JobSetting.BackoffSeconds;
 import com.google.appengine.tools.pipeline.JobSetting.IntValuedSetting;
 import com.google.appengine.tools.pipeline.JobSetting.MaxAttempts;
 import com.google.appengine.tools.pipeline.JobSetting.WaitForSetting;
-import com.google.appengine.tools.pipeline.Value;
 import com.google.appengine.tools.pipeline.impl.FutureValueImpl;
 import com.google.appengine.tools.pipeline.impl.PipelineManager;
 import com.google.appengine.tools.pipeline.impl.backend.UpdateSpec;
 
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
 
+/**
+ *  A record containing meta-data about a Job. Corresponds to a datastore entity.
+ * 
+ * @author rudominer@google.com (Mitch Rudominer)
+ *
+ */
 public class JobRecord extends CascadeModelObject implements JobInfo {
-
+  
+  /**
+   * 
+   * The state of the job.
+   *
+   */
   public static enum State {
-    WAITING_FOR_RUN_SLOTS,
-    READY_TO_RUN,
-    WAITING_FOR_FINALIZE_SLOT,
-    READY_TO_FINALIZE,
-    FINALIZED,
-    STOPPED,
-    RETRY
+    WAITING_FOR_RUN_SLOTS, READY_TO_RUN, WAITING_FOR_FINALIZE_SLOT, READY_TO_FINALIZE, FINALIZED,
+    STOPPED, RETRY
   }
 
   public static final String DATA_STORE_KIND = "job";
@@ -124,7 +141,8 @@ public class JobRecord extends CascadeModelObject implements JobInfo {
   }
 
   @SuppressWarnings("unchecked")
-  public JobRecord(JobSetting[] jobSettings, Key rootJobKey, Job<?> jobInstance, UpdateSpec updateSpec, Object... params) {
+  public JobRecord(JobSetting[] jobSettings, Key rootJobKey, Job<?> jobInstance,
+      UpdateSpec updateSpec, Object... params) {
     super(rootJobKey);
     rootJobKey = this.rootJobKey;
     this.jobInstanceRecordInflated = new JobInstanceRecord(this, jobInstance);
@@ -136,8 +154,7 @@ public class JobRecord extends CascadeModelObject implements JobInfo {
       Value<?> value;
       if (null != param && param instanceof Value<?>) {
         value = (Value<?>) param;
-      }
-      else {
+      } else {
         value = new ImmediateValue(param);
       }
       PipelineManager.registerSlotsWithBarrier(updateSpec, value, rootJobKey, runBarrierInflated);
@@ -157,8 +174,8 @@ public class JobRecord extends CascadeModelObject implements JobInfo {
         } else if (setting instanceof MaxAttempts) {
           maxAttempts = value;
         } else {
-          throw new RuntimeException(
-              "Unrecognized JobOption class " + setting.getClass().getName());
+          throw new RuntimeException("Unrecognized JobOption class "
+              + setting.getClass().getName());
         }
       } else {
         throw new RuntimeException("Unrecognized JobOption class " + setting.getClass().getName());
@@ -194,8 +211,8 @@ public class JobRecord extends CascadeModelObject implements JobInfo {
       return false;
     }
     if (!expectedGuid.equals(object.getKey())) {
-      throw new IllegalArgumentException(
-          "Wrong guid for " + name + ". Expected " + expectedGuid + " but was " + object.getKey());
+      throw new IllegalArgumentException("Wrong guid for " + name + ". Expected " + expectedGuid
+          + " but was " + object.getKey());
     }
     return true;
   }

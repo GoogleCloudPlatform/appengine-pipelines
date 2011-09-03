@@ -1,3 +1,17 @@
+// Copyright 2011 Google Inc.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not
+// use this file except in compliance with the License. You may obtain a copy of
+// the License at
+// 
+// http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+// License for the specific language governing permissions and limitations under
+// the License.
+
 package com.google.appengine.tools.pipeline;
 
 import java.util.ArrayList;
@@ -14,14 +28,14 @@ public class FutureListTest extends PipelineTest {
   public void testFutureList() throws Exception {
     PipelineService service = PipelineServiceFactory.newPipelineService();
     String pipelineId = service.startNewPipeline(new SumsListJob1());
-    Integer sum = waitForJobToComplete(pipelineId);
+    Integer sum = (Integer) waitForJobToComplete(pipelineId);
     assertEquals(21, sum.intValue());
   }
 
   public void testReturnFutureList() throws Exception {
     PipelineService service = PipelineServiceFactory.newPipelineService();
     String pipelineId = service.startNewPipeline(new SumsListJob2());
-    Integer sum = waitForJobToComplete(pipelineId);
+    Integer sum = (Integer) waitForJobToComplete(pipelineId);
     assertEquals(21, sum.intValue());
   }
 
@@ -45,7 +59,7 @@ public class FutureListTest extends PipelineTest {
       valueList.add(immediate(4));
       return futureCall(sumJob, futureList(valueList));
     }
-  };
+  }
 
   /**
    * In this job, the call to futureList() happens in a child job, ReturnsList
@@ -56,7 +70,7 @@ public class FutureListTest extends PipelineTest {
     public Value<Integer> run() {
       return futureCall(new SumJob(), futureCall(new ReturnsListJob()));
     }
-  };
+  }
 
   private static class ReturnsListJob extends Job0<List<Integer>> {
     @Override
@@ -87,5 +101,5 @@ public class FutureListTest extends PipelineTest {
       }
       return immediate(sum);
     }
-  };
-};
+  }
+}
