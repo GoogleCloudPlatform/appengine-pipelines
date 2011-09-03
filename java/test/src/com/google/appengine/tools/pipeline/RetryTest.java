@@ -1,4 +1,16 @@
-// Copyright 2011 Google Inc. All Rights Reserved.
+// Copyright 2011 Google Inc.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not
+// use this file except in compliance with the License. You may obtain a copy of
+// the License at
+// 
+// http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+// License for the specific language governing permissions and limitations under
+// the License.
 
 package com.google.appengine.tools.pipeline;
 
@@ -17,7 +29,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * @author rudominer@google.com (Mitch Rudominer)
- *
+ * 
  */
 public class RetryTest extends TestCase {
 
@@ -35,7 +47,8 @@ public class RetryTest extends TestCase {
   public void setUp() throws Exception {
     super.setUp();
     helper.setUp();
-    System.setProperty("com.google.appengine.api.pipeline.use-simple-guids-for-debugging", "true");
+    System
+        .setProperty("com.google.appengine.api.pipeline.use-simple-guids-for-debugging", "true");
   }
 
   @Override
@@ -77,24 +90,29 @@ public class RetryTest extends TestCase {
     // Wait for framework to save Job information
     Thread.sleep(1000L);
     JobInfo jobInfo = service.getJobInfo(pipelineId);
-    JobInfo.State expectedState = (succeedTheLastTime
-        ? JobInfo.State.COMPLETED_SUCCESSFULLY : JobInfo.State.STOPPED_BY_ERROR);
+    JobInfo.State expectedState =
+        (succeedTheLastTime ? JobInfo.State.COMPLETED_SUCCESSFULLY
+            : JobInfo.State.STOPPED_BY_ERROR);
     assertEquals(expectedState, jobInfo.getJobState());
   }
 
-  private String runJob(
-      int backoffFactor, int maxAttempts, int awaitSeconds, boolean succeedTheLastTime)
-      throws Exception {
+  private String runJob(int backoffFactor, int maxAttempts, int awaitSeconds,
+      boolean succeedTheLastTime) throws Exception {
     PipelineService service = PipelineServiceFactory.newPipelineService();
     countdownLatch = new CountDownLatch(maxAttempts);
 
-    String pipelineId = service.startNewPipeline(
-        new InvokesFailureJob(succeedTheLastTime, maxAttempts, backoffFactor));
+    String pipelineId =
+        service.startNewPipeline(new InvokesFailureJob(succeedTheLastTime, maxAttempts,
+            backoffFactor));
     countdownLatch.await(awaitSeconds, TimeUnit.SECONDS);
     assertEquals(0, countdownLatch.getCount());
     return pipelineId;
   }
-
+  
+  /**
+   * A job that invokes {@link FailureJob}.
+   *
+   */
   public static class InvokesFailureJob extends Job0<Void> {
     private boolean succeedTheLastTime;
     int maxAttempts;
@@ -108,12 +126,18 @@ public class RetryTest extends TestCase {
 
     @Override
     public Value<Void> run() {
-      JobSetting[] jobSettings = new JobSetting[] {
-          new MaxAttempts(maxAttempts), new BackoffSeconds(1), new BackoffFactor(backoffFactor)};
+      JobSetting[] jobSettings =
+          new JobSetting[] {new MaxAttempts(maxAttempts), new BackoffSeconds(1),
+              new BackoffFactor(backoffFactor)};
       return futureCall(new FailureJob(succeedTheLastTime), jobSettings);
     }
   }
-
+  
+  /**
+   * 
+   * A job that fails every time except possibly the last time.
+   *
+   */
   public static class FailureJob extends Job0<Void> {
     private boolean succeedTheLastTime;
 

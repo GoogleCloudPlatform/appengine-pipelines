@@ -14,18 +14,23 @@
 
 package com.google.appengine.tools.pipeline;
 
+import com.google.appengine.tools.pipeline.impl.servlets.StaticContentHandler;
+
+import junit.framework.TestCase;
+
+import java.io.InputStream;
+
 /**
- * An Exception that indicates that the framework cannot find an object with a
- * specified identifier.
- * 
  * @author rudominer@google.com (Mitch Rudominer)
+ * 
  */
-public class NoSuchObjectException extends Exception {
-  public NoSuchObjectException(String key) {
-    super(key);
+public class StaticContentHandlerTest extends TestCase {
+
+  public void testGetResourceAsStream() throws Exception {
+    InputStream in = StaticContentHandler.getResourceAsStream("common.js");
+    assertTrue(in.read() != -1);
+    in = StaticContentHandler.getResourceAsStream("images/treeview-black.gif");
+    assertTrue(in.read() != -1);
   }
 
-  public NoSuchObjectException(String key, Throwable cause) {
-    super(key, cause);
-  }
 }

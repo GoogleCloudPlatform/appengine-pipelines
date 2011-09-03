@@ -1,3 +1,17 @@
+// Copyright 2011 Google Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not
+// use this file except in compliance with the License. You may obtain a copy of
+// the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+// License for the specific language governing permissions and limitations under
+// the License.
+
 package com.google.appengine.tools.pipeline;
 
 import com.google.appengine.api.datastore.Key;
@@ -16,39 +30,49 @@ import java.util.List;
 /**
  * The abstract ancestor class of all user job classes. A <b>job</b> is by
  * definition a subclass of this class that implements a method named <code>run
- * </code>. 
+ * </code>.
  * <p>
  * In order to fully take advantage of the framework's compile-time
  * type-checking, a user's job class should subclass one of {@link Job0},
- * {@link Job1}, {@link Job2}, etc instead of directly subclassing this class, and
- * then implement the appropriate type-safe version of {@code run()}.
- * The only reason a user-written job class should directly subclass this class
- * is if the {@code run} method of the job needs to take more arguments than the
+ * {@link Job1}, {@link Job2}, etc instead of directly subclassing this class,
+ * and then implement the appropriate type-safe version of {@code run()}. The
+ * only reason a user-written job class should directly subclass this class is
+ * if the {@code run} method of the job needs to take more arguments than the
  * greatest {@code n} such that the framework offers a {@code Jobn} class.
  * <p>
- * This class contains several protected methods that may be invoked from with the
- * {@code run()} method.
+ * This class contains several protected methods that may be invoked from with
+ * the {@code run()} method.
  * <ul>
- * <li> <b>{@code futureCall()}</b> There is a family of methods named {@code futureCall()}
- * used to specify a job node in a generated child job graph. There are several
- * type-safe versions of {@code futureCall()} such as {@link #futureCall(Job0, JobSetting...)}
- * and {@link #futureCall(Job1, Value, JobSetting...)}. There is also one non-type-safe version
- * {@link #futureCallUnchecked(JobSetting[], Job, Object...)} used for child jobs that
- * directly subclass {@code Job} rather than subclassing {@code Jobn} for some {@code n}.
- * <li> {@link #newPromise(Class)} is used to construct a new {@link PromisedValue}.
- * <li> Several methods that are <em>syntactic sugar</em>. These are methods that allow
- * one to construct objects that may be used as arguments to {@code futureCall()} using less
- * typing. These include
+ * <li><b>{@code futureCall()}</b> There is a family of methods named {@code
+ * futureCall()} used to specify a job node in a generated child job graph.
+ * There are several type-safe versions of {@code futureCall()} such as
+ * {@link #futureCall(Job0, JobSetting...)} and
+ * {@link #futureCall(Job1, Value, JobSetting...)}. There is also one
+ * non-type-safe version
+ * {@link #futureCallUnchecked(JobSetting[], Job, Object...)} used for child
+ * jobs that directly subclass {@code Job} rather than subclassing {@code Jobn}
+ * for some {@code n}.
+ * <li> {@link #newPromise(Class)} is used to construct a new
+ * {@link PromisedValue}.
+ * <li>Several methods that are <em>syntactic sugar</em>. These are methods that
+ * allow one to construct objects that may be used as arguments to {@code
+ * futureCall()} using less typing. These include
  * <ol>
  * <li> {@link #futureList(List)}. Constructs a new {@link FutureList}
  * <li> {@link #immediate(Object)}. Constructs a new {@link ImmediateValue}
- * <li> {@link #waitFor(FutureValue)}. Constructs a new {@link JobSetting.WaitForSetting}.
- * <li> {@link #backOffFactor(int)}.  Constructs a new {@link JobSetting.BackoffFactor}.
- * <li> {@link #backOffSeconds(int)}. Constructs a new {@link JobSetting.BackoffSeconds}.
- * <li> {@link #maxAttempts(int)}. Constructs a new {@link JobSetting.MaxAttempts}.
+ * <li> {@link #waitFor(FutureValue)}. Constructs a new
+ * {@link JobSetting.WaitForSetting}.
+ * <li> {@link #backOffFactor(int)}. Constructs a new
+ * {@link JobSetting.BackoffFactor}.
+ * <li> {@link #backOffSeconds(int)}. Constructs a new
+ * {@link JobSetting.BackoffSeconds}.
+ * <li> {@link #maxAttempts(int)}. Constructs a new
+ * {@link JobSetting.MaxAttempts}.
  * </ol>
  * </ul>
- * As an example of the use of the syntactic sugar, from within a {@code run} method one might write
+ * As an example of the use of the syntactic sugar, from within a {@code run}
+ * method one might write
+ *
  * <pre>
  * <code>
  * FutureValue&lt;Integer&gt; x = futureCall(new MyJob(), immediate(4));
@@ -57,8 +81,6 @@ import java.util.List;
  * </code>
  * </pre>
  * <p>
- * Seethe<ahref="https://docs0.google.com/a/google.com/document/d/1hw83aFJX6C3mlc0R8qn9aKqhWD37TfX9dO_SV0QnuMU/edit#">
- * user's guide</a> for more information.
  *
  * @author rudominer@google.com (Mitch Rudominer)
  *
@@ -86,24 +108,25 @@ public abstract class Job<E> implements Serializable {
   private final void registerReturnValue(Value<E> value) {
     Barrier finalizeBarrier = thisJobRecord.getFinalizeBarrierInflated();
     if (null == finalizeBarrier) {
-      throw new RuntimeException(
-          "Internal logic error: finalize barrier not inflated in " + thisJobRecord);
+      throw new RuntimeException("Internal logic error: finalize barrier not inflated in "
+          + thisJobRecord);
     }
-    PipelineManager.registerSlotsWithBarrier(updateSpec, value, getPipelineKey(), finalizeBarrier);
+    PipelineManager
+        .registerSlotsWithBarrier(updateSpec, value, getPipelineKey(), finalizeBarrier);
     updateSpec.includeBarrier(finalizeBarrier);
-    // Propagate the filler of the finalize slot to also be the filler of the 
-    // output slot. This is tricky in the case that there is more than one finalize
+    // Propagate the filler of the finalize slot to also be the filler of the
+    // output slot. This is tricky in the case that there is more than one
+    // finalize
     // slot (i.e. the return value is a FutureList.) If there are two different
     // finalize slots and they have different fillerJobKeys, then we resort to
     // assigning this job as the filler job.
     Key fillerJobKey = null;
-    for(SlotDescriptor slotDescriptor : finalizeBarrier.getWaitingOnInflated()) {
+    for (SlotDescriptor slotDescriptor : finalizeBarrier.getWaitingOnInflated()) {
       Key key = slotDescriptor.slot.getSourceJobKey();
       if (null != key) {
         if (null == fillerJobKey) {
           fillerJobKey = key;
-        }
-        else {
+        } else {
           if (!fillerJobKey.toString().equals(key.toString())) {
             fillerJobKey = this.getJobKey();
             break;
@@ -117,7 +140,7 @@ public abstract class Job<E> implements Serializable {
       updateSpec.includeSlot(outputSlot);
     }
   }
-  
+
 
   /**
    * This is the non-type-safe version of the {@code futureCall()} family of
@@ -140,8 +163,8 @@ public abstract class Job<E> implements Serializable {
    *         may be passed in to further invocations of {@code futureCall()} in
    *         order to specify a data dependency.
    */
-  protected <T> FutureValue<T> futureCallUnchecked(
-      JobSetting[] settings, Job<?> jobInstance, Object... params) {
+  protected <T> FutureValue<T> futureCallUnchecked(JobSetting[] settings, Job<?> jobInstance,
+      Object... params) {
     JobRecord childJobRecord =
         PipelineManager.registerNewJob(updateSpec, settings, thisJobRecord, jobInstance, params);
     return new FutureValueImpl<T>(childJobRecord.getOutputSlotInflated());
@@ -179,8 +202,8 @@ public abstract class Job<E> implements Serializable {
    *         may be passed in to further invocations of {@code futureCall()} in
    *         order to specify a data dependency.
    */
-  protected <T, T1> FutureValue<T> futureCall(
-      Job1<T, T1> jobInstance, Value<T1> v1, JobSetting... settings) {
+  protected <T, T1> FutureValue<T> futureCall(Job1<T, T1> jobInstance, Value<T1> v1,
+      JobSetting... settings) {
     return futureCallUnchecked(settings, jobInstance, v1);
   }
 
@@ -201,8 +224,8 @@ public abstract class Job<E> implements Serializable {
    *         may be passed in to further invocations of {@code futureCall()} in
    *         order to specify a data dependency.
    */
-  protected <T, T1, T2> FutureValue<T> futureCall(
-      Job2<T, T1, T2> jobInstance, Value<T1> v1, Value<T2> v2, JobSetting... settings) {
+  protected <T, T1, T2> FutureValue<T> futureCall(Job2<T, T1, T2> jobInstance, Value<T1> v1,
+      Value<T2> v2, JobSetting... settings) {
     return futureCallUnchecked(settings, jobInstance, v1, v2);
   }
 
@@ -225,8 +248,8 @@ public abstract class Job<E> implements Serializable {
    *         may be passed in to further invocations of {@code futureCall()} in
    *         order to specify a data dependency.
    */
-  protected <T, T1, T2, T3> FutureValue<T> futureCall(Job3<T, T1, T2, T3> jobInstance, Value<T1> v1,
-      Value<T2> v2, Value<T3> v3, JobSetting... settings) {
+  protected <T, T1, T2, T3> FutureValue<T> futureCall(Job3<T, T1, T2, T3> jobInstance,
+      Value<T1> v1, Value<T2> v2, Value<T3> v3, JobSetting... settings) {
     return futureCallUnchecked(settings, jobInstance, v1, v2, v3);
   }
 
@@ -252,11 +275,7 @@ public abstract class Job<E> implements Serializable {
    *         order to specify a data dependency.
    */
   protected <T, T1, T2, T3, T4> FutureValue<T> futureCall(Job4<T, T1, T2, T3, T4> jobInstance,
-      Value<T1> v1,
-      Value<T2> v2,
-      Value<T3> v3,
-      Value<T4> v4,
-      JobSetting... settings) {
+      Value<T1> v1, Value<T2> v2, Value<T3> v3, Value<T4> v4, JobSetting... settings) {
     return futureCallUnchecked(settings, jobInstance, v1, v2, v3, v4);
   }
 
@@ -284,14 +303,9 @@ public abstract class Job<E> implements Serializable {
    *         may be passed in to further invocations of {@code futureCall()} in
    *         order to specify a data dependency.
    */
-  protected <T, T1, T2, T3, T4, T5> FutureValue<T> futureCall(Job5<
-      T, T1, T2, T3, T4, T5> jobInstance,
-      Value<T1> v1,
-      Value<T2> v2,
-      Value<T3> v3,
-      Value<T4> v4,
-      Value<T5> v5,
-      JobSetting... settings) {
+  protected <T, T1, T2, T3, T4, T5> FutureValue<T> futureCall(
+      Job5<T, T1, T2, T3, T4, T5> jobInstance, Value<T1> v1, Value<T2> v2, Value<T3> v3,
+      Value<T4> v4, Value<T5> v5, JobSetting... settings) {
     return futureCallUnchecked(settings, jobInstance, v1, v2, v3, v4, v5);
   }
 
@@ -320,15 +334,9 @@ public abstract class Job<E> implements Serializable {
    *         may be passed in to further invocations of {@code futureCall()} in
    *         order to specify a data dependency.
    */
-  protected <T, T1, T2, T3, T4, T5, T6> FutureValue<T> futureCall(Job6<
-      T, T1, T2, T3, T4, T5, T6> jobInstance,
-      Value<T1> v1,
-      Value<T2> v2,
-      Value<T3> v3,
-      Value<T4> v4,
-      Value<T5> v5,
-      Value<T6> v6,
-      JobSetting... settings) {
+  protected <T, T1, T2, T3, T4, T5, T6> FutureValue<T> futureCall(
+      Job6<T, T1, T2, T3, T4, T5, T6> jobInstance, Value<T1> v1, Value<T2> v2, Value<T3> v3,
+      Value<T4> v4, Value<T5> v5, Value<T6> v6, JobSetting... settings) {
     return futureCallUnchecked(settings, jobInstance, v1, v2, v3, v4, v5, v6);
   }
 
@@ -414,8 +422,8 @@ public abstract class Job<E> implements Serializable {
 
   /**
    * Constructs a new {@code FutureList}. This method is only syntactic sugar.
-   * {@code futureList(listOfValues)} is equivalent to
-   * {@code new FutureList(listOfValues)}.
+   * {@code futureList(listOfValues)} is equivalent to {@code new
+   * FutureList(listOfValues)}.
    *
    * @param <F> The type of element in the list
    * @param listOfValues A list of {@code Values<F>}

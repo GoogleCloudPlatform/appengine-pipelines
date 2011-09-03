@@ -1,4 +1,16 @@
-// Copyright 2011 Google Inc. All Rights Reserved.
+// Copyright 2011 Google Inc.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not
+// use this file except in compliance with the License. You may obtain a copy of
+// the License at
+// 
+// http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+// License for the specific language governing permissions and limitations under
+// the License.
 
 package com.google.appengine.tools.pipeline;
 
@@ -26,7 +38,7 @@ import java.util.Set;
 
 /**
  * @author rudominer@google.com (Mitch Rudominer)
- *
+ * 
  */
 public class FanoutTaskTest extends TestCase {
 
@@ -37,7 +49,8 @@ public class FanoutTaskTest extends TestCase {
   public void setUp() throws Exception {
     super.setUp();
     helper.setUp();
-    System.setProperty("com.google.appengine.api.pipeline.use-simple-guids-for-debugging", "true");
+    System
+        .setProperty("com.google.appengine.api.pipeline.use-simple-guids-for-debugging", "true");
   }
 
   @Override
@@ -57,7 +70,7 @@ public class FanoutTaskTest extends TestCase {
     key = KeyFactory.createKey(Slot.DATA_STORE_KIND, "slot1");
     HandleSlotFilledTask hsfTask = new HandleSlotFilledTask(key, null);
     LinkedList<Task> taskList =
-        Lists.<Task>newLinkedList(runJobTask, runJobTask2, finalizeJobTask, hsfTask);
+        Lists.<Task> newLinkedList(runJobTask, runJobTask2, finalizeJobTask, hsfTask);
     // step 2. Build a fanout task that represents the tasks in the list
     FanoutTask fanoutTask = new FanoutTask(taskList);
     // step 3. Extract the properties from the fanout task

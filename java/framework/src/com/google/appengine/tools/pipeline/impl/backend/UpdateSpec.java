@@ -1,4 +1,16 @@
-// Copyright 2010 Google Inc. All Rights Reserved.
+// Copyright 2011 Google Inc.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not
+// use this file except in compliance with the License. You may obtain a copy of
+// the License at
+// 
+// http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+// License for the specific language governing permissions and limitations under
+// the License.
 
 package com.google.appengine.tools.pipeline.impl.backend;
 
@@ -21,56 +33,57 @@ import java.util.Set;
  * 
  */
 public class UpdateSpec {
-	
-	private static final int INITIAL_SIZE = 20;
-	
-	private Set<Task> taskSet = new HashSet<Task>(INITIAL_SIZE);
-	private Map<Key, JobRecord> jobMap = new HashMap<Key, JobRecord>(INITIAL_SIZE);
-	private Map<Key, Barrier> barrierMap = new HashMap<Key, Barrier>(INITIAL_SIZE);
-	private Map<Key, Slot> slotMap = new HashMap<Key, Slot>(INITIAL_SIZE);
-	private Map<Key, JobInstanceRecord> jobInstanceMap = new HashMap<Key, JobInstanceRecord>(INITIAL_SIZE);
-	
-	private static <E extends CascadeModelObject> void put(Map<Key, E> map, E object){
-		map.put(object.getKey(),object);
-	}
 
-	public void registerTask(Task task) {
-		taskSet.add(task);
-	}
-	
-	public Collection<Task> getTasks(){
-		return taskSet;
-	}
+  private static final int INITIAL_SIZE = 20;
 
-	public void includeBarrier(Barrier barrier) {
-		put(barrierMap, barrier);
-	}
-	
-	public Collection<Barrier> getBarriers(){
-		return barrierMap.values();
-	}
+  private Set<Task> taskSet = new HashSet<Task>(INITIAL_SIZE);
+  private Map<Key, JobRecord> jobMap = new HashMap<Key, JobRecord>(INITIAL_SIZE);
+  private Map<Key, Barrier> barrierMap = new HashMap<Key, Barrier>(INITIAL_SIZE);
+  private Map<Key, Slot> slotMap = new HashMap<Key, Slot>(INITIAL_SIZE);
+  private Map<Key, JobInstanceRecord> jobInstanceMap =
+      new HashMap<Key, JobInstanceRecord>(INITIAL_SIZE);
 
-	public void includeJob(JobRecord job) {
-		put(jobMap, job);
-	}
-	
-	public Collection<JobRecord> getJobs(){
-		return jobMap.values();
-	}
+  private static <E extends CascadeModelObject> void put(Map<Key, E> map, E object) {
+    map.put(object.getKey(), object);
+  }
 
-	public void includeSlot(Slot slot) {
-		put(slotMap, slot);
-	}
-	
-	public Collection<Slot> getSlots(){
-		return slotMap.values();
-	}
-	
-	public void includeJobInstanceRecord(JobInstanceRecord record){
-	  put(jobInstanceMap, record);
-	}
-	
-	public Collection<JobInstanceRecord> getJobInstanceRecords() {
-	  return jobInstanceMap.values();
-	}
+  public void registerTask(Task task) {
+    taskSet.add(task);
+  }
+
+  public Collection<Task> getTasks() {
+    return taskSet;
+  }
+
+  public void includeBarrier(Barrier barrier) {
+    put(barrierMap, barrier);
+  }
+
+  public Collection<Barrier> getBarriers() {
+    return barrierMap.values();
+  }
+
+  public void includeJob(JobRecord job) {
+    put(jobMap, job);
+  }
+
+  public Collection<JobRecord> getJobs() {
+    return jobMap.values();
+  }
+
+  public void includeSlot(Slot slot) {
+    put(slotMap, slot);
+  }
+
+  public Collection<Slot> getSlots() {
+    return slotMap.values();
+  }
+
+  public void includeJobInstanceRecord(JobInstanceRecord record) {
+    put(jobInstanceMap, record);
+  }
+
+  public Collection<JobInstanceRecord> getJobInstanceRecords() {
+    return jobInstanceMap.values();
+  }
 }

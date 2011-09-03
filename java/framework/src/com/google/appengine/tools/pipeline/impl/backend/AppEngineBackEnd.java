@@ -1,4 +1,16 @@
-// Copyright 2010 Google Inc. All Rights Reserved.
+// Copyright 2011 Google Inc.
+// 
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not
+// use this file except in compliance with the License. You may obtain a copy of
+// the License at
+// 
+// http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+// License for the specific language governing permissions and limitations under
+// the License.
 
 package com.google.appengine.tools.pipeline.impl.backend;
 
@@ -41,7 +53,7 @@ import java.util.logging.Logger;
 
 /**
  * @author rudominer@google.com (Mitch Rudominer)
- *
+ * 
  */
 public class AppEngineBackEnd implements CascadeBackEnd {
 
@@ -118,8 +130,8 @@ public class AppEngineBackEnd implements CascadeBackEnd {
         return;
       } catch (ConcurrentModificationException e) {
         String logMessage =
-            "ConcurrentModificationException during " + operation.getName() + " attempt " + attempts
-                + ".";
+            "ConcurrentModificationException during " + operation.getName() + " attempt "
+                + attempts + ".";
         if (attempts++ < 5) {
           logger.finest(logMessage + " Trying again.");
           try {
@@ -232,7 +244,7 @@ public class AppEngineBackEnd implements CascadeBackEnd {
    * Given a {@link Collection} of {@link Barrier Barriers}, inflate each of the
    * {@link Barrier Barriers} so that {@link Barrier#getWaitingOnInflated()}
    * will not return null;
-   *
+   * 
    * @param barriers
    */
   private void inflateBarriers(Collection<Barrier> barriers) {
@@ -320,8 +332,8 @@ public class AppEngineBackEnd implements CascadeBackEnd {
     });
   }
 
-  private void transactionallyReleaseBarrier(
-      Barrier barrier, JobRecord job, JobRecord.State newJobState, Task task) {
+  private void transactionallyReleaseBarrier(Barrier barrier, JobRecord job,
+      JobRecord.State newJobState, Task task) {
     job.setState(newJobState);
     UpdateSpec updateSpec = new UpdateSpec();
     updateSpec.includeJob(job);
@@ -386,16 +398,16 @@ public class AppEngineBackEnd implements CascadeBackEnd {
       taskQueue.enqueue(task);
     }
   }
-  
-  
-  
+
+
+
   private Iterable<Entity> queryAll(String kind, Key rootJobKey, boolean keysOnly) {
     Query query = new Query(kind);
-    if (keysOnly){
+    if (keysOnly) {
       query.setKeysOnly();
     }
-    query.addFilter(
-        CascadeModelObject.ROOT_JOB_KEY_PROPERTY, Query.FilterOperator.EQUAL, rootJobKey);
+    query.addFilter(CascadeModelObject.ROOT_JOB_KEY_PROPERTY, Query.FilterOperator.EQUAL,
+        rootJobKey);
     PreparedQuery preparedQuery = dataStore.prepare(query);
     return preparedQuery.asIterable();
   }
@@ -404,8 +416,8 @@ public class AppEngineBackEnd implements CascadeBackEnd {
     E newObject(Entity entity);
   }
 
-  private <E extends CascadeModelObject> void putAll(
-      Map<Key, E> listOfObjects, Instantiator<E> instantiator, String kind, Key rootJobKey) {
+  private <E extends CascadeModelObject> void putAll(Map<Key, E> listOfObjects,
+      Instantiator<E> instantiator, String kind, Key rootJobKey) {
     for (Entity entity : queryAll(kind, rootJobKey, false)) {
       listOfObjects.put(entity.getKey(), instantiator.newObject(entity));
     }
@@ -426,32 +438,32 @@ public class AppEngineBackEnd implements CascadeBackEnd {
       public Slot newObject(Entity entity) {
         return new Slot(entity);
       }
-    }, Slot.DATA_STORE_KIND,rootJobKey);
+    }, Slot.DATA_STORE_KIND, rootJobKey);
     putAll(jobs, new Instantiator<JobRecord>() {
       public JobRecord newObject(Entity entity) {
         JobRecord jobRecord = new JobRecord(entity);
         return jobRecord;
       }
-    }, JobRecord.DATA_STORE_KIND,rootJobKey);
+    }, JobRecord.DATA_STORE_KIND, rootJobKey);
     putAll(jobInstanceRecords, new Instantiator<JobInstanceRecord>() {
       public JobInstanceRecord newObject(Entity entity) {
         return new JobInstanceRecord(entity);
       }
-    }, JobInstanceRecord.DATA_STORE_KIND,rootJobKey);
+    }, JobInstanceRecord.DATA_STORE_KIND, rootJobKey);
     return new PipelineObjects(rootJobKey, jobs, slots, barriers, jobInstanceRecords);
   }
-  
-  private void deleteAll(String kind, Key rootJobKey){
+
+  private void deleteAll(String kind, Key rootJobKey) {
     List<Key> keyList = new LinkedList<Key>();
-    for (Entity entity : queryAll(kind, rootJobKey, true)){
+    for (Entity entity : queryAll(kind, rootJobKey, true)) {
       keyList.add(entity.getKey());
     }
     dataStore.delete(keyList);
   }
-  
+
   public void deletePipeline(Key rootJobKey) throws NoSuchObjectException, IllegalStateException {
     JobRecord rootJobRecord = queryJob(rootJobKey, false, false);
-    switch(rootJobRecord.getState()){
+    switch (rootJobRecord.getState()) {
       case WAITING_FOR_RUN_SLOTS:
       case READY_TO_RUN:
       case WAITING_FOR_FINALIZE_SLOT:

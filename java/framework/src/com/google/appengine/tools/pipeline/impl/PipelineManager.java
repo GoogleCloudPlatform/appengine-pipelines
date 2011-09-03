@@ -1,9 +1,22 @@
+// Copyright 2011 Google Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not
+// use this file except in compliance with the License. You may obtain a copy of
+// the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+// License for the specific language governing permissions and limitations under
+// the License.
+
 package com.google.appengine.tools.pipeline.impl;
 
 import com.google.appengine.api.datastore.Key;
 import com.google.appengine.api.datastore.KeyFactory;
 import com.google.appengine.tools.pipeline.FutureList;
-import com.google.appengine.tools.pipeline.FutureValue;
 import com.google.appengine.tools.pipeline.ImmediateValue;
 import com.google.appengine.tools.pipeline.Job;
 import com.google.appengine.tools.pipeline.JobSetting;
@@ -15,10 +28,10 @@ import com.google.appengine.tools.pipeline.impl.backend.UpdateSpec;
 import com.google.appengine.tools.pipeline.impl.model.Barrier;
 import com.google.appengine.tools.pipeline.impl.model.JobInstanceRecord;
 import com.google.appengine.tools.pipeline.impl.model.JobRecord;
-import com.google.appengine.tools.pipeline.impl.model.JobRecord.State;
 import com.google.appengine.tools.pipeline.impl.model.PipelineObjects;
 import com.google.appengine.tools.pipeline.impl.model.Slot;
 import com.google.appengine.tools.pipeline.impl.model.SlotDescriptor;
+import com.google.appengine.tools.pipeline.impl.model.JobRecord.State;
 import com.google.appengine.tools.pipeline.impl.tasks.FanoutTask;
 import com.google.appengine.tools.pipeline.impl.tasks.FinalizeJobTask;
 import com.google.appengine.tools.pipeline.impl.tasks.HandleSlotFilledTask;
@@ -34,13 +47,20 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/**
+ * The central hub of the Pipeline implementation.
+ *
+ * @author rudominer@google.com (Mitch Rudominer)
+ *
+ */
 public class PipelineManager {
 
   private static final Logger logger = Logger.getLogger(PipelineManager.class.getName());
 
   private static CascadeBackEnd backEnd = new AppEngineBackEnd();
 
-  public static String startNewCascade(JobSetting[] settings, Job<?> jobInstance, Object... params) {
+  public static String startNewCascade(JobSetting[] settings, Job<?> jobInstance,
+      Object... params) {
     UpdateSpec updateSpec = new UpdateSpec();
     JobRecord jobRecord = registerNewJob(updateSpec, settings, null, jobInstance, params);
     backEnd.save(updateSpec);
@@ -76,11 +96,10 @@ public class PipelineManager {
    * then we add multiple slots, one for each {@code Value} in the List wrapped
    * by the {@code FutureList}. This process is not recursive because we do not
    * currently support {@code FutureLists} of {@code FutureLists}.
-   * 
+   *
    * @param updateSpec
-   * @param value
-   *          A {@code Value}. {@code Null} is interpreted as an
-   *          {@code ImmediateValue} with a value of {@code Null}.
+   * @param value A {@code Value}. {@code Null} is interpreted as an {@code
+   *        ImmediateValue} with a value of {@code Null}.
    * @param rootJobKey
    * @param barrier
    */
@@ -105,11 +124,11 @@ public class PipelineManager {
       List<Slot> slotList = new ArrayList<Slot>(futureList.getListOfValues().size());
       for (Value<?> valFromList : futureList.getListOfValues()) {
         Slot slot = null;
-        if (valFromList instanceof ImmediateValue) {
+        if (valFromList instanceof ImmediateValue<?>) {
           ImmediateValue<?> ivFromList = (ImmediateValue<?>) valFromList;
           slot = new Slot(rootJobKey);
           registerSlotFilled(updateSpec, slot, ivFromList.getValue());
-        } else if (valFromList instanceof FutureValueImpl) {
+        } else if (valFromList instanceof FutureValueImpl<?>) {
           FutureValueImpl<?> futureValFromList = (FutureValueImpl<?>) valFromList;
           slot = futureValFromList.getSlot();
         } else if (value instanceof FutureList<?>) {
@@ -214,24 +233,24 @@ public class PipelineManager {
   public static void processTask(Task task) {
     logger.finest("Processing task " + task);
     switch (task.getType()) {
-    case RUN_JOB:
-      RunJobTask runJobTask = (RunJobTask) task;
-      runJob(runJobTask.getJobKey());
-      break;
-    case HANDLE_SLOT_FILLED:
-      HandleSlotFilledTask hsfTask = (HandleSlotFilledTask) task;
-      handleSlotFilled(hsfTask.getSlotKey());
-      break;
-    case FINALIZE_JOB:
-      FinalizeJobTask finalizeJobTask = (FinalizeJobTask) task;
-      finalizeJob(finalizeJobTask.getJobKey());
-      break;
-    case FAN_OUT:
-      FanoutTask fanoutTask = (FanoutTask) task;
-      backEnd.handleFanoutTask(fanoutTask);
-      break;
-    default:
-      throw new IllegalArgumentException("Unrecognized task type: " + task.getType());
+      case RUN_JOB:
+        RunJobTask runJobTask = (RunJobTask) task;
+        runJob(runJobTask.getJobKey());
+        break;
+      case HANDLE_SLOT_FILLED:
+        HandleSlotFilledTask hsfTask = (HandleSlotFilledTask) task;
+        handleSlotFilled(hsfTask.getSlotKey());
+        break;
+      case FINALIZE_JOB:
+        FinalizeJobTask finalizeJobTask = (FinalizeJobTask) task;
+        finalizeJob(finalizeJobTask.getJobKey());
+        break;
+      case FAN_OUT:
+        FanoutTask fanoutTask = (FanoutTask) task;
+        backEnd.handleFanoutTask(fanoutTask);
+        break;
+      default:
+        throw new IllegalArgumentException("Unrecognized task type: " + task.getType());
     }
   }
 
@@ -240,7 +259,8 @@ public class PipelineManager {
   }
 
   @SuppressWarnings("unchecked")
-  private static void invokePrivateJobMethod(String methodName, Job<?> jobObject, Object... params) {
+  private static void invokePrivateJobMethod(String methodName, Job<?> jobObject,
+      Object... params) {
     Class<?>[] signature = new Class<?>[params.length];
     int i = 0;
     for (Object param : params) {
@@ -269,7 +289,7 @@ public class PipelineManager {
   // Currently we simply use the first method named "run" that we find.
   // As long as the user follows the rules and declares a single public method
   // named "run" this will be fine.
-  // TODO(rudominer) Consider actually looking for a method with matching
+  // TODO(user) Consider actually looking for a method with matching
   // signature.
   private static Method findAppropriateRunMethod(Class<?> klass, Object... params) {
     Method runMethod = null;
@@ -291,7 +311,7 @@ public class PipelineManager {
   }
 
   private static void registerReturnValue(Job<?> jobObject, Value<?> returnValue) {
-    invokePrivateJobMethod("registerReturnValue", jobObject, new Class[] { Value.class },
+    invokePrivateJobMethod("registerReturnValue", jobObject, new Class[] {Value.class},
         returnValue);
   }
 
@@ -341,7 +361,7 @@ public class PipelineManager {
       builder.append(StringUtils.toString(params));
       logger.finest(builder.toString());
     }
-    // TODO(rudominer) We currently don't save the job record until after the
+    // TODO(user) We currently don't save the job record until after the
     // job runs.
     // So we are not saving the job start time until after the job runs.
     jobRecord.setStartTime(new Date());
@@ -406,7 +426,8 @@ public class PipelineManager {
       List<Object> finalizeArguments = finalizeBarrier.buildArgumentList();
       int numFinalizeArguments = finalizeArguments.size();
       if (1 != numFinalizeArguments) {
-        throw new RuntimeException("Internal logic error: numFinalizeArguments=" + numFinalizeArguments);
+        throw new RuntimeException("Internal logic error: numFinalizeArguments="
+            + numFinalizeArguments);
       }
       Object finalizeValue = finalizeArguments.get(0);
       logger.finest("Finalizing " + jobRecord + " with value=" + finalizeValue);
@@ -421,8 +442,8 @@ public class PipelineManager {
       updateSpec.includeJob(jobRecord);
       backEnd.save(updateSpec);
     } catch (Exception e) {
-      logger.log(Level.WARNING, "An exception occurred while attempting to finalize " + jobRecord,
-          e);
+      logger.log(Level.WARNING,
+          "An exception occurred while attempting to finalize " + jobRecord, e);
       throw new RuntimeException(e);
     }
   }
@@ -476,18 +497,18 @@ public class PipelineManager {
     Task task;
     JobRecord.State jobState;
     switch (barrier.getType()) {
-    case RUN:
-      String taskName = null;
-      task = new RunJobTask(jobKey, taskName);
-      jobState = JobRecord.State.READY_TO_RUN;
-      break;
-    case FINALIZE:
-      taskName = null;
-      task = new FinalizeJobTask(jobKey, taskName);
-      jobState = JobRecord.State.READY_TO_FINALIZE;
-      break;
-    default:
-      throw new RuntimeException("Unknown barrier type " + barrier.getType());
+      case RUN:
+        String taskName = null;
+        task = new RunJobTask(jobKey, taskName);
+        jobState = JobRecord.State.READY_TO_RUN;
+        break;
+      case FINALIZE:
+        taskName = null;
+        task = new FinalizeJobTask(jobKey, taskName);
+        jobState = JobRecord.State.READY_TO_FINALIZE;
+        break;
+      default:
+        throw new RuntimeException("Unknown barrier type " + barrier.getType());
     }
     backEnd.releaseBarrier(barrier, job, jobState, task);
   }
