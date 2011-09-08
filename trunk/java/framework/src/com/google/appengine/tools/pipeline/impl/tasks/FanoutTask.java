@@ -14,14 +14,14 @@
 
 package com.google.appengine.tools.pipeline.impl.tasks;
 
+import com.google.appengine.api.datastore.Key;
+import com.google.appengine.api.datastore.KeyFactory;
 import com.google.appengine.tools.pipeline.impl.util.GUIDGenerator;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Enumeration;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Properties;
 
 /**
@@ -30,67 +30,88 @@ import java.util.Properties;
  */
 public class FanoutTask extends Task {
 
-  private static final String DELIMITER = "-";
-  // private static final String TASK_NAME_PROPERTY = "taskName";
+  private static final String KEY_VALUE_SEPERATOR = "::";
+  private static final String PROPERTY_SEPERATOR = ",,";
+  private static final String TASK_NAME_DELIMITTER = "--";
+  private static final String TASK_SEPERATOR = ";;";
+  private static final String RECORD_KEY_PROPERTY = "recordKey";
 
-  List<Task> listOfTasks;
+  private Key recordKey;
 
-  public FanoutTask(List<Task> taskList) {
+  public FanoutTask(Key recordKey) {
     super(Type.FAN_OUT, null);
-    this.listOfTasks = taskList;
+    this.recordKey = recordKey;
   }
 
   public FanoutTask(Properties properties) {
     super(Type.FAN_OUT, null);
-    Enumeration<?> propNames = properties.propertyNames();
-    Map<String, Properties> taskPropertiesMap = new HashMap<String, Properties>();
-    while (propNames.hasMoreElements()) {
-      String compoundPropName = (String) propNames.nextElement();
-      String value = properties.getProperty(compoundPropName);
-      String[] parts = compoundPropName.split(DELIMITER, 2);
-      if (parts.length == 2) {
-        String propName = parts[0];
-        String taskName = parts[1];
-        Properties taskProperties = taskPropertiesMap.get(taskName);
-        if (null == taskProperties) {
-          taskProperties = new Properties();
-          taskPropertiesMap.put(taskName, taskProperties);
-        }
-        taskProperties.put(propName, value);
-      }
-    }
-    listOfTasks = new ArrayList<Task>(taskPropertiesMap.size());
-    for (Entry<String, Properties> entry : taskPropertiesMap.entrySet()) {
-      String taskName = entry.getKey();
-      Properties taskProperties = entry.getValue();
-      Task task = Task.fromProperties(taskProperties);
-      task.setName(taskName);
-      listOfTasks.add(task);
-    }
+    String keyString = properties.getProperty(RECORD_KEY_PROPERTY);
+    recordKey = KeyFactory.stringToKey(keyString);
   }
 
   @Override
   protected void addProperties(Properties properties) {
-    for (Task task : listOfTasks) {
-      String taskName = GUIDGenerator.nextGUID();
-      Properties taskProps = task.toProperties();
-      Enumeration<?> propNames = taskProps.propertyNames();
-      while (propNames.hasMoreElements()) {
-        String propName = (String) propNames.nextElement();
-        String value = taskProps.getProperty(propName);
-        String compoundPropName = propName + DELIMITER + taskName;
-        properties.put(compoundPropName, value);
+    properties.setProperty(RECORD_KEY_PROPERTY, KeyFactory.keyToString(recordKey));
+  }
+
+  public Key getRecordKey() {
+    return recordKey;
+  }
+
+  public static byte[] encodeTasks(Collection<Task> taskList) {
+    StringBuilder builder = new StringBuilder(1024);
+    boolean firstTask = true;
+    for (Task task : taskList) {
+      if (!firstTask) {
+        builder.append(TASK_SEPERATOR);
       }
+      firstTask = false;
+      encodeTask(builder, task);
+    }
+    return builder.toString().getBytes();
+  }
+
+  private static void encodeTask(StringBuilder builder, Task task) {
+    String taskName = GUIDGenerator.nextGUID();
+    builder.append(taskName);
+    builder.append(TASK_NAME_DELIMITTER);
+    Properties taskProps = task.toProperties();
+    Enumeration<?> propNames = taskProps.propertyNames();
+    boolean firstProperty = true;
+    while (propNames.hasMoreElements()) {
+      if (!firstProperty) {
+        builder.append(PROPERTY_SEPERATOR);
+      }
+      firstProperty = false;
+      String propName = (String) propNames.nextElement();
+      String value = taskProps.getProperty(propName);
+      builder.append(propName).append(KEY_VALUE_SEPERATOR).append(value);
     }
   }
 
-  public List<Task> getTasks() {
+  public static List<Task> decodeTasks(byte[] encodedBytes) {
+    String encodedListOfTasks = new String(encodedBytes);
+    String[] encodedTaskArray = encodedListOfTasks.split(TASK_SEPERATOR);
+    int numTasks = encodedTaskArray.length;
+    List<Task> listOfTasks = new ArrayList<Task>(numTasks);
+    for (String encodedTask : encodedTaskArray) {
+      String[] nameAndProperties = encodedTask.split(TASK_NAME_DELIMITTER);
+      String taskName = nameAndProperties[0];
+      String encodedProperties = nameAndProperties[1];
+      String[] encodedPropertyArray = encodedProperties.split(PROPERTY_SEPERATOR);
+      int numProperties = encodedPropertyArray.length;
+      Properties taskProperties = new Properties();
+      for (String encodedProperty : encodedPropertyArray) {
+        String[] keyValuePair = encodedProperty.split(KEY_VALUE_SEPERATOR);
+        String key = keyValuePair[0];
+        String value = keyValuePair[1];
+        taskProperties.setProperty(key, value);
+      }
+      Task task = Task.fromProperties(taskProperties);
+      task.setName(taskName);
+      listOfTasks.add(task);
+    }
     return listOfTasks;
-  }
-
-  @Override
-  public String toString() {
-    return type.toString() + " Tasks: " + listOfTasks;
   }
 
 }

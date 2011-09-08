@@ -145,6 +145,7 @@ public class JobRecord extends CascadeModelObject implements JobInfo {
       UpdateSpec updateSpec, Object... params) {
     super(rootJobKey);
     rootJobKey = this.rootJobKey;
+    updateSpec.setRootJobKey(rootJobKey);
     this.jobInstanceRecordInflated = new JobInstanceRecord(this, jobInstance);
     this.jobInstanceKey = this.jobInstanceRecordInflated.key;
     state = State.WAITING_FOR_RUN_SLOTS;

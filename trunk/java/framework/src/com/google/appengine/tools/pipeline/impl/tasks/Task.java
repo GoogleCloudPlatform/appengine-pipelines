@@ -30,7 +30,7 @@ public abstract class Task {
    * 
    */
   public static enum Type {
-    HANDLE_SLOT_FILLED, RUN_JOB, FINALIZE_JOB, FAN_OUT
+    HANDLE_SLOT_FILLED, RUN_JOB, FINALIZE_JOB, FAN_OUT, DELETE_PIPELINE
   }
 
   protected String taskName;
@@ -87,6 +87,8 @@ public abstract class Task {
         return new FinalizeJobTask(properties);
       case FAN_OUT:
         return new FanoutTask(properties);
+      case DELETE_PIPELINE:
+        return new DeletePipelineTask(properties);
       default:
         throw new RuntimeException("Unrecognized task type: " + type);
     }

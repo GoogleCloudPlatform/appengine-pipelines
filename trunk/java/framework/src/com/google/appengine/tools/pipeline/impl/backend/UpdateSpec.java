@@ -35,16 +35,29 @@ import java.util.Set;
 public class UpdateSpec {
 
   private static final int INITIAL_SIZE = 20;
-
+  
+  private Key rootJobKey;
   private Set<Task> taskSet = new HashSet<Task>(INITIAL_SIZE);
   private Map<Key, JobRecord> jobMap = new HashMap<Key, JobRecord>(INITIAL_SIZE);
   private Map<Key, Barrier> barrierMap = new HashMap<Key, Barrier>(INITIAL_SIZE);
   private Map<Key, Slot> slotMap = new HashMap<Key, Slot>(INITIAL_SIZE);
   private Map<Key, JobInstanceRecord> jobInstanceMap =
       new HashMap<Key, JobInstanceRecord>(INITIAL_SIZE);
+  
+  public UpdateSpec(Key rootJobKey){
+    this.rootJobKey = rootJobKey;
+  }
 
   private static <E extends CascadeModelObject> void put(Map<Key, E> map, E object) {
     map.put(object.getKey(), object);
+  }
+  
+  public void setRootJobKey(Key rootJobKey) {
+    this.rootJobKey = rootJobKey;
+  }
+  
+  public Key getRootJobKey() {
+    return rootJobKey;
   }
 
   public void registerTask(Task task) {

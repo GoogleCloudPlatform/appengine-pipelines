@@ -16,11 +16,15 @@ package com.google.appengine.tools.pipeline.impl.backend;
 
 import com.google.appengine.tools.pipeline.impl.tasks.Task;
 
+import java.util.Collection;
+
 /**
  * 
  * @author rudominer@google.com (Mitch Rudominer)
- *
+ * 
  */
 public interface CascadeTaskQueue {
   public void enqueue(Task task);
+
+  public void enqueue(final Collection<Task> tasks);
 }

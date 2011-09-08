@@ -28,10 +28,11 @@ import com.google.appengine.tools.pipeline.impl.backend.UpdateSpec;
 import com.google.appengine.tools.pipeline.impl.model.Barrier;
 import com.google.appengine.tools.pipeline.impl.model.JobInstanceRecord;
 import com.google.appengine.tools.pipeline.impl.model.JobRecord;
+import com.google.appengine.tools.pipeline.impl.model.JobRecord.State;
 import com.google.appengine.tools.pipeline.impl.model.PipelineObjects;
 import com.google.appengine.tools.pipeline.impl.model.Slot;
 import com.google.appengine.tools.pipeline.impl.model.SlotDescriptor;
-import com.google.appengine.tools.pipeline.impl.model.JobRecord.State;
+import com.google.appengine.tools.pipeline.impl.tasks.DeletePipelineTask;
 import com.google.appengine.tools.pipeline.impl.tasks.FanoutTask;
 import com.google.appengine.tools.pipeline.impl.tasks.FinalizeJobTask;
 import com.google.appengine.tools.pipeline.impl.tasks.HandleSlotFilledTask;
@@ -61,8 +62,10 @@ public class PipelineManager {
 
   public static String startNewCascade(JobSetting[] settings, Job<?> jobInstance,
       Object... params) {
-    UpdateSpec updateSpec = new UpdateSpec();
+    UpdateSpec updateSpec = new UpdateSpec(null); // We don't have a rootJobKey
+    // yet
     JobRecord jobRecord = registerNewJob(updateSpec, settings, null, jobInstance, params);
+    updateSpec.setRootJobKey(jobRecord.getRootJobKey());
     backEnd.save(updateSpec);
     return KeyFactory.keyToString(jobRecord.getKey());
   }
@@ -186,16 +189,32 @@ public class PipelineManager {
     Key key = KeyFactory.stringToKey(jobHandle);
     JobRecord jobRecord = backEnd.queryJob(key, false, false);
     jobRecord.setState(JobRecord.State.STOPPED);
-    UpdateSpec updateSpec = new UpdateSpec();
+    UpdateSpec updateSpec = new UpdateSpec(jobRecord.getRootJobKey());
     updateSpec.includeJob(jobRecord);
     backEnd.save(updateSpec);
   }
 
-  public static void deletePipelineRecords(String pipelineHandle) throws NoSuchObjectException,
-      IllegalStateException {
+  /**
+   * Delete all datastore entities corresponding to the given pipeline.
+   *
+   * @param pipelineHandle The handle of the pipeline to be deleted
+   * @param force If this parameter is not {@code true} then this method will
+   *        throw an {@link IllegalStateException} if the specified pipeline is
+   *        not in the {@link JobRecord.State#FINALIZED} or
+   *        {@link JobRecord.State#STOPPED} state.
+   * @param async If this parameter is {@code true} then instead of performing
+   *        the delete operation synchronously, this method will enqueue a task
+   *        to perform the operation.
+   * @throws NoSuchObjectException If there is no Job with the given key.
+   * @throws IllegalStateException If {@code force = false} and the specified
+   *         pipeline is not in the {@link JobRecord.State#FINALIZED} or
+   *         {@link JobRecord.State#STOPPED} state.
+   */
+  public static void deletePipelineRecords(String pipelineHandle, boolean force, boolean async)
+      throws NoSuchObjectException, IllegalStateException {
     checkNonEmpty(pipelineHandle, "pipelineHandle");
     Key key = KeyFactory.stringToKey(pipelineHandle);
-    backEnd.deletePipeline(key);
+    backEnd.deletePipeline(key, force, async);
   }
 
   public static void acceptPromisedValue(String promiseHandle, Object value)
@@ -221,7 +240,7 @@ public class PipelineManager {
     if (null == slot) {
       throw new NoSuchObjectException("There is no promise with handle " + promiseHandle);
     }
-    UpdateSpec updateSpec = new UpdateSpec();
+    UpdateSpec updateSpec = new UpdateSpec(slot.getRootJobKey());
     registerSlotFilled(updateSpec, slot, value);
     backEnd.save(updateSpec);
   }
@@ -247,7 +266,21 @@ public class PipelineManager {
         break;
       case FAN_OUT:
         FanoutTask fanoutTask = (FanoutTask) task;
-        backEnd.handleFanoutTask(fanoutTask);
+        try {
+          backEnd.handleFanoutTask(fanoutTask);
+        } catch (NoSuchObjectException e) {
+          logger.log(Level.SEVERE,
+              "Pipeline is fatally corrupt. Fanout task record not found", e);
+        }
+        break;
+      case DELETE_PIPELINE:
+        DeletePipelineTask deletePipelineTask = (DeletePipelineTask) task;
+        try {
+          backEnd.deletePipeline(deletePipelineTask.getRootJobKey(), deletePipelineTask
+              .shouldForce(), false);
+        } catch (Exception e) {
+          logger.log(Level.WARNING, "DeletePipeline operation failed.", e);
+        }
         break;
       default:
         throw new IllegalArgumentException("Unrecognized task type: " + task.getType());
@@ -352,7 +385,7 @@ public class PipelineManager {
     Object[] params = runBarrier.buildArgumentArray();
     setJobRecord(jobObject, jobRecord);
     jobRecord.incrementAttemptNumber();
-    UpdateSpec updateSpec = new UpdateSpec();
+    UpdateSpec updateSpec = new UpdateSpec(jobRecord.getRootJobKey());
     setUpdateSpec(jobObject, updateSpec);
     Method runMethod = findAppropriateRunMethod(jobObject.getClass(), params);
     if (logger.isLoggable(Level.FINEST)) {
@@ -376,7 +409,7 @@ public class PipelineManager {
     if (null != caughtException) {
       // Make a new UpdateSpec. Any changes made to the UpdateSpec during
       // the failed Job should be discarded.
-      updateSpec = new UpdateSpec();
+      updateSpec = new UpdateSpec(jobRecord.getRootJobKey());
       handleExceptionDuringRun(jobRecord, rootJobRecord, updateSpec, caughtException);
     } else {
       logger.finest("Job returned: " + returnValue);
@@ -435,7 +468,7 @@ public class PipelineManager {
       if (null == slot) {
         throw new RuntimeException("" + jobRecord + " has not been inflated.");
       }
-      UpdateSpec updateSpec = new UpdateSpec();
+      UpdateSpec updateSpec = new UpdateSpec(jobRecord.getRootJobKey());
       registerSlotFilled(updateSpec, slot, finalizeValue);
       jobRecord.setState(JobRecord.State.FINALIZED);
       jobRecord.setEndTime(new Date());

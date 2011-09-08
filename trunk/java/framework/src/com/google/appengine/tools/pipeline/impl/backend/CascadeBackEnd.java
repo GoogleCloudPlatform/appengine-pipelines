@@ -17,7 +17,6 @@ package com.google.appengine.tools.pipeline.impl.backend;
 import com.google.appengine.api.datastore.Key;
 import com.google.appengine.tools.pipeline.NoSuchObjectException;
 import com.google.appengine.tools.pipeline.impl.model.Barrier;
-import com.google.appengine.tools.pipeline.impl.model.CascadeModelObject;
 import com.google.appengine.tools.pipeline.impl.model.JobRecord;
 import com.google.appengine.tools.pipeline.impl.model.PipelineObjects;
 import com.google.appengine.tools.pipeline.impl.model.Slot;
@@ -82,12 +81,27 @@ public interface CascadeBackEnd {
 
   public Object deserializeValue(Object serliazedVersion) throws IOException;
 
-  public Key generateKey(CascadeModelObject newObject);
-
-  public void handleFanoutTask(FanoutTask fanoutTask);
+  public void handleFanoutTask(FanoutTask fanoutTask) throws NoSuchObjectException;
 
   public PipelineObjects queryFullPipeline(Key rootJobKey);
 
-  public void deletePipeline(Key rootJobKey) throws NoSuchObjectException, IllegalStateException;
+  /**
+   * Delete all datastore entities corresponding to the given pipeline.
+   * 
+   * @param rootJobKey The root job key identifying the pipeline
+   * @param force If this parameter is not {@code true} then this method will
+   *        throw an {@link IllegalStateException} if the specified pipeline is
+   *        not in the {@link JobRecord.State#FINALIZED} or
+   *        {@link JobRecord.State#STOPPED} state.
+   * @param async If this parameter is {@code true} then instead of performing
+   *        the delete operation synchronously, this method will enqueue a task
+   *        to perform the operation.
+   * @throws NoSuchObjectException If there is no Job with the given key.
+   * @throws IllegalStateException If {@code force = false} and the specified
+   *         pipeline is not in the {@link JobRecord.State#FINALIZED} or
+   *         {@link JobRecord.State#STOPPED} state.
+   */
+  public void deletePipeline(Key rootJobKey, boolean force, boolean async)
+      throws NoSuchObjectException, IllegalStateException;
 
 }
