@@ -28,10 +28,10 @@ import com.google.appengine.tools.pipeline.NoSuchObjectException;
 import com.google.appengine.tools.pipeline.PipelineService;
 
 /**
- * Implements {@link PipelineService}  by delegating to {@link PipelineManager}.
+ * Implements {@link PipelineService} by delegating to {@link PipelineManager}.
  * 
  * @author rudominer@google.com (Mitch Rudominer)
- *
+ * 
  */
 public class PipelineServiceImpl implements PipelineService {
 
@@ -81,14 +81,20 @@ public class PipelineServiceImpl implements PipelineService {
 
   public void deletePipelineRecords(String pipelineHandle) throws NoSuchObjectException,
       IllegalStateException {
-    PipelineManager.deletePipelineRecords(pipelineHandle);
+    deletePipelineRecords(pipelineHandle, false, false);
+  }
+
+  public void deletePipelineRecords(String pipelineHandle, boolean force, boolean async)
+      throws NoSuchObjectException, IllegalStateException {
+    PipelineManager.deletePipelineRecords(pipelineHandle, force, async);
   }
 
   public JobInfo getJobInfo(String jobHandle) throws NoSuchObjectException {
     return PipelineManager.getJob(jobHandle);
   }
 
-  public void submitPromisedValue(String promiseHandle, Object value) throws NoSuchObjectException {
+  public void submitPromisedValue(String promiseHandle, Object value)
+      throws NoSuchObjectException {
     PipelineManager.acceptPromisedValue(promiseHandle, value);
   }
 }

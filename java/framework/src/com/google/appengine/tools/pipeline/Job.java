@@ -89,7 +89,7 @@ import java.util.List;
 public abstract class Job<E> implements Serializable {
 
   private transient JobRecord thisJobRecord;
-  private transient UpdateSpec updateSpec = new UpdateSpec();
+  private transient UpdateSpec updateSpec;
 
   // This method will be invoked by reflection from PipelineManager
   @SuppressWarnings("unused")

@@ -21,21 +21,22 @@ import com.google.appengine.api.datastore.DatastoreService;
 import com.google.appengine.api.datastore.DatastoreServiceFactory;
 import com.google.appengine.api.datastore.Entity;
 import com.google.appengine.api.datastore.EntityNotFoundException;
+import com.google.appengine.api.datastore.FetchOptions;
 import com.google.appengine.api.datastore.Key;
-import com.google.appengine.api.datastore.KeyFactory;
 import com.google.appengine.api.datastore.PreparedQuery;
 import com.google.appengine.api.datastore.Query;
 import com.google.appengine.api.datastore.Transaction;
 import com.google.appengine.tools.pipeline.NoSuchObjectException;
 import com.google.appengine.tools.pipeline.impl.model.Barrier;
 import com.google.appengine.tools.pipeline.impl.model.CascadeModelObject;
+import com.google.appengine.tools.pipeline.impl.model.FanoutTaskRecord;
 import com.google.appengine.tools.pipeline.impl.model.JobInstanceRecord;
 import com.google.appengine.tools.pipeline.impl.model.JobRecord;
 import com.google.appengine.tools.pipeline.impl.model.PipelineObjects;
 import com.google.appengine.tools.pipeline.impl.model.Slot;
+import com.google.appengine.tools.pipeline.impl.tasks.DeletePipelineTask;
 import com.google.appengine.tools.pipeline.impl.tasks.FanoutTask;
 import com.google.appengine.tools.pipeline.impl.tasks.Task;
-import com.google.appengine.tools.pipeline.impl.util.GUIDGenerator;
 import com.google.appengine.tools.pipeline.impl.util.SerializationUtils;
 
 import java.io.IOException;
@@ -79,19 +80,31 @@ public class AppEngineBackEnd implements CascadeBackEnd {
     dataStore.put(entityList);
   }
 
+  // N.B. (rudominer) This method must be called from within a datastore
+  // transaction.
   private void saveAll(UpdateSpec updateSpec) {
+    if (null == dataStore.getCurrentTransaction()) {
+      throw new RuntimeException(
+          "Internal logic error: This method must be called from within a datastore transaction");
+    }
     putAll(updateSpec.getBarriers());
     putAll(updateSpec.getJobs());
     putAll(updateSpec.getSlots());
     putAll(updateSpec.getJobInstanceRecords());
     Collection<Task> tasks = updateSpec.getTasks();
     if (tasks.size() > MAX_TRANSACTIONAL_TASKS) {
-      FanoutTask fannoutTask = new FanoutTask(new ArrayList<Task>(tasks));
+      byte[] encodedTasks = FanoutTask.encodeTasks(tasks);
+      Key rootJobKey = updateSpec.getRootJobKey();
+      FanoutTaskRecord ftRecord = new FanoutTaskRecord(rootJobKey, encodedTasks);
+      // Store FanoutTaskRecord outside of any transaction, but before
+      // the FanoutTask is enqueued. If the put succeeds but the
+      // enqueue fails then the FanoutTaskRecord is orphaned. But
+      // the Pipeline is still consistent.
+      dataStore.put(null, ftRecord.toEntity());
+      FanoutTask fannoutTask = new FanoutTask(ftRecord.getKey());
       taskQueue.enqueue(fannoutTask);
     } else {
-      for (Task task : updateSpec.getTasks()) {
-        taskQueue.enqueue(task);
-      }
+      taskQueue.enqueue(updateSpec.getTasks());
     }
   }
 
@@ -136,7 +149,7 @@ public class AppEngineBackEnd implements CascadeBackEnd {
           logger.finest(logMessage + " Trying again.");
           try {
             // Sleep between 0.2 and 4.2 seconds
-            Thread.sleep((long) (random.nextFloat() + 0.05) * 4000);
+            Thread.sleep((long) ((random.nextFloat() + 0.05) * 4000.0));
           } catch (InterruptedException f) {
             // ignore
           }
@@ -335,7 +348,7 @@ public class AppEngineBackEnd implements CascadeBackEnd {
   private void transactionallyReleaseBarrier(Barrier barrier, JobRecord job,
       JobRecord.State newJobState, Task task) {
     job.setState(newJobState);
-    UpdateSpec updateSpec = new UpdateSpec();
+    UpdateSpec updateSpec = new UpdateSpec(barrier.getRootJobKey());
     updateSpec.includeJob(job);
     updateSpec.registerTask(task);
     Transaction transaction = dataStore.beginTransaction();
@@ -373,35 +386,24 @@ public class AppEngineBackEnd implements CascadeBackEnd {
     return SerializationUtils.deserialize(((Blob) serializedVersion).getBytes());
   }
 
-  public Key generateKey(CascadeModelObject newObject) {
-    Key rootJobKey = newObject.getRootJobKey();
-    String name = GUIDGenerator.nextGUID();
-    String kind = newObject.getDatastoreKind();
-    Key key;
-    if (null == rootJobKey) {
-      if (JobRecord.DATA_STORE_KIND.equals(kind)) {
-        // This object is the root job.
-        key = KeyFactory.createKey(kind, name);
-      } else {
-        throw new RuntimeException("rootJobKeyString is null for " + newObject);
-      }
-    } else {
-      key = rootJobKey.getChild(kind, name);
+  public void handleFanoutTask(FanoutTask fanoutTask) throws NoSuchObjectException {
+    Key fanoutTaskRecordKey = fanoutTask.getRecordKey();
+    // Fetch the fanoutTaskRecord outside of any transaction
+    Entity entity = null;
+    try {
+      entity = dataStore.get(null, fanoutTaskRecordKey);
+    } catch (EntityNotFoundException e) {
+      throw new NoSuchObjectException(fanoutTaskRecordKey.toString(), e);
     }
-    return key;
-  }
-
-  public void handleFanoutTask(FanoutTask fanoutTask) {
-    UpdateSpec updateSpec = new UpdateSpec();
-    Collection<Task> taskCollection = fanoutTask.getTasks();
-    for (Task task : taskCollection) {
-      taskQueue.enqueue(task);
-    }
+    FanoutTaskRecord ftRecord = new FanoutTaskRecord(entity);
+    byte[] encodedBytes = ftRecord.getPayload();
+    taskQueue.enqueue(FanoutTask.decodeTasks(encodedBytes));
   }
 
 
 
-  private Iterable<Entity> queryAll(String kind, Key rootJobKey, boolean keysOnly) {
+  private Iterable<Entity> queryAll(String kind, Key rootJobKey, boolean keysOnly,
+      FetchOptions fetchOptions) {
     Query query = new Query(kind);
     if (keysOnly) {
       query.setKeysOnly();
@@ -409,7 +411,13 @@ public class AppEngineBackEnd implements CascadeBackEnd {
     query.addFilter(CascadeModelObject.ROOT_JOB_KEY_PROPERTY, Query.FilterOperator.EQUAL,
         rootJobKey);
     PreparedQuery preparedQuery = dataStore.prepare(query);
-    return preparedQuery.asIterable();
+    Iterable<Entity> returnValue;
+    if (null != fetchOptions) {
+      returnValue = preparedQuery.asIterable(fetchOptions);
+    } else {
+      returnValue = preparedQuery.asIterable();
+    }
+    return returnValue;
   }
 
   private interface Instantiator<E extends CascadeModelObject> {
@@ -418,7 +426,7 @@ public class AppEngineBackEnd implements CascadeBackEnd {
 
   private <E extends CascadeModelObject> void putAll(Map<Key, E> listOfObjects,
       Instantiator<E> instantiator, String kind, Key rootJobKey) {
-    for (Entity entity : queryAll(kind, rootJobKey, false)) {
+    for (Entity entity : queryAll(kind, rootJobKey, false, null)) {
       listOfObjects.put(entity.getKey(), instantiator.newObject(entity));
     }
   }
@@ -453,31 +461,79 @@ public class AppEngineBackEnd implements CascadeBackEnd {
     return new PipelineObjects(rootJobKey, jobs, slots, barriers, jobInstanceRecords);
   }
 
-  private void deleteAll(String kind, Key rootJobKey) {
+  /**
+   * Delete up to N entities of the specified kind, with the specified
+   * rootJobKey
+   * 
+   * @return The number of entities deleted.
+   */
+  private int deleteN(String kind, Key rootJobKey, int n) {
+    if (n < 1) {
+      throw new IllegalArgumentException("n must be positive");
+    }
+    logger.info("Deleting  " + n + " " + kind + "s with rootJobKey=" + rootJobKey);
     List<Key> keyList = new LinkedList<Key>();
-    for (Entity entity : queryAll(kind, rootJobKey, true)) {
+    FetchOptions fetchOptions = FetchOptions.Builder.withLimit(n).chunkSize(Math.min(n, 500));
+    for (Entity entity : queryAll(kind, rootJobKey, true, fetchOptions)) {
       keyList.add(entity.getKey());
     }
     dataStore.delete(keyList);
+    return keyList.size();
   }
 
-  public void deletePipeline(Key rootJobKey) throws NoSuchObjectException, IllegalStateException {
-    JobRecord rootJobRecord = queryJob(rootJobKey, false, false);
-    switch (rootJobRecord.getState()) {
-      case WAITING_FOR_RUN_SLOTS:
-      case READY_TO_RUN:
-      case WAITING_FOR_FINALIZE_SLOT:
-      case READY_TO_FINALIZE:
-      case RETRY:
-        throw new IllegalStateException("Pipeline is still running: " + rootJobRecord);
-      case FINALIZED:
-      case STOPPED:
-        // OK
+  private void deleteAll(String kind, Key rootJobKey) {
+    logger.info("Deleting all " + kind + " with rootJobKey=" + rootJobKey);
+    while (deleteN(kind, rootJobKey, 2000) > 0) {
+      continue;
+    }
+  }
+
+  /**
+   * Delete all datastore entities corresponding to the given pipeline.
+   * 
+   * @param rootJobKey The root job key identifying the pipeline
+   * @param force If this parameter is not {@code true} then this method will
+   *        throw an {@link IllegalStateException} if the specified pipeline is
+   *        not in the {@link JobRecord.State#FINALIZED} or
+   *        {@link JobRecord.State#STOPPED} state.
+   * @param async If this parameter is {@code true} then instead of performing
+   *        the delete operation synchronously, this method will enqueue a task
+   *        to perform the operation.
+   * @throws NoSuchObjectException If there is no Job with the given key.
+   * @throws IllegalStateException If {@code force = false} and the specified
+   *         pipeline is not in the {@link JobRecord.State#FINALIZED} or
+   *         {@link JobRecord.State#STOPPED} state.
+   */
+  public void deletePipeline(Key rootJobKey, boolean force, boolean async)
+      throws NoSuchObjectException, IllegalStateException {
+
+    if (!force) {
+      JobRecord rootJobRecord = queryJob(rootJobKey, false, false);
+      switch (rootJobRecord.getState()) {
+        case WAITING_FOR_RUN_SLOTS:
+        case READY_TO_RUN:
+        case WAITING_FOR_FINALIZE_SLOT:
+        case READY_TO_FINALIZE:
+        case RETRY:
+          throw new IllegalStateException("Pipeline is still running: " + rootJobRecord);
+        case FINALIZED:
+        case STOPPED:
+          // OK
+      }
+    }
+    if (async) {
+      // We do all the checks above before bothering to enqueue a task.
+      // They will have to be done again when the task is processed.
+      DeletePipelineTask task = new DeletePipelineTask(rootJobKey, null, force);
+      taskQueue.enqueue(task);
+      return;
     }
     deleteAll(JobRecord.DATA_STORE_KIND, rootJobKey);
     deleteAll(Slot.DATA_STORE_KIND, rootJobKey);
     deleteAll(Barrier.DATA_STORE_KIND, rootJobKey);
     deleteAll(JobInstanceRecord.DATA_STORE_KIND, rootJobKey);
+    deleteAll(FanoutTaskRecord.DATA_STORE_KIND, rootJobKey);
   }
+
 
 }

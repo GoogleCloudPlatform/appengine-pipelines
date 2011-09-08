@@ -26,7 +26,7 @@ import java.util.TreeMap;
 import java.util.Map.Entry;
 
 /**
- * @author rudominer@google.com (Your Name Here)
+ * @author rudominer@google.com (Mitch Rudominer)
  * 
  */
 public class LetterCountExample {
@@ -34,7 +34,7 @@ public class LetterCountExample {
   public static class LetterCounter extends Job1<SortedMap<Character, Integer>, String> {
     @Override
     public Value<SortedMap<Character, Integer>> run(String text) {
-      String[] words = text.split("[^a-z,A-Z]");
+      String[] words = text.split("[^a-zA-Z]");
       List<FutureValue<SortedMap<Character, Integer>>> countsForEachWord =
           new LinkedList<FutureValue<SortedMap<Character, Integer>>>();
       for (String word : words) {

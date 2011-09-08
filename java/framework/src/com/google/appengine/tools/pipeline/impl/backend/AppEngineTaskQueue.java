@@ -20,7 +20,10 @@ import com.google.appengine.api.taskqueue.TaskOptions;
 import com.google.appengine.tools.pipeline.impl.servlets.TaskHandler;
 import com.google.appengine.tools.pipeline.impl.tasks.Task;
 
+import java.util.Collection;
 import java.util.Enumeration;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Properties;
 import java.util.logging.Logger;
 
@@ -28,11 +31,13 @@ import java.util.logging.Logger;
  * Encapsulates access to the App Engine Task Queue API
  * 
  * @author rudominer@google.com (Mitch Rudominer)
- *
+ * 
  */
 public class AppEngineTaskQueue implements CascadeTaskQueue {
 
   private static final Logger logger = Logger.getLogger(AppEngineTaskQueue.class.getName());
+
+  private static final int MAX_TASKS_PER_ENQUEUE = 100;
 
   private Queue taskQueue;
 
@@ -43,6 +48,20 @@ public class AppEngineTaskQueue implements CascadeTaskQueue {
   public void enqueue(Task task) {
     logger.finest("Enqueueing: " + task);
     taskQueue.add(toTaskOptions(task));
+  }
+
+  public void enqueue(final Collection<Task> tasks) {
+    List<TaskOptions> taskOptionsList = new LinkedList<TaskOptions>();
+    for (Task task : tasks) {
+      taskOptionsList.add(toTaskOptions(task));
+      if (taskOptionsList.size() >= MAX_TASKS_PER_ENQUEUE) {
+        taskQueue.add(taskOptionsList);
+        taskOptionsList = new LinkedList<TaskOptions>();
+      }
+    }
+    if (taskOptionsList.size() > 0) {
+      taskQueue.add(taskOptionsList);
+    }
   }
 
   private TaskOptions toTaskOptions(Task task) {

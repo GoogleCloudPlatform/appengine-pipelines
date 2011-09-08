@@ -16,7 +16,8 @@ package com.google.appengine.tools.pipeline.impl.model;
 
 import com.google.appengine.api.datastore.Entity;
 import com.google.appengine.api.datastore.Key;
-import com.google.appengine.tools.pipeline.impl.PipelineManager;
+import com.google.appengine.api.datastore.KeyFactory;
+import com.google.appengine.tools.pipeline.impl.util.GUIDGenerator;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -35,32 +36,75 @@ public abstract class CascadeModelObject {
   protected Key key;
   protected Key rootJobKey;
 
-  protected CascadeModelObject(Key rootJobKey, Key key) {
-    this.key = key;
+  /**
+   * Construct a new PipelineModelObject from the provided data.
+   * 
+   * @param rootJobKey The key of the root job for this pipeline. This must be
+   *        non-null, except in the case that we are currently constructing the
+   *        root job. In that case {@code thisKey} and {@code parentKey} must
+   *        both be null and this must be a {@link JobRecord}.
+   * @param parentKey The entity group parent key. This must be null unless
+   *        {@code thisKey} is null. If {@code thisKey} is null then {@code
+   *        parentKey} will be used to construct {@code thisKey}. {@code
+   *        parentKey} and {@code thisKey} are both allowed to be null, in which
+   *        case {@code thisKey} will be constructed without a parent.
+   * @param thisKey The key for the object being constructed. If this is null
+   *        then a new key will be constructed.
+   */
+  protected CascadeModelObject(Key rootJobKey, Key parentKey, Key thisKey) {
+    this.key = thisKey;
     this.rootJobKey = rootJobKey;
-    if (null == key) {
-      this.key = PipelineManager.getBackEnd().generateKey(this);
-    }
     if (null == rootJobKey) {
-      if (this instanceof JobRecord && null == key) {
-        // This is the root job of a new cascade
-        this.rootJobKey = this.key;
+      if (this instanceof JobRecord) {
+        // We are constructing the root job of a new cascade
+        if (null != thisKey) {
+          throw new IllegalArgumentException("rootJobKey is null and thisKey is not null");
+        }
+        if (null != parentKey) {
+          throw new IllegalArgumentException("rootJobKey is null and parentKey is not null");
+        }
       } else {
         throw new IllegalArgumentException("rootJobKey is null");
       }
+    } 
+    if (null == key) {
+      this.key = generateKey(parentKey, getDatastoreKind());
+    } else if (parentKey != null) {
+      throw new IllegalArgumentException("You may not specify both thisKey and parentKey");
+    }
+    if (null == rootJobKey) {
+      // This is the root job of a new cascade
+      this.rootJobKey = this.key;
     }
   }
 
+  /**
+   * Construct a new PipelineModelObject with the given rootJobKey as the parent
+   * key.
+   * 
+   * @param rootJobKey Key of the root job. Must not be null.
+   */
   protected CascadeModelObject(Key rootJobKey) {
-    this(rootJobKey, null);
+    this(rootJobKey, rootJobKey, null);
   }
 
   protected CascadeModelObject(Entity entity) {
-    this(extractRootJobKey(entity), extractKey(entity));
+    this(extractRootJobKey(entity), null, extractKey(entity));
     String expectedEntityType = getDatastoreKind();
     if (!getDatastoreKind().equals(extractType(entity))) {
       throw new IllegalArgumentException("The entity is not of kind " + getDatastoreKind());
     }
+  }
+
+  private static Key generateKey(Key parentKey, String kind) {
+    String name = GUIDGenerator.nextGUID();
+    Key key;
+    if (null == parentKey) {
+      key = KeyFactory.createKey(kind, name);
+    } else {
+      key = parentKey.getChild(kind, name);
+    }
+    return key;
   }
 
   private static Key extractRootJobKey(Entity entity) {
