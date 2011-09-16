@@ -38,6 +38,15 @@ public class FutureListTest extends PipelineTest {
     Integer sum = (Integer) waitForJobToComplete(pipelineId);
     assertEquals(21, sum.intValue());
   }
+  
+  // Thanks to Ronoaldo José de Lana Pereira for
+  // suggesting this.
+  public void testEmptyFutureList() throws Exception {
+    PipelineService service = PipelineServiceFactory.newPipelineService();
+    String pipelineId = service.startNewPipeline(new SumsEmptyListJob());
+    Integer sum = (Integer) waitForJobToComplete(pipelineId);
+    assertEquals(0, sum.intValue());
+  }
 
   /**
    * In this job, the call to futureList() happens not in a child job but in
@@ -69,6 +78,14 @@ public class FutureListTest extends PipelineTest {
     @Override
     public Value<Integer> run() {
       return futureCall(new SumJob(), futureCall(new ReturnsListJob()));
+    }
+  }
+  
+  private static class SumsEmptyListJob extends Job0<Integer> {
+    @Override
+    public Value<Integer> run() {
+      List<Value<Integer>> emptyValueList = new ArrayList<Value<Integer>>(0);
+      return futureCall(new SumJob(), futureList(emptyValueList));
     }
   }
 

@@ -89,12 +89,14 @@ public class BarrierTest extends TestCase {
       if (value instanceof ListMarker) {
         List<?> valueList = ((ListMarker) value).valueList;
         List<Slot> slotList = new ArrayList<Slot>(valueList.size());
+        Slot dummyListSlot = Slot.dummyInstanceForTesting();
+        dummyListSlot.fill(null);
         for (Object v : valueList) {
           Slot slot = Slot.dummyInstanceForTesting();
           slot.fill(v);
           slotList.add(slot);
         }
-        barrier.addListArgumentSlots(slotList);
+        barrier.addListArgumentSlots(dummyListSlot, slotList);
       } else if (value instanceof PhantomMarker) {
         Slot slot = Slot.dummyInstanceForTesting();
         slot.fill(((PhantomMarker) value).value);
