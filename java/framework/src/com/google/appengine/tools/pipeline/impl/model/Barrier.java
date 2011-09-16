@@ -1,11 +1,11 @@
 // Copyright 2011 Google Inc.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
 // the License at
-// 
+//
 // http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
 // WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -29,7 +29,7 @@ import java.util.Map;
  * 
  */
 public class Barrier extends CascadeModelObject {
-  
+
   /**
    * The type of Barrier
    */
@@ -163,18 +163,19 @@ public class Barrier extends CascadeModelObject {
       Object nextValue = descriptor.slot.getValue();
       if (currentListArg != null) {
         // Assert: currentListArg.size() < currentListArgExpectedSize
-        if (descriptor.groupSize != currentListArgExpectedSize) {
+        if (descriptor.groupSize != currentListArgExpectedSize + 1) {
           throw new RuntimeException("expectedGroupSize: " + currentListArgExpectedSize
               + ", groupSize: " + descriptor.groupSize + "; nextValue=" + nextValue);
         }
         currentListArg.add(nextValue);
       } else {
         if (descriptor.groupSize > 0) {
-          // We are not in the midst of a list and this element starts a new
-          // list
-          currentListArgExpectedSize = descriptor.groupSize;
+          // We are not in the midst of a list and this element indicates
+          // a new list is starting. This element itself is a dummy
+          // marker, its value is ignored. The list is comprised
+          // of the next groupSize - 1 elements.
+          currentListArgExpectedSize = descriptor.groupSize - 1;
           currentListArg = new ArrayList<Object>(currentListArgExpectedSize);
-          currentListArg.add(nextValue);
           argumentList.add(currentListArg);
         } else if (descriptor.groupSize == 0) {
           // We are not in the midst of a list and this element is not part of
@@ -212,11 +213,26 @@ public class Barrier extends CascadeModelObject {
     addSlotDescriptor(new SlotDescriptor(slot, -1));
   }
 
-  public void addListArgumentSlots(List<Slot> slotList) {
-    int groupSize = slotList.size();
-    if (groupSize < 1) {
-      throw new IllegalArgumentException("slotList must have positive length.");
+  /**
+   * Adds multiple slots to this barrier's waiting-on list representing a single
+   * Job argument of type list.
+   * 
+   * @param dummySlot A slot representing the list as a whole. It is necessary
+   *        to add this slot to the barrier to handle the case that the length
+   *        of the list is zero. In that case no other slots will be added and
+   *        the presence of this slot indicates the existence of the empty list.
+   *        This slot should be already registered as filled because the barrier
+   *        will be waiting on it. It does not matter what value the slot is
+   *        filled with because the value will not be used.
+   * @param slotList A list of slots that will be added to the barrier and used
+   *        as the elements of the list Job argument.
+   */
+  public void addListArgumentSlots(Slot initialSlot, List<Slot> slotList) {
+    int groupSize = slotList.size() + 1;
+    if (!initialSlot.isFilled()) {
+      throw new IllegalArgumentException("initialSlot must be filled");
     }
+    addSlotDescriptor(new SlotDescriptor(initialSlot, groupSize));
     for (Slot slot : slotList) {
       addSlotDescriptor(new SlotDescriptor(slot, groupSize));
     }

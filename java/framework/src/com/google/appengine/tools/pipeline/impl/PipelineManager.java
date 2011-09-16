@@ -101,8 +101,8 @@ public class PipelineManager {
    * currently support {@code FutureLists} of {@code FutureLists}.
    *
    * @param updateSpec
-   * @param value A {@code Value}. {@code Null} is interpreted as an {@code
-   *        ImmediateValue} with a value of {@code Null}.
+   * @param value A {@code Value}. {@code Null} is interpreted as an
+   *        {@code ImmediateValue} with a value of {@code Null}.
    * @param rootJobKey
    * @param barrier
    */
@@ -125,6 +125,10 @@ public class PipelineManager {
     } else if (value instanceof FutureList<?>) {
       FutureList<?> futureList = (FutureList<?>) value;
       List<Slot> slotList = new ArrayList<Slot>(futureList.getListOfValues().size());
+      // The dummyListSlot is a marker slot that indicates that the
+      // next group of slots forms a single list argument.
+      Slot dummyListSlot = new Slot(rootJobKey);
+      registerSlotFilled(updateSpec, dummyListSlot, null);
       for (Value<?> valFromList : futureList.getListOfValues()) {
         Slot slot = null;
         if (valFromList instanceof ImmediateValue<?>) {
@@ -143,7 +147,7 @@ public class PipelineManager {
         slotList.add(slot);
         updateSpec.includeSlot(slot);
       }
-      barrier.addListArgumentSlots(slotList);
+      barrier.addListArgumentSlots(dummyListSlot, slotList);
     } else {
       throwUnrecognizedValueException(value);
     }

@@ -23,7 +23,7 @@ package com.google.appengine.tools.pipeline.impl.model;
  * <li>A single argument.
  * <li>A member of a {@code List} argument. These are used to implement the
  * {@code futureList()} feature in which {@code List} of {@code FutureValues}
- * may be interpretted as a {@code FutureValue<List>}.
+ * may be interpreted as a {@code FutureValue<List>}.
  * <li>A phantom argument. These are used to implement the {@code waitFor}
  * feature. The {@code Barrier} is waiting for the {@code Slot} to be filled,
  * but the value of the {@code Slot} will be ignored, it will not be passed to
@@ -34,7 +34,9 @@ package com.google.appengine.tools.pipeline.impl.model;
  * <ul>
  * <li>groupSize < 0 : The slot is phantom
  * <li>groupSize = 0 : The slot is a single argument
- * <li>groupSize > 0 : The slot is a member of a list of length groupSize
+ * <li>groupSize > 0 : The slot is a member of a list of length groupSize - 1. The
+ *                     first slot in the group is ignored. This allows us to encode
+ *                     lists of length zero.
  * </ul>
  * 
  * @author rudominer@google.com (Mitch Rudominer)
