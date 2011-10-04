@@ -30,14 +30,16 @@ import urllib
 # Fix up paths for running tests.
 sys.path.insert(0, '../src/')
 
+import simplejson
 
 from pipeline import testutil
-import pipeline
 from pipeline import common
 from pipeline import models
+from pipeline import pipeline
 import test_shared
 
 from google.appengine.api import mail
+from google.appengine.ext import blobstore
 from google.appengine.ext import db
 
 # For convenience.
@@ -85,7 +87,7 @@ class SlotTest(TestBase):
     now = datetime.datetime.utcnow()
     slot_record = _SlotRecord(
         filler=filler_key,
-        value='my value',
+        value=simplejson.dumps('my value'),
         status=_SlotRecord.FILLED,
         fill_time=now)
 
@@ -228,14 +230,14 @@ class PipelineFutureTest(TestBase):
   def testInheritOutputsResolveValues(self):
     """Tests _inherit_outputs with resolving their current values."""
     one = _SlotRecord(
-        value='hi one',
+        value=simplejson.dumps('hi one'),
         status=_SlotRecord.FILLED,
         fill_time=datetime.datetime.utcnow(),
         filler=db.Key.from_path('mykind', 'mykey1'))
     one.put()
 
     two = _SlotRecord(
-        value='hi two',
+        value=simplejson.dumps('hi two'),
         status=_SlotRecord.FILLED,
         fill_time=datetime.datetime.utcnow(),
         filler=db.Key.from_path('mykind', 'mykey2'))
@@ -363,6 +365,7 @@ class PipelineTest(TestBase):
     self.assertEquals('default', stage.queue_name)
     self.assertEquals('/_ah/pipeline', stage.base_path)
     self.assertEquals(stage.pipeline_id, stage.root_pipeline_id)
+    self.assertTrue(stage.is_root)
 
     pipeline_record = _PipelineRecord.get_by_key_name(stage.pipeline_id)
     self.assertTrue(pipeline_record is not None)
@@ -499,6 +502,7 @@ class PipelineTest(TestBase):
     self.assertEquals('/other', other.base_path)
     self.assertEquals('meep', other.pipeline_id)
     self.assertEquals('meep', other.root_pipeline_id)
+    self.assertTrue(other.is_root)
     self.assertEquals(15, other.max_attempts)
     self.assertEquals(1234.56, other.backoff_seconds)
     self.assertEquals(2.718, other.backoff_factor)
@@ -545,6 +549,23 @@ class PipelineTest(TestBase):
     other = NothingPipeline.from_id(stage.pipeline_id)
     self.assertEquals('red', other.outputs.one.value)
     self.assertEquals('blue', other.outputs.two.value)
+
+  def testFillSlot_Huge(self):
+    """Tests filling a slot with over 1MB of data."""
+    stage = NothingPipeline('one', 'two', three='red', four=1234)
+    stage.start(queue_name='other', base_path='/other', idempotence_key='meep')
+
+    big_data = 'red' * 1000000
+    self.assertTrue(len(big_data) > 1000000)
+    small_data = 'blue' * 500
+    self.assertTrue(len(small_data) < 1000000)
+
+    stage.fill(stage.outputs.one, big_data)
+    stage.fill(stage.outputs.two, small_data)
+
+    other = NothingPipeline.from_id(stage.pipeline_id)
+    self.assertEquals(big_data, other.outputs.one.value)
+    self.assertEquals(small_data, other.outputs.two.value)
 
   def testFillSlotErrors(self):
     """Tests errors that happen when filling slots."""
@@ -716,6 +737,52 @@ class PipelineTest(TestBase):
     self.assertTrue(stage.abort('gotta bail!'))
     self.assertFalse(stage.abort('gotta bail 2!'))
 
+  def testFinalizeEmailDone_HighReplication(self):
+    """Tests completion emails for completed root pipelines on HRD."""
+    old_app_id = os.environ['APPLICATION_ID']
+    testutil.TEST_APP_ID = 's~my-hrd-app'
+    os.environ['APPLICATION_ID'] = testutil.TEST_APP_ID
+    testutil.setup_for_testing(define_queues=['other'])
+    try:
+      stage = OutputlessPipeline()
+      stage.start(idempotence_key='banana')
+      stage._context.transition_complete(stage._pipeline_key)
+      other = OutputlessPipeline.from_id(stage.pipeline_id)
+
+      result = []
+      def fake_mail(self, sender, subject, body, html=None):
+        result.append((sender, subject, body, html))
+
+      old_sendmail = pipeline.Pipeline._send_mail
+      pipeline.Pipeline._send_mail = fake_mail
+      try:
+        other.send_result_email()
+      finally:
+        pipeline.Pipeline._send_mail = old_sendmail
+
+      self.assertEquals(1, len(result))
+      sender, subject, body, html = result[0]
+      self.assertEquals('my-hrd-app@my-hrd-app.appspotmail.com', sender)
+      self.assertEquals(
+          'Pipeline successful: App "my-hrd-app", '
+          '__main__.OutputlessPipeline#banana',
+          subject)
+      self.assertEquals(
+          'View the pipeline results here:\n\n'
+          'http://my-hrd-app.appspot.com/_ah/pipeline/status?root=banana\n\n'
+          'Thanks,\n\nThe Pipeline API\n',
+          body)
+      self.assertEquals(
+          '<html><body>\n<p>View the pipeline results here:</p>\n\n<p><a href="'
+          'http://my-hrd-app.appspot.com/_ah/pipeline/status?root=banana"\n'
+          '>http://my-hrd-app.appspot.com/_ah/pipeline/status?root=banana'
+          '</a></p>\n\n<p>\nThanks,\n<br>\nThe Pipeline API\n</p>\n'
+          '</body></html>\n',
+          html)
+    finally:
+      testutil.TEST_APP_ID = old_app_id
+      os.environ['APPLICATION_ID'] = old_app_id
+
   def testFinalizeEmailDone(self):
     """Tests completion emails for completed root pipelines."""
     stage = OutputlessPipeline()
@@ -867,6 +934,7 @@ class PipelineTest(TestBase):
     stage = OutputlessPipeline()
     self.assertRaises(pipeline.UnexpectedPipelineError, stage.cleanup)
     stage.start(idempotence_key='banana')
+    self.assertTrue(stage.is_root)
     stage.cleanup()
     task_list = test_shared.get_tasks('default')
     self.assertEquals(2, len(task_list))
@@ -880,6 +948,14 @@ class PipelineTest(TestBase):
     self.assertEquals(
         ['aglteS1hcHAtaWRyHwsSE19BRV9QaXBlbGluZV9SZWNvcmQiBmJhbmFuYQw'],
         cleanup_task['params']['root_pipeline_key'])
+
+    # If the stage is actually a child stage, then cleanup does nothing.
+    stage._root_pipeline_key = db.Key.from_path(
+        _PipelineRecord.kind(), 'other')
+    self.assertFalse(stage.is_root)
+    stage.cleanup()
+    task_list = test_shared.get_tasks('default')
+    self.assertEquals(2, len(task_list))
 
 
 class OrderingTest(TestBase):
@@ -1000,9 +1076,11 @@ class UtilitiesTest(TestBase):
 
     other_future._after_all_pipelines.add(future)
 
+    # When the parameters are small.
     stage = GenerateArgs(future.one, 'some value', future,
-                           red=1234, blue=future.two)
-    dependent_slots, output_slot_keys, params = pipeline._generate_args(
+                         red=1234, blue=future.two)
+    (dependent_slots, output_slot_keys,
+     params_text, params_blob) = pipeline._generate_args(
         stage,
         other_future,
         'my-queue',
@@ -1016,6 +1094,8 @@ class UtilitiesTest(TestBase):
              other_future.default.key]),
         output_slot_keys)
 
+    self.assertEquals(None, params_blob)
+    params = simplejson.loads(params_text)
     self.assertEquals(
         {
             'queue_name': 'my-queue',
@@ -1044,6 +1124,42 @@ class UtilitiesTest(TestBase):
             'backoff_seconds': 15,
             'task_retry': False,
         }, params)
+
+    # When the parameters are big enough we need an external blob.
+    stage = GenerateArgs(future.one, 'some value' * 1000000, future,
+                         red=1234, blue=future.two)
+
+    (dependent_slots, output_slot_keys,
+     params_text, params_blob) = pipeline._generate_args(
+        stage,
+        other_future,
+        'my-queue',
+        '/base-path')
+
+    self.assertEquals(
+        set([future.one.key, future.default.key, future.two.key]),
+        dependent_slots)
+    self.assertEquals(
+        set([other_future.three.key, other_future.four.key,
+             other_future.default.key]),
+        output_slot_keys)
+
+    self.assertEquals(None, params_text)
+    params = simplejson.loads(blobstore.BlobInfo(params_blob).open().read())
+    self.assertEquals('some value' * 1000000, params['args'][1]['value'])
+
+  def testShortRepr(self):
+    """Tests for the _short_repr function."""
+    my_dict = {
+      'red': 1,
+      'two': ['hi'] * 100
+    }
+    self.assertEquals(
+        "{'two': ['hi', 'hi', 'hi', 'hi', 'hi', 'hi', 'hi', 'hi', 'hi', "
+        "'hi', 'hi', 'hi', 'hi', 'hi', 'hi', 'hi', 'hi', 'hi', 'hi', 'hi', "
+        "'hi', 'hi', 'hi', 'hi', 'hi', 'hi', 'hi', 'hi', 'hi', 'hi', 'hi', "
+        "'hi',... (619 bytes)",
+        pipeline._short_repr(my_dict))
 
 
 class PipelineContextTest(TestBase):
@@ -1298,7 +1414,9 @@ class PipelineContextTest(TestBase):
         key=self.pipeline1_key,
         max_attempts=5,
         current_attempt=4,
-        params=params,
+        # Bug in DB means we need to use the storage name here,
+        # not the local property name.
+        params=simplejson.dumps(params),
         root_pipeline=self.pipeline5_key)
     pipeline_record.put()
     self.assertTrue(db.get(self.pipeline1_key) is not None)
@@ -1331,7 +1449,9 @@ class PipelineContextTest(TestBase):
         key=self.pipeline1_key,
         max_attempts=5,
         current_attempt=0,
-        params=params,
+        # Bug in DB means we need to use the storage name here,
+        # not the local property name.
+        params=simplejson.dumps(params),
         root_pipeline=self.pipeline5_key)
     pipeline_record.put()
     self.assertTrue(db.get(self.pipeline1_key) is not None)
@@ -1403,7 +1523,9 @@ class PipelineContextTest(TestBase):
         status=_PipelineRecord.ABORTED,
         abort_requested=False,
         key=self.pipeline1_key,
-        params=params)
+        # Bug in DB means we need to use the storage name here,
+        # not the local property name.
+        params=simplejson.dumps(params))
     pipeline_record.put()
     self.assertTrue(db.get(self.pipeline1_key) is not None)
 
@@ -1422,7 +1544,9 @@ class PipelineContextTest(TestBase):
         status=_PipelineRecord.WAITING,
         abort_requested=True,
         key=self.pipeline1_key,
-        params=params)
+        # Bug in DB means we need to use the storage name here,
+        # not the local property name.
+        params=simplejson.dumps(params))
     pipeline_record.put()
     self.assertTrue(db.get(self.pipeline1_key) is not None)
 
@@ -1440,7 +1564,9 @@ class PipelineContextTest(TestBase):
     pipeline_record = _PipelineRecord(
         status=_PipelineRecord.RUN,
         key=self.pipeline1_key,
-        params=params)
+        # Bug in DB means we need to use the storage name here,
+        # not the local property name.
+        params=simplejson.dumps(params))
     pipeline_record.put()
     self.assertTrue(db.get(self.pipeline1_key) is not None)
 
@@ -1468,27 +1594,37 @@ class PipelineContextTest(TestBase):
     pipeline_record1 = _PipelineRecord(
         status=_PipelineRecord.RUN,
         key=self.pipeline1_key,
-        params=params,
+        # Bug in DB means we need to use the storage name here,
+        # not the local property name.
+        params=simplejson.dumps(params),
         root_pipeline=self.pipeline1_key)
     pipeline_record2 = _PipelineRecord(
         status=_PipelineRecord.RUN,
         key=self.pipeline2_key,
-        params=params,
+        # Bug in DB means we need to use the storage name here,
+        # not the local property name.
+        params=simplejson.dumps(params),
         root_pipeline=self.pipeline1_key)
     pipeline_record3 = _PipelineRecord(
         status=_PipelineRecord.RUN,
         key=self.pipeline3_key,
-        params=params,
+        # Bug in DB means we need to use the storage name here,
+        # not the local property name.
+        params=simplejson.dumps(params),
         root_pipeline=self.pipeline1_key)
     pipeline_record4 = _PipelineRecord(
         status=_PipelineRecord.ABORTED,
         key=self.pipeline4_key,
-        params=params,
+        # Bug in DB means we need to use the storage name here,
+        # not the local property name.
+        params=simplejson.dumps(params),
         root_pipeline=self.pipeline1_key)
     pipeline_record5 = _PipelineRecord(
         status=_PipelineRecord.DONE,
         key=self.pipeline5_key,
-        params=params,
+        # Bug in DB means we need to use the storage name here,
+        # not the local property name.
+        params=simplejson.dumps(params),
         root_pipeline=self.pipeline1_key)
 
     db.put([pipeline_record1, pipeline_record2, pipeline_record3,
@@ -1606,7 +1742,9 @@ class PipelineContextTest(TestBase):
     pipeline_record = _PipelineRecord(
         status=_PipelineRecord.ABORTED,
         key=self.pipeline1_key,
-        params=params,
+        # Bug in DB means we need to use the storage name here,
+        # not the local property name.
+        params=simplejson.dumps(params),
         finalized_time=finalized_time)
     pipeline_record.put()
     self.assertTrue(db.get(self.pipeline1_key) is not None)
@@ -1629,7 +1767,9 @@ class PipelineContextTest(TestBase):
     pipeline_record = _PipelineRecord(
         status=_PipelineRecord.WAITING,
         key=self.pipeline1_key,
-        params=params)
+        # Bug in DB means we need to use the storage name here,
+        # not the local property name.
+        params=simplejson.dumps(params))
     pipeline_record.put()
     self.assertTrue(db.get(self.pipeline1_key) is not None)
 
@@ -1672,7 +1812,10 @@ class EvaluateErrorTest(test_shared.TaskRunningMixin, TestBase):
     pipeline_record = _PipelineRecord(
         root_pipeline=self.pipeline_key,
         status=_PipelineRecord.WAITING,
-        params={'output_slots': {'default': str(self.slot_key)}},
+        # Bug in DB means we need to use the storage name here,
+        # not the local property name.
+        params=simplejson.dumps({
+            'output_slots': {'default': str(self.slot_key)}}),
         key=self.pipeline_key)
     pipeline_record.put()
     self.assertTrue(db.get(self.slot_key) is None)
@@ -1688,7 +1831,10 @@ class EvaluateErrorTest(test_shared.TaskRunningMixin, TestBase):
     pipeline_record = _PipelineRecord(
         root_pipeline=missing_key,
         status=_PipelineRecord.WAITING,
-        params={'output_slots': {'default': str(self.slot_key)}},
+        # Bug in DB means we need to use the storage name here,
+        # not the local property name.
+        params=simplejson.dumps({
+            'output_slots': {'default': str(self.slot_key)}}),
         key=self.pipeline_key)
     pipeline_record.put()
     self.assertTrue(db.get(missing_key) is None)
@@ -1705,7 +1851,10 @@ class EvaluateErrorTest(test_shared.TaskRunningMixin, TestBase):
         root_pipeline=self.pipeline_key,
         status=_PipelineRecord.WAITING,
         class_path='does.not.exist',
-        params={'output_slots': {'default': str(self.slot_key)}},
+        # Bug in DB means we need to use the storage name here,
+        # not the local property name.
+        params=simplejson.dumps({
+            'output_slots': {'default': str(self.slot_key)}}),
         key=self.pipeline_key)
     pipeline_record.put()
     self.assertTrue(db.get(self.slot_key) is not None)
@@ -1858,7 +2007,9 @@ class TaskRunningTest(test_shared.TaskRunningMixin, TestBase):
         root_pipeline=self.pipeline_key,
         status=_PipelineRecord.WAITING,
         class_path='does.not.exist',
-        params={
+        # Bug in DB means we need to use the storage name here,
+        # not the local property name.
+        params=simplejson.dumps({
                  'output_slots': {'default': str(self.slot_key)},
                  'args': [],
                  'kwargs': {},
@@ -1868,7 +2019,7 @@ class TaskRunningTest(test_shared.TaskRunningMixin, TestBase):
                  'max_attempts': 4,
                  'queue_name': 'default',
                  'base_path': '',
-               },
+               }),
         key=self.pipeline_key,
         max_attempts=4)
     self.barrier_record = _BarrierRecord(
@@ -1930,11 +2081,13 @@ class TaskRunningTest(test_shared.TaskRunningMixin, TestBase):
   def testSubstagesBlock(self):
     """Tests that sub-stages with pending inputs will have a barrier added."""
     self.pipeline_record.class_path = '__main__.DumbGeneratorYields'
-    self.pipeline_record.params.update({
+    params = self.pipeline_record.params.copy()
+    params.update({
         'output_slots': {'default': str(self.slot_key)},
         'args': [{'type': 'value', 'value': True}],
         'kwargs': {},
     })
+    self.pipeline_record.params_text = simplejson.dumps(params)
     db.put([self.pipeline_record, self.slot_record, self.barrier_record])
 
     before_record = db.get(self.pipeline_key)
@@ -1987,11 +2140,13 @@ class TaskRunningTest(test_shared.TaskRunningMixin, TestBase):
   def testFannedOutOrdering(self):
     """Tests that the fanned_out property lists children in code order."""
     self.pipeline_record.class_path = '__main__.DumbGeneratorYields'
-    self.pipeline_record.params.update({
+    params = self.pipeline_record.params.copy()
+    params.update({
         'output_slots': {'default': str(self.slot_key)},
         'args': [{'type': 'value', 'value': True}],
         'kwargs': {},
     })
+    self.pipeline_record.params_text = simplejson.dumps(params)
     db.put([self.pipeline_record, self.slot_record, self.barrier_record])
 
     before_record = db.get(self.pipeline_key)
@@ -2036,7 +2191,7 @@ class TaskRunningTest(test_shared.TaskRunningMixin, TestBase):
     """Tests a finalizing, sync pipeline task being re-run."""
     self.pipeline_record.class_path = '__main__.DumbSync'
     self.slot_record.status = _SlotRecord.FILLED
-    self.slot_record.value = None
+    self.slot_record.value_text = simplejson.dumps(None)
     db.put([self.pipeline_record, self.slot_record])
 
     self.context.evaluate(self.pipeline_key, purpose=_BarrierRecord.FINALIZE)
@@ -2058,7 +2213,7 @@ class TaskRunningTest(test_shared.TaskRunningMixin, TestBase):
     self.pipeline_record.status = _PipelineRecord.DONE
     self.pipeline_record.finalized_time = now
     self.slot_record.status = _SlotRecord.FILLED
-    self.slot_record.value = None
+    self.slot_record.value_text = simplejson.dumps(None)
     db.put([self.pipeline_record, self.slot_record])
 
     self.context.evaluate(self.pipeline_key, purpose=_BarrierRecord.FINALIZE)
@@ -2123,7 +2278,7 @@ class TaskRunningTest(test_shared.TaskRunningMixin, TestBase):
     """Tests a finalizing, async pipeline task being re-run."""
     self.pipeline_record.class_path = '__main__.DumbAsync'
     self.slot_record.status = _SlotRecord.FILLED
-    self.slot_record.value = None
+    self.slot_record.value_text = simplejson.dumps(None)
     db.put([self.pipeline_record, self.slot_record])
 
     self.context.evaluate(self.pipeline_key, purpose=_BarrierRecord.FINALIZE)
@@ -2148,7 +2303,7 @@ class TaskRunningTest(test_shared.TaskRunningMixin, TestBase):
     self.pipeline_record.status = _PipelineRecord.DONE
     self.pipeline_record.finalized_time = now
     self.slot_record.status = _SlotRecord.FILLED
-    self.slot_record.value = None
+    self.slot_record.value_text = simplejson.dumps(None)
     db.put([self.pipeline_record, self.slot_record])
 
     self.context.evaluate(self.pipeline_key, purpose=_BarrierRecord.FINALIZE)
@@ -2212,7 +2367,7 @@ class TaskRunningTest(test_shared.TaskRunningMixin, TestBase):
     self.pipeline_record.class_path = '__main__.DumbGeneratorYields'
     self.pipeline_record.status = _PipelineRecord.RUN
     self.slot_record.status = _SlotRecord.FILLED
-    self.slot_record.value = None
+    self.slot_record.value_text = simplejson.dumps(None)
     db.put([self.pipeline_record, self.slot_record])
 
     self.context.evaluate(self.pipeline_key, purpose=_BarrierRecord.FINALIZE)
@@ -2234,7 +2389,7 @@ class TaskRunningTest(test_shared.TaskRunningMixin, TestBase):
     self.pipeline_record.status = _PipelineRecord.DONE
     self.pipeline_record.finalized_time = now
     self.slot_record.status = _SlotRecord.FILLED
-    self.slot_record.value = None
+    self.slot_record.value_text = simplejson.dumps(None)
     db.put([self.pipeline_record, self.slot_record])
 
     self.context.evaluate(self.pipeline_key, purpose=_BarrierRecord.FINALIZE)
@@ -2385,7 +2540,9 @@ class TaskRunningTest(test_shared.TaskRunningMixin, TestBase):
         root_pipeline=self.pipeline2_key,
         status=_PipelineRecord.RUN,
         class_path='does.not.exist',
-        params={
+        # Bug in DB means we need to use the storage name here,
+        # not the local property name.
+        params=simplejson.dumps({
                  'output_slots': {'default': str(self.slot_key)},
                  'args': [],
                  'kwargs': {},
@@ -2395,7 +2552,7 @@ class TaskRunningTest(test_shared.TaskRunningMixin, TestBase):
                  'max_attempts': 4,
                  'queue_name': 'default',
                  'base_path': '',
-               },
+               }),
         key=self.pipeline2_key,
         is_root_pipeline=True,
         max_attempts=4,
@@ -2642,7 +2799,7 @@ class CallbackHandlerTest(TestBase):
         stage.pipeline_id)
     params = pipeline_record.params
     params['class_path'] = 'does.not.exist'
-    pipeline_record.params = params
+    pipeline_record.params_text = simplejson.dumps(params)
     pipeline_record.put()
 
     handler = test_shared.create_handler(
@@ -2731,7 +2888,12 @@ class CleanupHandlerTest(test_shared.TaskRunningMixin, TestBase):
     stage.cleanup()
     task_list = self.get_tasks()
     self.assertEquals(2, len(task_list))
-    self.run_task(task_list[1])
+
+    # The order of the tasks (start or cleanup) is unclear, so
+    # fish out the one that's the cleanup task and run it directly.
+    for task in task_list:
+      if task['url'] == '/_ah/pipeline/cleanup':
+        self.run_task(task)
 
     self.assertEquals(0, len(list(_PipelineRecord.all())))
     self.assertEquals(0, len(list(_SlotRecord.all())))
@@ -3429,6 +3591,18 @@ class FunctionalTest(test_shared.TaskRunningMixin, TestBase):
     self.assertEquals('second-green', outputs.three.value)
     self.assertEquals('second-yellow', outputs.four.value)
 
+  def testDeepGenerator_Huge(self):
+    """Tests a multi-level generator with huge inputs and outputs."""
+    big_data = 'blue' * 1000000
+    stage = TwoLevelFillAndPass(
+        one='red', two=big_data, three='green', four='yellow')
+    outputs = self.run_pipeline(stage)
+    self.assertEquals(None, outputs.default.value)
+    self.assertEquals('second-first-red', outputs.one.value)
+    self.assertEquals('second-first-' + big_data, outputs.two.value)
+    self.assertEquals('second-green', outputs.three.value)
+    self.assertEquals('second-yellow', outputs.four.value)
+
   def testOnlyConsumePassedOnOutputs(self):
     """Tests that just accessing a Slot on a PipelineFuture won't consume it."""
     stage = UnusedOutputReference()
@@ -3677,21 +3851,27 @@ class StatusTest(TestBase):
         root_pipeline=self.pipeline1_key,
         status=_PipelineRecord.RUN,
         class_path='does.not.exist1',
-        params=self.params1,
+        # Bug in DB means we need to use the storage name here,
+        # not the local property name.
+        params=simplejson.dumps(self.params1),
         key=self.pipeline1_key,
         max_attempts=4)
     self.pipeline2_record = _PipelineRecord(
         root_pipeline=self.pipeline1_key,
         status=_PipelineRecord.WAITING,
         class_path='does.not.exist2',
-        params=self.params2,
+        # Bug in DB means we need to use the storage name here,
+        # not the local property name.
+        params=simplejson.dumps(self.params2),
         key=self.pipeline2_key,
         max_attempts=3)
     self.pipeline3_record = _PipelineRecord(
         root_pipeline=self.pipeline1_key,
         status=_PipelineRecord.DONE,
         class_path='does.not.exist3',
-        params=self.params3,
+        # Bug in DB means we need to use the storage name here,
+        # not the local property name.
+        params=simplejson.dumps(self.params3),
         key=self.pipeline3_key,
         max_attempts=2)
 
@@ -4049,7 +4229,8 @@ class StatusTest(TestBase):
     self.slot1_record.filler = self.pipeline2_key
     self.slot1_record.fill_time = self.fill_time
     self.slot1_record.root_pipeline = self.pipeline1_key
-    self.slot1_record.value = {'one': 1234, 'two': 'hello'}
+    self.slot1_record.value_text = simplejson.dumps({
+        'one': 1234, 'two': 'hello'})
     expected = {
         'status': 'filled',
         'fillerPipelineId': 'two',
@@ -4122,7 +4303,9 @@ class StatusTest(TestBase):
         root_pipeline=self.pipeline1_key,
         status=_PipelineRecord.RUN,
         class_path='does.not.exist4',
-        params=self.params1,
+        # Bug in DB means we need to use the storage name here,
+        # not the local property name.
+        params=simplejson.dumps(self.params1),
         key=bad_pipeline_key,
         max_attempts=4)
 

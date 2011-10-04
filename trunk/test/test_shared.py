@@ -137,7 +137,7 @@ class TaskRunningMixin(object):
         'CONTENT_TYPE': headers.get('content-type', ''),
         'CONTENT_LENGTH': headers.get('content-length', ''),
         'HTTP_X_APPENGINE_TASKNAME': name,
-        'HTTP_X_APPENGINE_QUEUENAME': self.queue_name
+        'HTTP_X_APPENGINE_QUEUENAME': self.queue_name,
     }
     match_url = url
     if method == 'GET':
