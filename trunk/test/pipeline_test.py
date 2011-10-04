@@ -3389,6 +3389,20 @@ class SetStatusPipeline(pipeline.Pipeline):
                     status_links=dict(one='/red', two='/blue'))
 
 
+class PassBadValue(pipeline.Pipeline):
+  """Simple pipeline that passes along a non-JSON serializable value."""
+
+  def run(self):
+    yield EchoSync(object())
+
+
+class ReturnBadValue(pipeline.Pipeline):
+  """Simple pipeline that returns a non-JSON serializable value."""
+
+  def run(self):
+    return object()
+
+
 class FunctionalTest(test_shared.TaskRunningMixin, TestBase):
   """End-to-end tests for various Pipeline constructs."""
 
@@ -3789,6 +3803,26 @@ class FunctionalTest(test_shared.TaskRunningMixin, TestBase):
     stage = SetStatusPipeline()
     self.run_pipeline(stage)
     # That's it. No exceptions raised.
+
+  def testPassBadValue(self):
+    """Tests when a pipeline passes a non-serializable value to a child."""
+    stage = PassBadValue()
+    if self.test_mode:
+      self.assertRaises(TypeError, self.run_pipeline, stage)
+    else:
+      self.assertRaises(
+          TypeError, self.run_pipeline,
+          stage, _task_retry=False, _require_slots_filled=False)
+
+  def testReturnBadValue(self):
+    """Tests when a pipeline returns a non-serializable value."""
+    stage = ReturnBadValue()
+    if self.test_mode:
+      self.assertRaises(TypeError, self.run_pipeline, stage)
+    else:
+      self.assertRaises(
+          TypeError, self.run_pipeline,
+          stage, _task_retry=False, _require_slots_filled=False)
 
 
 class FunctionalTestModeTest(test_shared.TestModeMixin, FunctionalTest):
