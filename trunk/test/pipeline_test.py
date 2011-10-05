@@ -30,7 +30,7 @@ import urllib
 # Fix up paths for running tests.
 sys.path.insert(0, '../src/')
 
-import simplejson
+from pipeline import simplejson
 
 from pipeline import testutil
 from pipeline import common
@@ -493,6 +493,7 @@ class PipelineTest(TestBase):
     stage.max_attempts = 15
     stage.backoff_seconds = 1234.56
     stage.backoff_factor = 2.718
+    stage.target = 'my-other-target'
     stage.start(queue_name='other', base_path='/other', idempotence_key='meep')
 
     other = NothingPipeline.from_id(stage.pipeline_id)
@@ -506,6 +507,7 @@ class PipelineTest(TestBase):
     self.assertEquals(15, other.max_attempts)
     self.assertEquals(1234.56, other.backoff_seconds)
     self.assertEquals(2.718, other.backoff_factor)
+    self.assertEquals('my-other-target', other.target)
     self.assertEquals(1, other.current_attempt)
 
     self.assertFalse(other.outputs.one.filled)
@@ -957,6 +959,31 @@ class PipelineTest(TestBase):
     task_list = test_shared.get_tasks('default')
     self.assertEquals(2, len(task_list))
 
+  def testWithParams(self):
+    """Tests the with_params helper method."""
+    stage = OutputlessPipeline().with_params(target='my-cool-target')
+    self.assertEquals('my-cool-target', stage.target)
+    stage.start(idempotence_key='banana')
+
+    task_list = test_shared.get_tasks('default')
+    self.assertEquals(1, len(task_list))
+    start_task = task_list[0]
+    self.assertEquals('/_ah/pipeline/run', start_task['url'])
+    self.assertEquals('my-cool-target.', dict(start_task['headers'])['Host'])
+
+  def testWithParams_Errors(self):
+    """Tests misuse of the with_params helper method."""
+    stage = OutputlessPipeline()
+
+    # Bad argument
+    self.assertRaises(
+        TypeError, stage.with_params, unknown_arg='blah')
+
+    # If it's already active then you can't change the parameters.
+    stage.start(idempotence_key='banana')
+    self.assertRaises(
+        pipeline.UnexpectedPipelineError, stage.with_params)
+
 
 class OrderingTest(TestBase):
   """Tests for the Ordering classes."""
@@ -1123,6 +1150,7 @@ class UtilitiesTest(TestBase):
             'backoff_factor': 2,
             'backoff_seconds': 15,
             'task_retry': False,
+            'target': None,
         }, params)
 
     # When the parameters are big enough we need an external blob.
@@ -3403,6 +3431,25 @@ class ReturnBadValue(pipeline.Pipeline):
     return object()
 
 
+class EchoParams(pipeline.Pipeline):
+  """Echos the parameters this pipeline has."""
+
+  def run(self):
+    ALLOWED = ('backoff_seconds', 'backoff_factor', 'max_attempts', 'target')
+    return dict((key, getattr(self, key)) for key in ALLOWED)
+
+
+class WithParams(pipeline.Pipeline):
+  """Simple pipeline that uses the with_params helper method."""
+
+  def run(self):
+    foo = yield EchoParams().with_params(
+        max_attempts=8,
+        backoff_seconds=99,
+        target='other-backend')
+    yield EchoSync(foo, 'stuff')
+
+
 class FunctionalTest(test_shared.TaskRunningMixin, TestBase):
   """End-to-end tests for various Pipeline constructs."""
 
@@ -3823,6 +3870,36 @@ class FunctionalTest(test_shared.TaskRunningMixin, TestBase):
       self.assertRaises(
           TypeError, self.run_pipeline,
           stage, _task_retry=False, _require_slots_filled=False)
+
+  def testWithParams(self):
+    """Tests when a pipeline uses the with_params helper."""
+    stage = WithParams()
+    outputs = self.run_pipeline(stage)
+    if self.test_mode:
+      # In test mode you cannot modify the runtime parameters.
+      self.assertEquals(
+          [
+            {
+              'backoff_seconds': 15,
+              'backoff_factor': 2,
+              'target': None,
+              'max_attempts': 3
+            },
+            'stuff'
+          ],
+          outputs.default.value)
+    else:
+      self.assertEquals(
+          [
+            {
+              'backoff_seconds': 99,
+              'backoff_factor': 2,
+              'target': 'other-backend',
+              'max_attempts': 8
+            },
+            'stuff',
+          ],
+          outputs.default.value)
 
 
 class FunctionalTestModeTest(test_shared.TestModeMixin, FunctionalTest):
