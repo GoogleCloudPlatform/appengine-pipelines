@@ -754,10 +754,13 @@ function initStatusDone() {
   if (!AUTO_REFRESH) {
     $('#auto-refresh').attr('checked', '');
   } else {
-    // TODO: Once in a terminal state, do not update.
-    window.setTimeout(function() {
-      window.location.replace('');
-    }, 30 * 1000);
+    var rootStatus = STATUS_MAP.pipelines[STATUS_MAP.rootPipelineId].status;
+    if (rootStatus != 'done' && rootStatus != 'aborted') {
+      // Only do auto-refresh behavior if we're not in a terminal state.
+      window.setTimeout(function() {
+        window.location.replace('');
+      }, 30 * 1000);
+    }
   }
   $('.refresh-link').click(handleRefreshClick);
   $('#control').show();
