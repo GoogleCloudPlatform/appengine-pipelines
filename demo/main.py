@@ -32,6 +32,8 @@ from google.appengine.ext.webapp import util
 import pipeline
 from pipeline import common
 
+# Let anyone hit Pipeline handlers!
+pipeline.set_enforce_auth(False)
 
 ################################################################################
 # An example pipeline for generating reports.

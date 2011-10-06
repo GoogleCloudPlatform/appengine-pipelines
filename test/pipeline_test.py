@@ -899,7 +899,7 @@ class PipelineTest(TestBase):
     # Now resetting it will overwrite all fields.
     stage.set_status(console_url='/another_console')
     after_status_record = db.get(status_record.key())
-    
+
     self.assertEquals(None, after_status_record.message)
     self.assertEquals('/another_console', after_status_record.console_url)
     self.assertEquals([], after_status_record.link_names)
@@ -969,7 +969,9 @@ class PipelineTest(TestBase):
     self.assertEquals(1, len(task_list))
     start_task = task_list[0]
     self.assertEquals('/_ah/pipeline/run', start_task['url'])
-    self.assertEquals('my-cool-target.', dict(start_task['headers'])['Host'])
+    self.assertEquals(
+        'my-cool-target.my-app-id.appspot.com',
+        dict(start_task['headers'])['Host'])
 
   def testWithParams_Errors(self):
     """Tests misuse of the with_params helper method."""
