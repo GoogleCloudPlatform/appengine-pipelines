@@ -20,7 +20,9 @@ import logging
 import sys
 import unittest
 
-sys.path.insert(0, '../lib/')  # For simplejson
+# Fix up paths for running tests.
+sys.path.insert(0, '../src/')
+
 from pipeline import testutil
 
 import main

@@ -22,7 +22,7 @@ __all__ = [
     'PipelineRuntimeError', 'SlotNotFilledError', 'SlotNotDeclaredError',
     'UnexpectedPipelineError', 'PipelineStatusError', 'Slot', 'Pipeline',
     'PipelineFuture', 'After', 'InOrder', 'Retry', 'Abort', 'get_status_tree',
-    'create_handlers_map',
+    'create_handlers_map', 'set_enforce_auth',
 ]
 
 import datetime
@@ -140,6 +140,8 @@ _RETRY_WIGGLE_TIMEDELTA = datetime.timedelta(seconds=20)
 _DEBUG = False
 
 _MAX_JSON_SIZE = 900000
+
+_ENFORCE_AUTH = True
 
 ################################################################################
 
@@ -2879,15 +2881,15 @@ class _StatusUiHandler(webapp.RequestHandler):
   }
 
   def get(self, resource=''):
-    if users.get_current_user() is None:
-      self.redirect(users.create_login_url(self.request.url))
-      return
+    if _ENFORCE_AUTH:
+      if users.get_current_user() is None:
+        self.redirect(users.create_login_url(self.request.url))
+        return
 
-    # Note: Disable this when deploying the demo.
-    if not users.is_current_user_admin():
-      self.response.out.write('Forbidden')
-      self.response.set_status(403)
-      return
+      if not users.is_current_user_admin():
+        self.response.out.write('Forbidden')
+        self.response.set_status(403)
+        return
 
     if resource not in self._RESOURCE_MAP:
       logging.info('Could not find: %s', resource)
@@ -2912,11 +2914,11 @@ class _BaseRpcHandler(webapp.RequestHandler):
   """
 
   def get(self):
-    # Note: Disable this when deploying the demo.
-    if not users.is_current_user_admin():
-      self.response.out.write('Forbidden')
-      self.response.set_status(403)
-      return
+    if _ENFORCE_AUTH:
+      if not users.is_current_user_admin():
+        self.response.out.write('Forbidden')
+        self.response.set_status(403)
+        return
 
     # XSRF protection
     if (not _DEBUG and
@@ -2953,6 +2955,18 @@ class _TreeStatusHandler(_BaseRpcHandler):
         get_status_tree(self.request.get('root_pipeline_id')))
 
 ################################################################################
+
+def set_enforce_auth(new_status):
+  """Sets whether Pipeline API handlers rely on app.yaml for access control.
+
+  Args:
+    new_status: If True, then the Pipeline API will enforce its own
+      access control on status and static file handlers. If False, then
+      it will assume app.yaml is doing the enforcement.
+  """
+  global _ENFORCE_AUTH
+  _ENFORCE_AUTH = new_status
+
 
 def create_handlers_map(prefix='.*'):
   """Create new handlers map.
