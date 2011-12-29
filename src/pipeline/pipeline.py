@@ -2847,55 +2847,6 @@ def get_status_tree(root_pipeline_id):
   return output
 
 
-def get_root_list(cursor=None, count=50):
-  """TODO
-  """
-  query = (
-      _PipelineRecord.all(cursor=cursor)
-      .filter('is_root_pipeline =', True)
-      .order('-start_time'))
-  root_list = query.fetch(count)
-
-  key_list = []
-  for pipeline_record in root_list:
-    fetch_list.append(db.Key(pipeline_record.params['output_slots']['default']))
-    fetch_list.append(db.Key.from_path(
-        _BarrierRecord.kind(), _BarrierRecord.START,
-        parent=pipeline_record.key()))
-    fetch_list.append(db.Key.from_path(
-        _BarrierRecord.kind(), _BarrierRecord.FINALIZE,
-        parent=pipeline_record.key()))
-    fetch_list.append(db.Key.from_path(
-        _StatusRecord.kind(), pipeline_record.key().name()))
-
-  pipeline_dict = dict((stage.key(), stage) for stage in root_list)
-  slot_dict = {}
-  barrier_dict = {}
-  status_dict = {}
-  for entity in db.get(key_list):
-    if isinstance(entity, _BarrierRecord):
-      barrier_dict[entity.key()] = entity
-    elif isinstance(entity, _SlotRecord):
-      slot_dict[entity.key()] = entity
-    elif isinstance(entity, _StatusRecord):
-      status_dict[entity.key()] = entity
-    else:
-      assert False
-
-  results = []
-  for pipeline_record in root_list:
-    results.append(_get_internal_status(
-        pipeline_record.key(),
-        pipeline_dict=pipeline_dict,
-        slot_dict=slot_dict,
-        barrier_dict=barrier_dict,
-        status_dict=status_dict))
-  return {
-    'pipelines': results,
-    'cursor': query.cursor(),
-  }
-
-
 class _StatusUiHandler(webapp.RequestHandler):
   """Render the status UI."""
 
@@ -2903,9 +2854,6 @@ class _StatusUiHandler(webapp.RequestHandler):
     '/status': ('ui/status.html', 'text/html'),
     '/status.css': ('ui/status.css', 'text/css'),
     '/status.js': ('ui/status.js', 'text/javascript'),
-    '/list': ('ui/root_list.html', 'text/html'),
-    '/list.css': ('ui/root_list.css', 'text/css'),
-    '/list.js': ('ui/root_list.js', 'text/javascript'),
     '/common.js': ('ui/common.js', 'text/javascript'),
     '/common.css': ('ui/common.css', 'text/css'),
     '/jquery-1.4.2.min.js': ('ui/jquery-1.4.2.min.js', 'text/javascript'),
@@ -3006,14 +2954,6 @@ class _TreeStatusHandler(_BaseRpcHandler):
     self.json_response.update(
         get_status_tree(self.request.get('root_pipeline_id')))
 
-
-class _RootListHandler(_BaseRpcHandler):
-  """RPC handler for getting the status of all root pipelines."""
-
-  def handle(self):
-    self.json_response.update(
-        get_root_list(cursor=self.request.get('cursor')))
-
 ################################################################################
 
 def set_enforce_auth(new_status):
@@ -3047,6 +2987,5 @@ def create_handlers_map(prefix='.*'):
       (prefix + '/fanout_abort', _FanoutAbortHandler),
       (prefix + '/callback', _CallbackHandler),
       (prefix + '/rpc/tree', _TreeStatusHandler),
-      (prefix + '/rpc/list', _RootListHandler),
       (prefix + '(/.+)', _StatusUiHandler),
       ]
