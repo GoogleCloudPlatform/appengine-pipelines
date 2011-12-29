@@ -152,6 +152,13 @@ function constructStageNode(pipelineId, infoMap, sidebar) {
   detailDiv.append(detailLink);
   containerDiv.append(detailDiv);
 
+  // ID of the pipeline
+  if (!sidebar) {
+    var pipelineIdDiv = $('<div class="status-pipeline-id">');
+    pipelineIdDiv.text('ID #' + pipelineId);
+    containerDiv.append(pipelineIdDiv);
+  }
+
   // Broad status category.
   var statusTitleDiv = $('<div class="status-title">');
   if (!sidebar) {
@@ -159,43 +166,6 @@ function constructStageNode(pipelineId, infoMap, sidebar) {
   }
   statusTitleDiv.append($('<span>').text(infoMap.status));
   containerDiv.append(statusTitleDiv);
-
-  // Completed children count.
-  if (infoMap.status == 'run') {
-    var counts = countChildren(pipelineId);
-    var totalChildren = counts[0] - 1;  // Do not count ourselves
-    var doneChildren = counts[1];
-    if (totalChildren > 0 && doneChildren < totalChildren) {
-      var doneChildrenDiv = $('<div class="active-children">');
-      doneChildrenDiv.append($('<span>').text('Children: '));
-      var countText = '' + doneChildren + ' / ' + totalChildren + ' done';
-      doneChildrenDiv.append($('<span>').text(countText));
-      containerDiv.append(doneChildrenDiv);
-    }
-  }
-
-  // Number of attempts, if more than one.
-  if (infoMap.currentAttempt > 1) {
-    var attemptDiv = $('<div class="status-attempt">');
-    var attemptTitle = 'Attempt: ';
-    if (infoMap.status == 'retry') {
-      attemptTitle = 'Next Attempt: ';
-    } else if (infoMap.status == 'done') {
-      attemptTitle = 'Attempts: ';
-    }
-    attemptDiv.append($('<span>').text(attemptTitle));
-    var attemptText = '' + infoMap.currentAttempt + ' / ' +
-        infoMap.maxAttempts + '';
-    attemptDiv.append($('<span>').text(attemptText));
-    containerDiv.append(attemptDiv);
-  }
-
-  // ID of the pipeline
-  if (!sidebar) {
-    var pipelineIdDiv = $('<div class="status-pipeline-id">');
-    pipelineIdDiv.text('ID #' + pipelineId);
-    containerDiv.append(pipelineIdDiv);
-  }
 
   // Determine timing information based on state.
   var statusTimeLabel = null;
@@ -235,7 +205,7 @@ function constructStageNode(pipelineId, infoMap, sidebar) {
   // Last abort message, if any.
   if (infoMap.abortMessage) {
     var abortMessageDiv = $('<div class="status-message abort">');
-    abortMessageDiv.append($('<span>').text('Abort reason: '));
+    abortMessageDiv.append($('<span>').text('Abort Message: '));
     abortMessageDiv.append(
         $('<span class="status-message-text">').text(infoMap.abortMessage));
     containerDiv.append(abortMessageDiv);
@@ -244,7 +214,7 @@ function constructStageNode(pipelineId, infoMap, sidebar) {
   // Last error message that caused a retry, if any.
   if (infoMap.lastRetryMessage) {
     var errorMessageDiv = $('<div class="status-message error">');
-    errorMessageDiv.append($('<span>').text('Retry reason: '));
+    errorMessageDiv.append($('<span>').text('Retry Message: '));
     errorMessageDiv.append(
         $('<span class="status-message-text">').text(infoMap.lastRetryMessage));
     containerDiv.append(errorMessageDiv);
@@ -257,6 +227,41 @@ function constructStageNode(pipelineId, infoMap, sidebar) {
     statusMessageDiv.append(
         $('<span class="status-message-text">').text(infoMap.statusMessage));
     containerDiv.append(statusMessageDiv);
+  }
+
+  // Completed children count.
+  if (infoMap.status == 'run' || infoMap.status == 'done') {
+    var counts = countChildren(pipelineId);
+    var totalChildren = counts[0];
+    var doneChildren = counts[1];
+    // Do not count ourselves
+    totalChildren--;
+    if (infoMap.status == 'done') {
+      doneChildren--;
+    }
+    if (totalChildren > 0 && doneChildren < totalChildren) {
+      var doneChildrenDiv = $('<div class="active-children">');
+      doneChildrenDiv.append($('<span>').text('Children: '));
+      var countText = '' + doneChildren + ' / ' + totalChildren + ' done';
+      doneChildrenDiv.append($('<span>').text(countText));
+      containerDiv.append(doneChildrenDiv);
+    }
+  }
+
+  // Number of attempts, if more than one.
+  if (infoMap.currentAttempt > 1) {
+    var attemptDiv = $('<div class="status-attempt">');
+    var attemptTitle = 'Attempt: ';
+    if (infoMap.status == 'retry') {
+      attemptTitle = 'Next Attempt: ';
+    } else if (infoMap.status == 'done') {
+      attemptTitle = 'Attempts: ';
+    }
+    attemptDiv.append($('<span>').text(attemptTitle));
+    var attemptText = '' + infoMap.currentAttempt + ' / ' +
+        infoMap.maxAttempts + '';
+    attemptDiv.append($('<span>').text(attemptText));
+    containerDiv.append(attemptDiv);
   }
 
   // Runtime if present.
