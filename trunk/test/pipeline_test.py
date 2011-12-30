@@ -1346,18 +1346,14 @@ class PipelineContextTest(TestBase):
     self.assertEquals(_BarrierRecord.FIRED, barrier5.status)
     self.assertTrue(barrier5.trigger_time is not None)
 
-    # Running the continuation task again will re-tigger the barriers.
+    # Running the continuation task again will re-tigger the barriers,
+    # but no tasks will be inserted because they're already tombstoned.
     self.context.task_name = 'my-task1-ae-barrier-notify-0'
     self.context.notify_barriers(
         self.slot1_key,
         continuation_task['params']['cursor'][0],
         max_to_notify=2)
-    task_list = test_shared.get_tasks()
-    self.assertEquals(2, len(task_list))
-    test_shared.delete_tasks(task_list)
-
-    self.assertEquals(third_task['name'], task_list[0]['name'])
-    self.assertEquals(continuation2_task['name'], task_list[1]['name'])
+    self.assertEquals(0, len(test_shared.get_tasks()))
 
     # Running the last continuation task will do nothing.
     self.context.task_name = 'my-task1-ae-barrier-notify-1'
@@ -3071,6 +3067,37 @@ class EchoNamedAsync(pipeline.Pipeline):
     self.callback(**kwargs)
 
 
+class EchoNamedHalfAsync(pipeline.Pipeline):
+  """Pipeline that echos to named outputs and completes async.
+
+  This is different than the other EchoNamedAsync because it fills all the
+  slots except the default slot immediately, and then uses a callback to
+  finally complete.
+  """
+
+  async = True
+  output_names = ['one', 'two', 'three', 'four']
+
+  def run(self, **kwargs):
+    prefix = kwargs.get('prefix', '')
+    if prefix:
+      del kwargs['prefix']
+    for name, value in kwargs.iteritems():
+      self.fill(name, prefix + value)
+    self.get_callback_task(params=kwargs).add()
+
+  def callback(self, **kwargs):
+    self.complete()
+
+  def run_test(self, **kwargs):
+    prefix = kwargs.get('prefix', '')
+    if prefix:
+      del kwargs['prefix']
+    for name, value in kwargs.iteritems():
+      self.fill(name, prefix + value)
+    self.callback(**kwargs)
+
+
 class EchoParticularNamedAsync(EchoNamedAsync):
   """Has preexisting output names so it can be used as a root pipeline."""
 
@@ -3243,6 +3270,23 @@ class DoAfterNested(pipeline.Pipeline):
 
         with pipeline.After(fourth):
           yield SaveRunOrder('fifth')
+
+
+class DoAfterList(pipeline.Pipeline):
+  """Test the After clause with a list of jobs."""
+
+  def run(self):
+    job_list = []
+    for i in xrange(10):
+      job = yield EchoNamedHalfAsync(
+          one='red', two='blue', three='green', four='yellow')
+      job_list.append(job)
+
+    with pipeline.After(*job_list):
+      combined = yield common.Concat(*[job.one for job in job_list])
+      result = yield SaveRunOrder(combined)
+      with pipeline.After(result):
+        yield SaveRunOrder('twelfth')
 
 
 class DoInOrder(pipeline.Pipeline):
@@ -3699,6 +3743,13 @@ class FunctionalTest(test_shared.TaskRunningMixin, TestBase):
     stage = DoAfterNested()
     self.run_pipeline(stage)
     self.assertEquals(['first', 'first', 'third', 'third', 'fifth', 'fifth'],
+                      RunOrder.get())
+
+  def testAfterWithList(self):
+    """Tests that After() with a list of dependencies works."""
+    stage = DoAfterList()
+    self.run_pipeline(stage)
+    self.assertEquals( ['redredredredredredredredredred', 'twelfth'],
                       RunOrder.get())
 
   def testInOrder(self):
