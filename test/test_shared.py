@@ -72,7 +72,10 @@ def delete_tasks(task_list, queue_name='default'):
   """Deletes a set of tasks from a queue."""
   taskqueue_stub = apiproxy_stub_map.apiproxy.GetStub('taskqueue')
   for task in task_list:
-    taskqueue_stub.DeleteTask(queue_name, task['name'])
+    # NOTE: Use Delete here instad of DeleteTask because DeleteTask will
+    # remove the task's name from the list of tombstones, which will cause
+    # some tasks to run multiple times in tests if barriers fire twice.
+    taskqueue_stub._GetGroup().GetQueue(queue_name).Delete(task['name'])
 
 
 def create_handler(handler_class, method, url, headers={}, input_body=''):
@@ -170,9 +173,10 @@ class TaskRunningMixin(object):
       task_list = self.get_tasks()
       if not task_list:
         break
+
       for task in task_list:
         self.run_task(task)
-        self.taskqueue_stub.DeleteTask(self.queue_name, task['name'])
+        delete_tasks([task])
 
     if require_slots_filled:
       for slot_record in _SlotRecord.all():
