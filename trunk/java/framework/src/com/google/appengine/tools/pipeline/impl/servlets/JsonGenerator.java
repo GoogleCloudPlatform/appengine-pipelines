@@ -144,12 +144,10 @@ public class JsonGenerator {
     map.put(JOB_CLASS, jobRecord.getJobInstanceInflated().getJobClass());
     String statusString = null;
     switch (jobRecord.getState()) {
-      case WAITING_FOR_RUN_SLOTS:
-      case READY_TO_RUN:
+      case WAITING_TO_RUN:
         statusString = WAITING_STATUS;
         break;
-      case WAITING_FOR_FINALIZE_SLOT:
-      case READY_TO_FINALIZE:
+      case WAITING_TO_FINALIZE:
         statusString = RUN_STATUS;
         break;
       case FINALIZED:

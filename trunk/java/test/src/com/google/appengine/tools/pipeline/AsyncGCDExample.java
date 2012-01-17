@@ -1,11 +1,11 @@
 // Copyright 2011 Google Inc.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
 // the License at
-// 
+//
 // http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
 // WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -26,7 +26,7 @@ public class AsyncGCDExample {
 
   /**
    * A Callback
-   *
+   * 
    */
   public static interface Callback {
     public int getFirstInt();
@@ -77,6 +77,8 @@ public class AsyncGCDExample {
             service.submitPromisedValue(bHandle, b);
           } catch (NoSuchObjectException e) {
             throw new RuntimeException(e);
+          } catch (OrphanedObjectException f) {
+            return;
           }
         }
       };
@@ -106,6 +108,8 @@ public class AsyncGCDExample {
             service.submitPromisedValue(handle, name);
           } catch (NoSuchObjectException e) {
             throw new RuntimeException(e);
+          } catch (OrphanedObjectException f) {
+            return;
           }
         }
       };

@@ -31,7 +31,7 @@ public class AllTests {
     suite.addTestSuite(FanoutTaskTest.class);
     suite.addTestSuite(MiscPipelineTest.class);
     suite.addTestSuite(UserGuideTest.class);
-
+    suite.addTestSuite(OrphanedJobGraphTest.class);
     suite.addTestSuite(LetterCounterTest.class);
     suite.addTestSuite(FutureListTest.class);
     suite.addTestSuite(GCDTest.class);

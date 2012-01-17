@@ -112,7 +112,7 @@ public class JsonUtils {
       builder.append("null");
     } else {
       if (y instanceof List) {
-        List list = (List) y;
+        List<?> list = (List<?>) y;
         builder.append("(");
         boolean first = true;
         for (Object x : list) {
@@ -124,7 +124,7 @@ public class JsonUtils {
         }
         builder.append(")");
       } else if (y instanceof Map) {
-        Map map = (Map) y;
+        Map<?, ?> map = (Map<?, ?>) y;
         builder.append("{");
         boolean first = true;
         for (Object key : map.keySet()) {

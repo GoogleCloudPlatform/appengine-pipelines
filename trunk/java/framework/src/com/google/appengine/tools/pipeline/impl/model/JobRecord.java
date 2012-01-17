@@ -1,11 +1,11 @@
 // Copyright 2011 Google Inc.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
 // the License at
-// 
+//
 // http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
 // WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -17,42 +17,88 @@ package com.google.appengine.tools.pipeline.impl.model;
 import com.google.appengine.api.datastore.Entity;
 import com.google.appengine.api.datastore.Key;
 import com.google.appengine.api.datastore.Text;
-import com.google.appengine.tools.pipeline.ImmediateValue;
 import com.google.appengine.tools.pipeline.Job;
 import com.google.appengine.tools.pipeline.JobInfo;
 import com.google.appengine.tools.pipeline.JobSetting;
-import com.google.appengine.tools.pipeline.Value;
 import com.google.appengine.tools.pipeline.JobSetting.BackoffFactor;
 import com.google.appengine.tools.pipeline.JobSetting.BackoffSeconds;
 import com.google.appengine.tools.pipeline.JobSetting.IntValuedSetting;
 import com.google.appengine.tools.pipeline.JobSetting.MaxAttempts;
 import com.google.appengine.tools.pipeline.JobSetting.WaitForSetting;
 import com.google.appengine.tools.pipeline.impl.FutureValueImpl;
-import com.google.appengine.tools.pipeline.impl.PipelineManager;
-import com.google.appengine.tools.pipeline.impl.backend.UpdateSpec;
+import com.google.appengine.tools.pipeline.impl.backend.CascadeBackEnd;
 
 import java.util.Date;
 import java.util.LinkedList;
 import java.util.List;
 
 /**
- *  A record containing meta-data about a Job. Corresponds to a datastore entity.
+ * The Pipeline model object corresponding to a job.
  * 
  * @author rudominer@google.com (Mitch Rudominer)
- *
+ * 
  */
 public class JobRecord extends CascadeModelObject implements JobInfo {
-  
+
   /**
    * 
    * The state of the job.
-   *
+   * 
    */
   public static enum State {
-    WAITING_FOR_RUN_SLOTS, READY_TO_RUN, WAITING_FOR_FINALIZE_SLOT, READY_TO_FINALIZE, FINALIZED,
-    STOPPED, RETRY
+    WAITING_TO_RUN, WAITING_TO_FINALIZE, FINALIZED, STOPPED, RETRY
   }
 
+  /**
+   * This enum serves as an input parameter to the method
+   * {@link CascadeBackEnd#queryJob(Key, InflationType)}. When fetching an
+   * instance of {@code JobRecord} from the data store this enum specifies how
+   * much auxiliary data should also be queried and used to inflate the instance
+   * of {@code JobRecord}.
+   * 
+   */
+  public static enum InflationType {
+    /**
+     * Do not inflate at all
+     */
+    NONE,
+
+    /**
+     * Inflate as necessary to run the job. In particular:
+     * <ul>
+     * <li>{@link JobRecord#getRunBarrierInflated()} will not return
+     * {@code null}; and
+     * <li>for the returned {@link Barrier}
+     * {@link Barrier#getWaitingOnInflated()} will not return {@code null}; and
+     * <li> {@link JobRecord#getOutputSlotInflated()} will not return
+     * {@code null}; and
+     * <li> {@link JobRecord#getFinalizeBarrierInflated()} will not return
+     * {@code null}
+     * </ul>
+     */
+    FOR_RUN,
+
+    /**
+     * Inflate as necessary to finalize the job. In particular:
+     * <ul>
+     * <li> {@link JobRecord#getOutputSlotInflated()} will not return
+     * {@code null}; and
+     * <li> {@link JobRecord#getFinalizeBarrierInflated()} will not return
+     * {@code null}; and
+     * <li>for the returned {@link Barrier} the method
+     * {@link Barrier#getWaitingOnInflated()} will not return {@code null}.
+     * </ul>
+     */
+    FOR_FINALIZE,
+
+    /**
+     * Inflate as necessary to retrieve the output of the job. In particular
+     * {@link JobRecord#getOutputSlotInflated()} will not return {@code null}
+     */
+    FOR_OUTPUT;
+  }
+
+  // Data store entity property names
   public static final String DATA_STORE_KIND = "job";
   private static final String JOB_INSTANCE_PROPERTY = "jobInstance";
   private static final String RUN_BARRIER_PROPERTY = "runBarrier";
@@ -67,8 +113,9 @@ public class JobRecord extends CascadeModelObject implements JobInfo {
   private static final String MAX_ATTEMPTS_PROPERTY = "maxAttempts";
   private static final String BACKOFF_SECONDS_PROPERTY = "backoffSeconds";
   private static final String BACKOFF_FACTOR_PROPERTY = "backoffFactor";
+  private static final String CHILD_GRAPH_GUID_PROPERTY = "childGraphGuid";
 
-  // persistent
+  // persistent fields
   private Key jobInstanceKey;
   private Key runBarrierKey;
   private Key finalizeBarrierKey;
@@ -77,18 +124,25 @@ public class JobRecord extends CascadeModelObject implements JobInfo {
   private String errorMessage;
   private Date startTime;
   private Date endTime;
+  private String childGraphGuid;
   private List<Key> childKeys;
   private long attemptNumber = 0;
   private long maxAttempts = JobSetting.MaxAttempts.DEFAULT;
   private long backoffSeconds = JobSetting.BackoffSeconds.DEFAULT;
   private long backoffFactor = JobSetting.BackoffFactor.DEFAULT;
 
-  // transient
+  // transient fields
   private Barrier runBarrierInflated;
   private Barrier finalizeBarrierInflated;
   private Slot outputSlotInflated;
   private JobInstanceRecord jobInstanceRecordInflated;
 
+
+  /**
+   * Re-constitutes an instance of this class from a Data Store entity.
+   * 
+   * @param entity
+   */
   @SuppressWarnings("unchecked")
   public JobRecord(Entity entity) {
     super(entity);
@@ -97,6 +151,10 @@ public class JobRecord extends CascadeModelObject implements JobInfo {
     this.runBarrierKey = (Key) entity.getProperty(RUN_BARRIER_PROPERTY);
     this.outputSlotKey = (Key) entity.getProperty(OUTPUT_SLOT_PROPERTY);
     this.state = State.valueOf((String) entity.getProperty(STATE_PROPERTY));
+    Text childGraphGuidText = (Text) entity.getProperty(CHILD_GRAPH_GUID_PROPERTY);
+    if (null != childGraphGuidText) {
+      this.childGraphGuid = childGraphGuidText.getValue();
+    }
     Text errorMessageText = (Text) entity.getProperty(ERROR_MESSAGE_PROPERTY);
     if (null != errorMessageText) {
       this.errorMessage = errorMessageText.getValue();
@@ -113,6 +171,10 @@ public class JobRecord extends CascadeModelObject implements JobInfo {
     this.backoffFactor = (Long) entity.getProperty(BACKOFF_FACTOR_PROPERTY);
   }
 
+  /**
+   * Constructs and returns a Data Store Entity that represents this model
+   * object
+   */
   @Override
   public Entity toEntity() {
     Entity entity = toProtoEntity();
@@ -123,6 +185,9 @@ public class JobRecord extends CascadeModelObject implements JobInfo {
     entity.setProperty(STATE_PROPERTY, state.toString());
     if (null != errorMessage) {
       entity.setUnindexedProperty(ERROR_MESSAGE_PROPERTY, new Text(errorMessage));
+    }
+    if (null != childGraphGuid) {
+      entity.setUnindexedProperty(CHILD_GRAPH_GUID_PROPERTY, new Text(childGraphGuid));
     }
     if (null != startTime) {
       entity.setProperty(START_TIME_PROPERTY, startTime);
@@ -140,66 +205,67 @@ public class JobRecord extends CascadeModelObject implements JobInfo {
     return entity;
   }
 
-  @SuppressWarnings("unchecked")
-  public JobRecord(JobSetting[] jobSettings, Key rootJobKey, Job<?> jobInstance,
-      UpdateSpec updateSpec, Object... params) {
-    super(rootJobKey);
-    rootJobKey = this.rootJobKey;
-    updateSpec.setRootJobKey(rootJobKey);
-    this.jobInstanceRecordInflated = new JobInstanceRecord(this, jobInstance);
-    this.jobInstanceKey = this.jobInstanceRecordInflated.key;
-    state = State.WAITING_FOR_RUN_SLOTS;
+  /**
+   * Constructs a new JobRecord given the provided data. The constructed
+   * instance will be inflated in the sense that
+   * {@link #getJobInstanceInflated()}, {@link #getFinalizeBarrierInflated()},
+   * {@link #getOutputSlotInflated()} and {@link #getRunBarrierInflated()} will
+   * all not return {@code null}. This constructor is used when a new JobRecord
+   * is created during the run() method of a parent job. The parent job is also
+   * known as the generator job.
+   * 
+   * @param rootJobKeyParam The key of the rootJob of the Pipeline, or
+   *        {@code null} if we are constructing the root job.
+   * @param generatorJobKeyParam The key of the parent generator job of this
+   *        job, or {@code null} if we are constructing the root job.
+   * @param graphGUIDParam The GUID of the local graph of this job, or
+   *        {@code null} if we are constructing the root job.
+   * @param jobInstance The non-null user-supplied instance of {@code Job} that
+   *        implements the Job that the newly created JobRecord represents.
+   * @param settings Array of {@code JobSettings} to apply to the newly created
+   *        JobRecord.
+   */
+  public JobRecord(Key rootJobKeyParam, Key generatorJobKeyParam, String graphGUIDParam,
+      Job<?> jobInstance, JobSetting[] settings) {
+    super(rootJobKeyParam, generatorJobKeyParam, graphGUIDParam);
+    jobInstanceRecordInflated = new JobInstanceRecord(this, jobInstance);
+    jobInstanceKey = jobInstanceRecordInflated.key;
     runBarrierInflated = new Barrier(Barrier.Type.RUN, this);
     runBarrierKey = runBarrierInflated.key;
-    for (Object param : params) {
-      Value<?> value;
-      if (null != param && param instanceof Value<?>) {
-        value = (Value<?>) param;
-      } else {
-        value = new ImmediateValue(param);
-      }
-      PipelineManager.registerSlotsWithBarrier(updateSpec, value, rootJobKey, runBarrierInflated);
+    finalizeBarrierInflated = new Barrier(Barrier.Type.FINALIZE, this);
+    finalizeBarrierKey = finalizeBarrierInflated.key;
+    outputSlotInflated = new Slot(rootJobKey, generatorJobKey, graphGUID);
+    // Initially we set the filler of the output slot to be this Job.
+    // During finalize we may reset it to the filler of the finalize slot.
+    outputSlotInflated.setSourceJobKey(key);
+    outputSlotKey = outputSlotInflated.key;
+    childKeys = new LinkedList<Key>();
+    state = State.WAITING_TO_RUN;
+    for (JobSetting setting : settings) {
+      applySetting(setting);
     }
-    for (JobSetting setting : jobSettings) {
-      if (setting instanceof WaitForSetting) {
-        WaitForSetting wf = (WaitForSetting) setting;
-        FutureValueImpl fv = (FutureValueImpl) wf.getFutureValue();
-        Slot slot = fv.getSlot();
-        runBarrierInflated.addPhantomArgumentSlot(slot);
-      } else if (setting instanceof IntValuedSetting) {
-        int value = ((IntValuedSetting) setting).getValue();
-        if (setting instanceof BackoffSeconds) {
-          backoffSeconds = value;
-        } else if (setting instanceof BackoffFactor) {
-          backoffFactor = value;
-        } else if (setting instanceof MaxAttempts) {
-          maxAttempts = value;
-        } else {
-          throw new RuntimeException("Unrecognized JobOption class "
-              + setting.getClass().getName());
-        }
+  }
+
+  private void applySetting(JobSetting setting) {
+    if (setting instanceof WaitForSetting) {
+      WaitForSetting wf = (WaitForSetting) setting;
+      FutureValueImpl<?> fv = (FutureValueImpl<?>) wf.getFutureValue();
+      Slot slot = fv.getSlot();
+      runBarrierInflated.addPhantomArgumentSlot(slot);
+    } else if (setting instanceof IntValuedSetting) {
+      int value = ((IntValuedSetting) setting).getValue();
+      if (setting instanceof BackoffSeconds) {
+        backoffSeconds = value;
+      } else if (setting instanceof BackoffFactor) {
+        backoffFactor = value;
+      } else if (setting instanceof MaxAttempts) {
+        maxAttempts = value;
       } else {
         throw new RuntimeException("Unrecognized JobOption class " + setting.getClass().getName());
       }
+    } else {
+      throw new RuntimeException("Unrecognized JobOption class " + setting.getClass().getName());
     }
-    if (0 == runBarrierInflated.getWaitingOnKeys().size()) {
-      // If the run barrier is not waiting on anything, add a phantom filled
-      // slot
-      // in order to trigger a HandleSlotFilledTask in order to trigger
-      // a RunJobTask.
-      Slot slot = new Slot(rootJobKey);
-      slot.fill(null);
-      runBarrierInflated.addPhantomArgumentSlot(slot);
-      PipelineManager.registerSlotFilledTask(updateSpec, slot);
-    }
-    finalizeBarrierInflated = new Barrier(Barrier.Type.FINALIZE, this);
-    finalizeBarrierKey = finalizeBarrierInflated.key;
-    outputSlotInflated = new Slot(rootJobKey);
-    // Initially we set the filler of the output slot to be this Job.
-    // During finalize we may reset it to the filler of the finalize slot.
-    outputSlotInflated.setSourceJobKey(this.getKey());
-    outputSlotKey = outputSlotInflated.key;
-    childKeys = new LinkedList<Key>();
   }
 
   @Override
@@ -286,6 +352,10 @@ public class JobRecord extends CascadeModelObject implements JobInfo {
     this.state = state;
   }
 
+  public void setChildGraphGuid(String guid) {
+    this.childGraphGuid = guid;
+  }
+
   public State getState() {
     return state;
   }
@@ -318,17 +388,20 @@ public class JobRecord extends CascadeModelObject implements JobInfo {
     return childKeys;
   }
 
+  public String getChildGraphGuid() {
+    return childGraphGuid;
+  }
+
   public void setErrorMessage(String message) {
     this.errorMessage = message;
   }
 
   // Interface JobInfo
+  @Override
   public JobInfo.State getJobState() {
     switch (state) {
-      case WAITING_FOR_RUN_SLOTS:
-      case READY_TO_RUN:
-      case WAITING_FOR_FINALIZE_SLOT:
-      case READY_TO_FINALIZE:
+      case WAITING_TO_RUN:
+      case WAITING_TO_FINALIZE:
         return JobInfo.State.RUNNING;
       case FINALIZED:
         return JobInfo.State.COMPLETED_SUCCESSFULLY;
@@ -345,6 +418,7 @@ public class JobRecord extends CascadeModelObject implements JobInfo {
     }
   }
 
+  @Override
   public Object getOutput() {
     if (null == outputSlotInflated) {
       return null;
@@ -353,6 +427,7 @@ public class JobRecord extends CascadeModelObject implements JobInfo {
     }
   }
 
+  @Override
   public String getError() {
     return errorMessage;
   }

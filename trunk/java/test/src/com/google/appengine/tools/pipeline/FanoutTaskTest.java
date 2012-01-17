@@ -52,13 +52,13 @@ public class FanoutTaskTest extends TestCase {
     System
         .setProperty("com.google.appengine.api.pipeline.use-simple-guids-for-debugging", "true");
     Key key = KeyFactory.createKey(JobRecord.DATA_STORE_KIND, "job1");
-    RunJobTask runJobTask = new RunJobTask(key, null);
+    RunJobTask runJobTask = new RunJobTask(key);
     key = KeyFactory.createKey(JobRecord.DATA_STORE_KIND, "job2");
-    RunJobTask runJobTask2 = new RunJobTask(key, null);
+    RunJobTask runJobTask2 = new RunJobTask(key);
     key = KeyFactory.createKey(JobRecord.DATA_STORE_KIND, "job3");
-    FinalizeJobTask finalizeJobTask = new FinalizeJobTask(key, null);
+    FinalizeJobTask finalizeJobTask = new FinalizeJobTask(key);
     key = KeyFactory.createKey(Slot.DATA_STORE_KIND, "slot1");
-    HandleSlotFilledTask hsfTask = new HandleSlotFilledTask(key, null);
+    HandleSlotFilledTask hsfTask = new HandleSlotFilledTask(key);
     listOfTasks = Lists.<Task> newLinkedList(runJobTask, runJobTask2, finalizeJobTask, hsfTask);
     encodedBytes = FanoutTask.encodeTasks(listOfTasks);
   }

@@ -25,6 +25,8 @@ import javax.servlet.http.HttpServletResponse;
 
 /**
  * Servlet that handles all requests for the Pipeline framework.
+ * Dispatches all requests to {@link TaskHandler}, {@link JsonHandler} or
+ * {@link StaticContentHandler} as appropriate
  * 
  * @author rudominer@google.com (Mitch Rudominer)
  * 
@@ -71,22 +73,7 @@ public class PipelineServlet extends HttpServlet {
 
   @Override
   public void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException {
-    Pair<String, RequestType> pair = parseRequestType(req);
-    RequestType requestType = pair.second;
-    String path = pair.first;
-    switch (requestType) {
-      case HANDLE_TASK:
-        TaskHandler.doPost(req, resp);
-        break;
-      case GET_JSON:
-        JsonHandler.doGet(req, resp);
-        break;
-      case HANDLE_STATIC:
-        StaticContentHandler.doGet(req, resp, path);
-        break;
-      default:
-        throw new ServletException("Unknown request type: " + requestType);
-    }
+    doGet(req, resp);
   }
 
   @Override

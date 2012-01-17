@@ -1,11 +1,11 @@
 // Copyright 2011 Google Inc.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
 // the License at
-// 
+//
 // http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
 // WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -93,8 +93,8 @@ public interface PipelineService {
    *         {@link #getJobInfo(String)}, {@link #stopPipeline(String)}, and
    *         {@link #deletePipelineRecords(String, boolean, boolean)}
    */
-  <T1, T2, T3> String startNewPipeline(Job3<?, T1, T2, T3> jobInstance, T1 arg1, T2 arg2,
-      T3 arg3, JobSetting... settings);
+  <T1, T2, T3> String startNewPipeline(Job3<?, T1, T2, T3> jobInstance, T1 arg1, T2 arg2, T3 arg3,
+      JobSetting... settings);
 
   /**
    * Start a new Pipeline by specifying the root job and its arguments This
@@ -183,8 +183,8 @@ public interface PipelineService {
    * @param arguments An array of Objects to be used as the arguments of the
    *        root job. The type and number of the arguments must match the
    *        arguments of the {@code run()} method of the job. If possible, it is
-   *        preferable to use one of the type-safe versions of {@code
-   *        startNewPipeline()} instead of using this method.
+   *        preferable to use one of the type-safe versions of
+   *        {@code startNewPipeline()} instead of using this method.
    * @param settings Optional {@code JobSettings}. These apply only to the root
    *        job
    * @return The pipeline handle. This String uniquely identifies the newly
@@ -204,8 +204,8 @@ public interface PipelineService {
    *         the given identifer.
    */
   void stopPipeline(String pipelineHandle) throws NoSuchObjectException;
-  
-  
+
+
   /**
    * Delete all the records associated with a pipeline from the Datastore.
    * 
@@ -258,16 +258,36 @@ public interface PipelineService {
 
 
   /**
-   * This method is used to give the framework a value that was provided
+   * This method is used to give the framework a value that is provided
    * asynchronously by some external agent and that some job is currently
    * waiting on. We call such a value a {@link PromisedValue}.
    * 
-   * @param promiseHandle The unique identifer for the {@link PromisedValue}
-   *        obtained from {@link PromisedValue#getHandle()}.
+   * @param promiseHandle The unique identifier for the {@link PromisedValue}
+   *        obtained during the execution of some job via the method
+   *        {@link PromisedValue#getHandle()}.
    * @param value The value being submitted to the framework. The type of the
    *        value must match the type of the {@link PromisedValue}.
    * @throws NoSuchObjectException If the framework cannot find a
-   *         {@link PromisedValue} with the specified unique identifier.
+   *         {@link PromisedValue} identified by {@code promiseHandel}. This
+   *         exception may indicate that this method is being invoked too soon.
+   *         The thread that created the {@link PromisedValue} referenced by
+   *         {@code promiseHandle} may not have finished running the associated
+   *         job and saving the {@link PromisedValue} yet and this would explain
+   *         why the framework does not yet have an object with the given
+   *         handle. For this reason, this exception should be caught by the
+   *         caller and this method should be attempted again after waiting some
+   *         time. If the caller has good reason to believe that he has waited
+   *         long enough for the other thread to have completed its work, then
+   *         this method may indicate that the Pipeline has somehow become
+   *         corrupted and the caller should give up.
+   * @throws OrphanedObjectException If the {@link PromisedValue} reference by
+   *         {@code promiseHandle} has been orphaned during some failed
+   *         execution of a job. In this case the caller should not attempt to
+   *         use {@code promiseHandle} again. Most likely a different successful
+   *         execution of the same job generated a different promise handle, and
+   *         some other thread will be submitting the promised value via that
+   *         non-orphaned handle.
    */
-  void submitPromisedValue(String promiseHandle, Object value) throws NoSuchObjectException;
+  void submitPromisedValue(String promiseHandle, Object value) throws NoSuchObjectException,
+      OrphanedObjectException;
 }

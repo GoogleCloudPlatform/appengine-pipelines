@@ -42,6 +42,7 @@ public class TestingTaskQueueCallback implements LocalTaskQueueCallback {
    * @param req The url fetch request
    * @return The HTTP status code of the fetch.
    */
+  @Override
   public int execute(URLFetchServicePb.URLFetchRequest req) {
     String taskName = null;
     int retryCount = -1;
