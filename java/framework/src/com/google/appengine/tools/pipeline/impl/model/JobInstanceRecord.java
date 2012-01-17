@@ -42,7 +42,7 @@ public class JobInstanceRecord extends CascadeModelObject {
   private Job<?> jobInstance;
 
   public JobInstanceRecord(JobRecord job, Job<?> jobInstance) {
-    super(job.rootJobKey);
+    super(job.rootJobKey, job.generatorJobKey, job.graphGUID);
     jobKey = job.key;
     this.jobInstance = jobInstance;
     this.jobClass = jobInstance.getClass().getName();

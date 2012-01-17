@@ -83,9 +83,8 @@ public class LetterCounterTest extends PipelineTest {
         + "But I have promises to keep. And miles to go before I sleep.");
   }
   
-  // Disabling for now. This is flaky due to too-much-contention
-  // problems.
-  public void xtestLetterCounterHuge() throws Exception {
+  
+  public void testLetterCounterHuge() throws Exception {
     doLetterCounterTest(SSB);
   }
 

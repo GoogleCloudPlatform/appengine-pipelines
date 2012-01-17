@@ -45,14 +45,17 @@ public class AppEngineTaskQueue implements CascadeTaskQueue {
     taskQueue = QueueFactory.getDefaultQueue();
   }
 
+  @Override
   public void enqueue(Task task) {
     logger.finest("Enqueueing: " + task);
     taskQueue.add(toTaskOptions(task));
   }
 
+  @Override
   public void enqueue(final Collection<Task> tasks) {
     List<TaskOptions> taskOptionsList = new LinkedList<TaskOptions>();
     for (Task task : tasks) {
+      logger.finest("Enqueueing: " + task);
       taskOptionsList.add(toTaskOptions(task));
       if (taskOptionsList.size() >= MAX_TASKS_PER_ENQUEUE) {
         taskQueue.add(taskOptionsList);

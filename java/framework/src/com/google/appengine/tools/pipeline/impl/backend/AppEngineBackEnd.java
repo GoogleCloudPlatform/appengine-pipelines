@@ -1,11 +1,11 @@
 // Copyright 2011 Google Inc.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
 // the License at
-// 
+//
 // http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
 // WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -15,6 +15,7 @@
 package com.google.appengine.tools.pipeline.impl.backend;
 
 import static com.google.appengine.api.datastore.FetchOptions.Builder.withLimit;
+import static com.google.appengine.tools.pipeline.impl.util.TestUtils.throwHereForTesting;
 
 import com.google.appengine.api.datastore.Blob;
 import com.google.appengine.api.datastore.DatastoreService;
@@ -59,7 +60,6 @@ import java.util.logging.Logger;
 public class AppEngineBackEnd implements CascadeBackEnd {
 
   private static final Logger logger = Logger.getLogger(AppEngineBackEnd.class.getName());
-  private static final int MAX_TRANSACTIONAL_TASKS = 5;
 
   private static Random random = new Random();
 
@@ -80,38 +80,57 @@ public class AppEngineBackEnd implements CascadeBackEnd {
     dataStore.put(entityList);
   }
 
-  // N.B. (rudominer) This method must be called from within a datastore
-  // transaction.
-  private void saveAll(UpdateSpec updateSpec) {
-    if (null == dataStore.getCurrentTransaction()) {
-      throw new RuntimeException(
-          "Internal logic error: This method must be called from within a datastore transaction");
-    }
-    putAll(updateSpec.getBarriers());
-    putAll(updateSpec.getJobs());
-    putAll(updateSpec.getSlots());
-    putAll(updateSpec.getJobInstanceRecords());
-    Collection<Task> tasks = updateSpec.getTasks();
-    if (tasks.size() > MAX_TRANSACTIONAL_TASKS) {
-      byte[] encodedTasks = FanoutTask.encodeTasks(tasks);
-      Key rootJobKey = updateSpec.getRootJobKey();
-      FanoutTaskRecord ftRecord = new FanoutTaskRecord(rootJobKey, encodedTasks);
-      // Store FanoutTaskRecord outside of any transaction, but before
-      // the FanoutTask is enqueued. If the put succeeds but the
-      // enqueue fails then the FanoutTaskRecord is orphaned. But
-      // the Pipeline is still consistent.
-      dataStore.put(null, ftRecord.toEntity());
-      FanoutTask fannoutTask = new FanoutTask(ftRecord.getKey());
-      taskQueue.enqueue(fannoutTask);
-    } else {
-      taskQueue.enqueue(updateSpec.getTasks());
-    }
+  private void saveAll(UpdateSpec.Group group) {
+    putAll(group.getBarriers());
+    putAll(group.getJobs());
+    putAll(group.getSlots());
+    putAll(group.getJobInstanceRecords());
   }
 
-  private void transactionallySaveAll(UpdateSpec updateSpec) {
+  private void transactionallySaveAll(UpdateSpec.Transaction transactionSpec, Key rootJobKey,
+      Key jobKey, JobRecord.State... expectedStates) {
     Transaction transaction = dataStore.beginTransaction();
     try {
-      saveAll(updateSpec);
+      if (jobKey != null && expectedStates != null) {
+        Entity entity = null;
+        try {
+          entity = dataStore.get(jobKey);
+        } catch (EntityNotFoundException e) {
+          throw new RuntimeException(
+              "Fatal Pipeline corruption error. No JobRecord found with key = " + jobKey);
+        }
+        JobRecord jobRecord = new JobRecord(entity);
+        JobRecord.State state = jobRecord.getState();
+        boolean stateIsExpected = false;
+        for (JobRecord.State expectedState : expectedStates) {
+          if (state == expectedState) {
+            stateIsExpected = true;
+            break;
+          }
+        }
+        if (!stateIsExpected) {
+          logger.finest("Job " + jobRecord + " is not in one of the expected states: "
+              + expectedStates + " and so transactionallySaveAll() will not continue.");
+          return;
+        }
+      }
+      saveAll(transactionSpec);
+      if (transactionSpec instanceof UpdateSpec.TransactionWithTasks) {
+        UpdateSpec.TransactionWithTasks transactionWithTasks =
+            (UpdateSpec.TransactionWithTasks) transactionSpec;
+        Collection<Task> tasks = transactionWithTasks.getTasks();
+        if (tasks.size() > 0) {
+          byte[] encodedTasks = FanoutTask.encodeTasks(tasks);
+          FanoutTaskRecord ftRecord = new FanoutTaskRecord(rootJobKey, encodedTasks);
+          // Store FanoutTaskRecord outside of any transaction, but before
+          // the FanoutTask is enqueued. If the put succeeds but the
+          // enqueue fails then the FanoutTaskRecord is orphaned. But
+          // the Pipeline is still consistent.
+          dataStore.put(null, ftRecord.toEntity());
+          FanoutTask fannoutTask = new FanoutTask(ftRecord.getKey());
+          taskQueue.enqueue(fannoutTask);
+        }
+      }
       transaction.commit();
     } finally {
       if (transaction.isActive()) {
@@ -161,13 +180,44 @@ public class AppEngineBackEnd implements CascadeBackEnd {
     }
   }
 
-  public void save(final UpdateSpec updateSpec) {
+  @Override
+  public void enqueue(Task task) {
+    taskQueue.enqueue(task);
+  }
+
+  @Override
+  public void saveWithJobStateCheck(final UpdateSpec updateSpec, final Key jobKey,
+      final JobRecord.State... expectedStates) {
     tryFiveTimes(new Operation("save") {
       @Override
       public void perform() {
-        transactionallySaveAll(updateSpec);
+        saveAll(updateSpec.getNonTransactionalGroup());
       }
     });
+    for (final UpdateSpec.Transaction transactionSpec : updateSpec.getTransactions()) {
+      tryFiveTimes(new Operation("save") {
+        @Override
+        public void perform() {
+          transactionallySaveAll(transactionSpec, updateSpec.getRootJobKey(), null);
+        }
+      });
+    }
+
+    // If a unit test requests us to do so, fail here.
+    throwHereForTesting("AppEngineBackeEnd.saveWithJobStateCheck.beforeFinalTransaction");
+
+    tryFiveTimes(new Operation("save") {
+      @Override
+      public void perform() {
+        transactionallySaveAll(updateSpec.getFinalTransaction(), updateSpec.getRootJobKey(),
+            jobKey, expectedStates);
+      }
+    });
+  }
+
+  @Override
+  public void save(final UpdateSpec updateSpec) {
+    saveWithJobStateCheck(updateSpec, null);
   }
 
   private Entity queryEntity(Key key) throws EntityNotFoundException {
@@ -185,6 +235,7 @@ public class AppEngineBackEnd implements CascadeBackEnd {
     }
   }
 
+  @SuppressWarnings("unused")
   private Map<Key, Entity> transactionallyQueryEntities(Collection<Key> keys) {
     Transaction transaction = dataStore.beginTransaction();
     try {
@@ -199,7 +250,8 @@ public class AppEngineBackEnd implements CascadeBackEnd {
   /**
    * {@inheritDoc}
    */
-  public JobRecord queryJob(Key jobKey, boolean inflateForRun, boolean inflateForFinalize)
+  @Override
+  public JobRecord queryJob(Key jobKey, JobRecord.InflationType inflationType)
       throws NoSuchObjectException {
     try {
       Entity entity = transactionallyQueryEntity(jobKey);
@@ -208,15 +260,21 @@ public class AppEngineBackEnd implements CascadeBackEnd {
       Barrier finalizeBarrier = null;
       Slot outputSlot = null;
       JobInstanceRecord jobInstanceRecord = null;
-      if (inflateForRun) {
-        runBarrier = queryBarrier(jobRecord.getRunBarrierKey(), true, true);
-        finalizeBarrier = queryBarrier(jobRecord.getFinalizeBarrierKey(), false, true);
-        jobInstanceRecord = queryJobInstanceRecord(jobRecord.getJobInstanceKey());
-        outputSlot = querySlot(jobRecord.getOutputSlotKey(), false);
-      }
-      if (inflateForFinalize) {
-        finalizeBarrier = queryBarrier(jobRecord.getFinalizeBarrierKey(), true, true);
-        outputSlot = querySlot(jobRecord.getOutputSlotKey(), false);
+      switch (inflationType) {
+        case FOR_RUN:
+          runBarrier = queryBarrier(jobRecord.getRunBarrierKey(), true, true);
+          finalizeBarrier = queryBarrier(jobRecord.getFinalizeBarrierKey(), false, true);
+          jobInstanceRecord = queryJobInstanceRecord(jobRecord.getJobInstanceKey());
+          outputSlot = querySlot(jobRecord.getOutputSlotKey(), false);
+          break;
+        case FOR_FINALIZE:
+          finalizeBarrier = queryBarrier(jobRecord.getFinalizeBarrierKey(), true, true);
+          outputSlot = querySlot(jobRecord.getOutputSlotKey(), false);
+          break;
+        case FOR_OUTPUT:
+          outputSlot = querySlot(jobRecord.getOutputSlotKey(), false);
+          break;
+        default:
       }
       jobRecord.inflate(runBarrier, finalizeBarrier, outputSlot, jobInstanceRecord);
       logger.finest("Query returned: " + jobRecord);
@@ -269,7 +327,7 @@ public class AppEngineBackEnd implements CascadeBackEnd {
       }
     }
     // Step 2. Query the datastore for the Slot entities
-    Map<Key, Entity> entityMap = transactionallyQueryEntities(keySet);
+    Map<Key, Entity> entityMap = dataStore.get(keySet);
     // Step 3. Convert into map from key to Slot
     Map<Key, Slot> slotMap = new HashMap<Key, Slot>(entityMap.size());
     for (Key key : entityMap.keySet()) {
@@ -285,6 +343,7 @@ public class AppEngineBackEnd implements CascadeBackEnd {
   /**
    * {@inheritDoc}
    */
+  @Override
   public Slot querySlot(Key slotKey, boolean inflate) throws NoSuchObjectException {
     Entity entity;
     try {
@@ -295,20 +354,11 @@ public class AppEngineBackEnd implements CascadeBackEnd {
     Slot slot = new Slot(entity);
     if (inflate) {
       // Step 1. Query for all barriers that are waiting on this slot
-      Key ancestor = slot.getRootJobKey();
-      Query query = new Query(Barrier.DATA_STORE_KIND, ancestor);
+      Query query = new Query(Barrier.DATA_STORE_KIND);
       query.addFilter(Barrier.WAITING_ON_KEYS_PROPERTY, Query.FilterOperator.EQUAL, slotKey);
-      Iterable<Entity> result = null;
-      Transaction transaction = dataStore.beginTransaction();
-      try {
-        PreparedQuery preparedQuery = dataStore.prepare(query);
-        int numExpectedBarriers = slot.getWaitingOnMeKeys().size();
-        result = preparedQuery.asIterable(withLimit(numExpectedBarriers));
-      } finally {
-        if (transaction.isActive()) {
-          transaction.rollback();
-        }
-      }
+      PreparedQuery preparedQuery = dataStore.prepare(query);
+      int numExpectedBarriers = slot.getWaitingOnMeKeys().size();
+      Iterable<Entity> result = preparedQuery.asIterable(withLimit(numExpectedBarriers));
       // Step 2. Convert to a map from key to barrier
       Map<Key, Barrier> barrierMap = new HashMap<Key, Barrier>(20);
       for (Entity e : result) {
@@ -324,68 +374,19 @@ public class AppEngineBackEnd implements CascadeBackEnd {
     return slot;
   }
 
-
-  /**
-   * We must guarantee the following semantics:
-   * <ol>
-   * <li>The new state of {@code barrier} and {@code job} will not be persisted
-   * unless {@code task} is successfully enqueued
-   * <li>Two threads executing this method simulataneously on the same barrier
-   * will not both successfully enqueue the task. The latter is achieved because
-   * the task is named.
-   * </ol>
-   */
-  public void releaseBarrier(final Barrier barrier, final JobRecord job,
-      final JobRecord.State newJobState, final Task task) {
-    tryFiveTimes(new Operation("release " + barrier) {
-      @Override
-      public void perform() {
-        transactionallyReleaseBarrier(barrier, job, newJobState, task);
-      }
-    });
-  }
-
-  private void transactionallyReleaseBarrier(Barrier barrier, JobRecord job,
-      JobRecord.State newJobState, Task task) {
-    job.setState(newJobState);
-    UpdateSpec updateSpec = new UpdateSpec(barrier.getRootJobKey());
-    updateSpec.includeJob(job);
-    updateSpec.registerTask(task);
-    Transaction transaction = dataStore.beginTransaction();
-    try {
-      try {
-        // Query the barrier within the current transaction
-        boolean startNewTransaction = false;
-        barrier = queryBarrier(barrier.getKey(), false, startNewTransaction);
-      } catch (EntityNotFoundException e) {
-        throw new RuntimeException(e);
-      }
-      if (barrier.isReleased()) {
-        logger.finest("Already released: " + barrier);
-      } else {
-        barrier.setReleased();
-        updateSpec.includeBarrier(barrier);
-        saveAll(updateSpec);
-        transaction.commit();
-        logger.finest("Committed release: " + barrier);
-      }
-    } finally {
-      if (transaction.isActive()) {
-        transaction.rollback();
-      }
-    }
-  }
-
+  @Override
   public Object serlializeValue(Object value) throws IOException {
     // return JsonUtils.toJson(value);
     return new Blob(SerializationUtils.serialize(value));
   }
 
+  @Override
   public Object deserializeValue(Object serializedVersion) throws IOException {
     // return JsonUtils.fromJson((String) serliazedVersion);
     return SerializationUtils.deserialize(((Blob) serializedVersion).getBytes());
   }
 
+  @Override
   public void handleFanoutTask(FanoutTask fanoutTask) throws NoSuchObjectException {
     Key fanoutTaskRecordKey = fanoutTask.getRecordKey();
     // Fetch the fanoutTaskRecord outside of any transaction
@@ -401,8 +402,8 @@ public class AppEngineBackEnd implements CascadeBackEnd {
   }
 
 
-
-  private Iterable<Entity> queryAll(String kind, Key rootJobKey, boolean keysOnly,
+  // visible for testing
+  public Iterable<Entity> queryAll(String kind, Key rootJobKey, boolean keysOnly,
       FetchOptions fetchOptions) {
     Query query = new Query(kind);
     if (keysOnly) {
@@ -431,29 +432,33 @@ public class AppEngineBackEnd implements CascadeBackEnd {
     }
   }
 
-
+  @Override
   public PipelineObjects queryFullPipeline(final Key rootJobKey) {
     final Map<Key, JobRecord> jobs = new HashMap<Key, JobRecord>();
     final Map<Key, Slot> slots = new HashMap<Key, Slot>();
     final Map<Key, Barrier> barriers = new HashMap<Key, Barrier>();
     final Map<Key, JobInstanceRecord> jobInstanceRecords = new HashMap<Key, JobInstanceRecord>();
     putAll(barriers, new Instantiator<Barrier>() {
+      @Override
       public Barrier newObject(Entity entity) {
         return new Barrier(entity);
       }
     }, Barrier.DATA_STORE_KIND, rootJobKey);
     putAll(slots, new Instantiator<Slot>() {
+      @Override
       public Slot newObject(Entity entity) {
         return new Slot(entity);
       }
     }, Slot.DATA_STORE_KIND, rootJobKey);
     putAll(jobs, new Instantiator<JobRecord>() {
+      @Override
       public JobRecord newObject(Entity entity) {
         JobRecord jobRecord = new JobRecord(entity);
         return jobRecord;
       }
     }, JobRecord.DATA_STORE_KIND, rootJobKey);
     putAll(jobInstanceRecords, new Instantiator<JobInstanceRecord>() {
+      @Override
       public JobInstanceRecord newObject(Entity entity) {
         return new JobInstanceRecord(entity);
       }
@@ -494,31 +499,34 @@ public class AppEngineBackEnd implements CascadeBackEnd {
    * @param rootJobKey The root job key identifying the pipeline
    * @param force If this parameter is not {@code true} then this method will
    *        throw an {@link IllegalStateException} if the specified pipeline is
-   *        not in the {@link JobRecord.State#FINALIZED} or
-   *        {@link JobRecord.State#STOPPED} state.
+   *        not in the
+   *        {@link com.google.appengine.tools.pipeline.impl.model.JobRecord.State#FINALIZED}
+   *        or
+   *        {@link com.google.appengine.tools.pipeline.impl.model.JobRecord.State#STOPPED}
+   *        state.
    * @param async If this parameter is {@code true} then instead of performing
    *        the delete operation synchronously, this method will enqueue a task
    *        to perform the operation.
    * @throws NoSuchObjectException If there is no Job with the given key.
    * @throws IllegalStateException If {@code force = false} and the specified
-   *         pipeline is not in the {@link JobRecord.State#FINALIZED} or
-   *         {@link JobRecord.State#STOPPED} state.
+   *         pipeline is not in the
+   *         {@link com.google.appengine.tools.pipeline.impl.model.JobRecord.State#FINALIZED}
+   *         or
+   *         {@link com.google.appengine.tools.pipeline.impl.model.JobRecord.State#STOPPED}
+   *         state.
    */
+  @Override
   public void deletePipeline(Key rootJobKey, boolean force, boolean async)
       throws NoSuchObjectException, IllegalStateException {
 
     if (!force) {
-      JobRecord rootJobRecord = queryJob(rootJobKey, false, false);
+      JobRecord rootJobRecord = queryJob(rootJobKey, JobRecord.InflationType.NONE);
       switch (rootJobRecord.getState()) {
-        case WAITING_FOR_RUN_SLOTS:
-        case READY_TO_RUN:
-        case WAITING_FOR_FINALIZE_SLOT:
-        case READY_TO_FINALIZE:
-        case RETRY:
-          throw new IllegalStateException("Pipeline is still running: " + rootJobRecord);
         case FINALIZED:
         case STOPPED:
-          // OK
+          break;
+        default:
+          throw new IllegalStateException("Pipeline is still running: " + rootJobRecord);
       }
     }
     if (async) {

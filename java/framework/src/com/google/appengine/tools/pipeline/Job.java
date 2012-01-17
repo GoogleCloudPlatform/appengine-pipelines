@@ -19,10 +19,7 @@ import com.google.appengine.tools.pipeline.impl.FutureValueImpl;
 import com.google.appengine.tools.pipeline.impl.PipelineManager;
 import com.google.appengine.tools.pipeline.impl.PromisedValueImpl;
 import com.google.appengine.tools.pipeline.impl.backend.UpdateSpec;
-import com.google.appengine.tools.pipeline.impl.model.Barrier;
 import com.google.appengine.tools.pipeline.impl.model.JobRecord;
-import com.google.appengine.tools.pipeline.impl.model.Slot;
-import com.google.appengine.tools.pipeline.impl.model.SlotDescriptor;
 
 import java.io.Serializable;
 import java.util.List;
@@ -43,9 +40,9 @@ import java.util.List;
  * This class contains several protected methods that may be invoked from with
  * the {@code run()} method.
  * <ul>
- * <li><b>{@code futureCall()}</b> There is a family of methods named {@code
- * futureCall()} used to specify a job node in a generated child job graph.
- * There are several type-safe versions of {@code futureCall()} such as
+ * <li><b>{@code futureCall()}</b> There is a family of methods named
+ * {@code futureCall()} used to specify a job node in a generated child job
+ * graph. There are several type-safe versions of {@code futureCall()} such as
  * {@link #futureCall(Job0, JobSetting...)} and
  * {@link #futureCall(Job1, Value, JobSetting...)}. There is also one
  * non-type-safe version
@@ -55,8 +52,8 @@ import java.util.List;
  * <li> {@link #newPromise(Class)} is used to construct a new
  * {@link PromisedValue}.
  * <li>Several methods that are <em>syntactic sugar</em>. These are methods that
- * allow one to construct objects that may be used as arguments to {@code
- * futureCall()} using less typing. These include
+ * allow one to construct objects that may be used as arguments to
+ * {@code futureCall()} using less typing. These include
  * <ol>
  * <li> {@link #futureList(List)}. Constructs a new {@link FutureList}
  * <li> {@link #immediate(Object)}. Constructs a new {@link ImmediateValue}
@@ -90,6 +87,7 @@ public abstract class Job<E> implements Serializable {
 
   private transient JobRecord thisJobRecord;
   private transient UpdateSpec updateSpec;
+  private transient String currentRunGUID;
 
   // This method will be invoked by reflection from PipelineManager
   @SuppressWarnings("unused")
@@ -105,50 +103,17 @@ public abstract class Job<E> implements Serializable {
 
   // This method will be invoked by reflection from PipelineManager
   @SuppressWarnings("unused")
-  private final void registerReturnValue(Value<E> value) {
-    Barrier finalizeBarrier = thisJobRecord.getFinalizeBarrierInflated();
-    if (null == finalizeBarrier) {
-      throw new RuntimeException("Internal logic error: finalize barrier not inflated in "
-          + thisJobRecord);
-    }
-    PipelineManager
-        .registerSlotsWithBarrier(updateSpec, value, getPipelineKey(), finalizeBarrier);
-    updateSpec.includeBarrier(finalizeBarrier);
-    // Propagate the filler of the finalize slot to also be the filler of the
-    // output slot. This is tricky in the case that there is more than one
-    // finalize
-    // slot (i.e. the return value is a FutureList.) If there are two different
-    // finalize slots and they have different fillerJobKeys, then we resort to
-    // assigning this job as the filler job.
-    Key fillerJobKey = null;
-    for (SlotDescriptor slotDescriptor : finalizeBarrier.getWaitingOnInflated()) {
-      Key key = slotDescriptor.slot.getSourceJobKey();
-      if (null != key) {
-        if (null == fillerJobKey) {
-          fillerJobKey = key;
-        } else {
-          if (!fillerJobKey.toString().equals(key.toString())) {
-            fillerJobKey = this.getJobKey();
-            break;
-          }
-        }
-      }
-    }
-    if (null != fillerJobKey) {
-      Slot outputSlot = thisJobRecord.getOutputSlotInflated();
-      outputSlot.setSourceJobKey(fillerJobKey);
-      updateSpec.includeSlot(outputSlot);
-    }
+  private void setCurrentRunGuid(String guid) {
+    this.currentRunGUID = guid;
   }
-
 
   /**
    * This is the non-type-safe version of the {@code futureCall()} family of
    * methods. Normally a user will not need to invoke this method directly.
    * Instead, one of the type-safe methods such as
    * {@link #futureCall(Job2, Value, Value, JobSetting...)} should be used. The
-   * only reason a user should invoke this method directly is if {@code
-   * jobInstance} is a direct subclass of {@code Job} instead of being a
+   * only reason a user should invoke this method directly is if
+   * {@code jobInstance} is a direct subclass of {@code Job} instead of being a
    * subclass of one of the {@code Jobn} classes and the {@code run()} method of
    * {@code jobInstance} takes more arguments than the greatest {@code n} such
    * that the framework offers a {@code Jobn} class.
@@ -166,7 +131,9 @@ public abstract class Job<E> implements Serializable {
   protected <T> FutureValue<T> futureCallUnchecked(JobSetting[] settings, Job<?> jobInstance,
       Object... params) {
     JobRecord childJobRecord =
-        PipelineManager.registerNewJob(updateSpec, settings, thisJobRecord, jobInstance, params);
+        PipelineManager.registerNewJobRecord(updateSpec, settings, thisJobRecord, currentRunGUID,
+            jobInstance, params);
+    thisJobRecord.appendChildKey(childJobRecord.getKey());
     return new FutureValueImpl<T>(childJobRecord.getOutputSlotInflated());
   }
 
@@ -355,8 +322,9 @@ public abstract class Job<E> implements Serializable {
    *         order to specify a data dependency.
    */
   protected <F> PromisedValue<F> newPromise(Class<F> klass) {
-    PromisedValueImpl<F> promisedValue = new PromisedValueImpl<F>(getPipelineKey());
-    updateSpec.includeSlot(promisedValue.getSlot());
+    PromisedValueImpl<F> promisedValue =
+        new PromisedValueImpl<F>(getPipelineKey(), thisJobRecord.getKey(), currentRunGUID);
+    updateSpec.getNonTransactionalGroup().includeSlot(promisedValue.getSlot());
     return promisedValue;
   }
 

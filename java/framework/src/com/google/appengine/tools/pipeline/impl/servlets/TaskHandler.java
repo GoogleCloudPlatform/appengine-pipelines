@@ -27,8 +27,9 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 /**
- * @author rudominer@google.com (Your Name Here)
+ * A ServletHelper that handles all requests from the task queue.
  * 
+ * @author rudominer@google.com (Mitch Rudominer)
  */
 public class TaskHandler {
 
@@ -61,7 +62,7 @@ public class TaskHandler {
   @SuppressWarnings("unchecked")
   private static Task reconstructTask(HttpServletRequest request) {
     Properties properties = new Properties();
-    Enumeration paramNames = request.getParameterNames();
+    Enumeration<?> paramNames = request.getParameterNames();
     while (paramNames.hasMoreElements()) {
       String paramName = (String) paramNames.nextElement();
       String paramValue = request.getParameter(paramName);

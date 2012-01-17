@@ -25,6 +25,24 @@ import java.util.List;
 import java.util.Map;
 
 /**
+ * A {@code Barrier} represents a list of slots that need to be filled before
+ * something is allowed to happen.
+ * <p>
+ * There are two types of barriers, run barriers and finalize barriers. A run
+ * barrier is used to trigger the running of a job. Its list of slots represent
+ * arguments to the job. A finalize barrier is used to trigger the finalization
+ * of a job. It has only one slot which is used as the output value of the job.
+ * The essential properties are:
+ * <ul>
+ * <li>type: Either run or finalize
+ * <li>jobKey: The datastore key of the associated job
+ * <li>waitingOn: A list of the datastore keys of the slots for which this
+ * barrier is waiting
+ * <li>released: A boolean representing whether or not this barrier is released.
+ * Released means that all of the slots are filled and so the action associated
+ * with this barrier should be triggered.
+ * </ul>
+ * 
  * @author rudominer@google.com (Mitch Rudominer)
  * 
  */
@@ -54,10 +72,28 @@ public class Barrier extends CascadeModelObject {
   // transient
   private List<SlotDescriptor> waitingOnInflated;
 
+  /**
+   * Returns the entity group parent of a Barrier of the specified type.
+   * <p>
+   * According to our <a href="http://goto/java-pipeline-model">transactional
+   * model</a>: If B is the finalize barrier of a Job J, then the entity group
+   * parent of B is J. Run barriers do not have an entity group parent.
+   */
+  private static Key getEgParentKey(Type type, Key jobKey) {
+    switch (type) {
+      case RUN:
+        return null;
+      case FINALIZE:
+        if (null == jobKey) {
+          throw new IllegalArgumentException("jobKey is null");
+        }
+    }
+    return jobKey;
+  }
 
-  private Barrier(Type type, Key rootJobKey, Key key) {
-    super(rootJobKey);
-    this.jobKey = key;
+  private Barrier(Type type, Key rootJobKey, Key jobKey, Key generatorJobKey, String graphGUID) {
+    super(rootJobKey, getEgParentKey(type, jobKey), null, generatorJobKey, graphGUID);
+    this.jobKey = jobKey;
     this.type = type;
     this.waitingOnGroupSizes = new LinkedList<Long>();
     this.waitingOnInflated = new LinkedList<SlotDescriptor>();
@@ -66,11 +102,11 @@ public class Barrier extends CascadeModelObject {
 
   public static Barrier dummyInstanceForTesting() {
     Key dummyKey = KeyFactory.createKey("dummy", "dummy");
-    return new Barrier(Type.RUN, dummyKey, dummyKey);
+    return new Barrier(Type.RUN, dummyKey, dummyKey, dummyKey, "abc");
   }
 
   public Barrier(Type type, JobRecord jobRecord) {
-    this(type, jobRecord.rootJobKey, jobRecord.key);
+    this(type, jobRecord.rootJobKey, jobRecord.key, jobRecord.generatorJobKey, jobRecord.graphGUID);
   }
 
   @SuppressWarnings("unchecked")
@@ -217,13 +253,6 @@ public class Barrier extends CascadeModelObject {
    * Adds multiple slots to this barrier's waiting-on list representing a single
    * Job argument of type list.
    * 
-   * @param dummySlot A slot representing the list as a whole. It is necessary
-   *        to add this slot to the barrier to handle the case that the length
-   *        of the list is zero. In that case no other slots will be added and
-   *        the presence of this slot indicates the existence of the empty list.
-   *        This slot should be already registered as filled because the barrier
-   *        will be waiting on it. It does not matter what value the slot is
-   *        filled with because the value will not be used.
    * @param slotList A list of slots that will be added to the barrier and used
    *        as the elements of the list Job argument.
    */
