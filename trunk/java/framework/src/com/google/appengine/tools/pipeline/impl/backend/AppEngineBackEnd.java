@@ -29,7 +29,7 @@ import com.google.appengine.api.datastore.Query;
 import com.google.appengine.api.datastore.Transaction;
 import com.google.appengine.tools.pipeline.NoSuchObjectException;
 import com.google.appengine.tools.pipeline.impl.model.Barrier;
-import com.google.appengine.tools.pipeline.impl.model.CascadeModelObject;
+import com.google.appengine.tools.pipeline.impl.model.PipelineModelObject;
 import com.google.appengine.tools.pipeline.impl.model.FanoutTaskRecord;
 import com.google.appengine.tools.pipeline.impl.model.JobInstanceRecord;
 import com.google.appengine.tools.pipeline.impl.model.JobRecord;
@@ -57,7 +57,7 @@ import java.util.logging.Logger;
  * @author rudominer@google.com (Mitch Rudominer)
  * 
  */
-public class AppEngineBackEnd implements CascadeBackEnd {
+public class AppEngineBackEnd implements PipelineBackEnd {
 
   private static final Logger logger = Logger.getLogger(AppEngineBackEnd.class.getName());
 
@@ -71,9 +71,9 @@ public class AppEngineBackEnd implements CascadeBackEnd {
     taskQueue = new AppEngineTaskQueue();
   }
 
-  private void putAll(Collection<? extends CascadeModelObject> objects) {
+  private void putAll(Collection<? extends PipelineModelObject> objects) {
     List<Entity> entityList = new ArrayList<Entity>(objects.size());
-    for (CascadeModelObject x : objects) {
+    for (PipelineModelObject x : objects) {
       logger.finest("Storing: " + x);
       entityList.add(x.toEntity());
     }
@@ -409,7 +409,7 @@ public class AppEngineBackEnd implements CascadeBackEnd {
     if (keysOnly) {
       query.setKeysOnly();
     }
-    query.addFilter(CascadeModelObject.ROOT_JOB_KEY_PROPERTY, Query.FilterOperator.EQUAL,
+    query.addFilter(PipelineModelObject.ROOT_JOB_KEY_PROPERTY, Query.FilterOperator.EQUAL,
         rootJobKey);
     PreparedQuery preparedQuery = dataStore.prepare(query);
     Iterable<Entity> returnValue;
@@ -421,11 +421,11 @@ public class AppEngineBackEnd implements CascadeBackEnd {
     return returnValue;
   }
 
-  private interface Instantiator<E extends CascadeModelObject> {
+  private interface Instantiator<E extends PipelineModelObject> {
     E newObject(Entity entity);
   }
 
-  private <E extends CascadeModelObject> void putAll(Map<Key, E> listOfObjects,
+  private <E extends PipelineModelObject> void putAll(Map<Key, E> listOfObjects,
       Instantiator<E> instantiator, String kind, Key rootJobKey) {
     for (Entity entity : queryAll(kind, rootJobKey, false, null)) {
       listOfObjects.put(entity.getKey(), instantiator.newObject(entity));

@@ -26,7 +26,7 @@ import java.io.IOException;
  * @author rudominer@google.com (Mitch Rudominer)
  * 
  */
-public class JobInstanceRecord extends CascadeModelObject {
+public class JobInstanceRecord extends PipelineModelObject {
 
   public static final String DATA_STORE_KIND = "jobInstanceRecord";
   public static final String JOB_KEY_PROPERTY = "jobKey";

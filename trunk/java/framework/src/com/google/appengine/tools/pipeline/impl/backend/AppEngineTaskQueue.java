@@ -33,7 +33,7 @@ import java.util.logging.Logger;
  * @author rudominer@google.com (Mitch Rudominer)
  * 
  */
-public class AppEngineTaskQueue implements CascadeTaskQueue {
+public class AppEngineTaskQueue implements PipelineTaskQueue {
 
   private static final Logger logger = Logger.getLogger(AppEngineTaskQueue.class.getName());
 

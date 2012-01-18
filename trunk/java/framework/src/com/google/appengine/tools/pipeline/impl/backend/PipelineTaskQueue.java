@@ -23,7 +23,7 @@ import java.util.Collection;
  * @author rudominer@google.com (Mitch Rudominer)
  * 
  */
-public interface CascadeTaskQueue {
+public interface PipelineTaskQueue {
   public void enqueue(Task task);
 
   public void enqueue(final Collection<Task> tasks);

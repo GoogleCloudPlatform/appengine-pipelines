@@ -23,7 +23,7 @@ import com.google.appengine.api.datastore.Key;
  * 
  * @author rudominer@google.com (Mitch Rudominer)
  */
-public class FanoutTaskRecord extends CascadeModelObject {
+public class FanoutTaskRecord extends PipelineModelObject {
   
   public static final String DATA_STORE_KIND = "fanoutTask";
   private static final String PAYLOAD_PROPERTY = "payload";
