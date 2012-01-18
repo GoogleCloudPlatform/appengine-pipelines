@@ -16,7 +16,7 @@ package com.google.appengine.tools.pipeline.impl.backend;
 
 import com.google.appengine.api.datastore.Key;
 import com.google.appengine.tools.pipeline.impl.model.Barrier;
-import com.google.appengine.tools.pipeline.impl.model.CascadeModelObject;
+import com.google.appengine.tools.pipeline.impl.model.PipelineModelObject;
 import com.google.appengine.tools.pipeline.impl.model.JobInstanceRecord;
 import com.google.appengine.tools.pipeline.impl.model.JobRecord;
 import com.google.appengine.tools.pipeline.impl.model.Slot;
@@ -41,7 +41,7 @@ import java.util.Set;
  * <li>A {@link #getFinalTransaction() final transactional group}.
  * <ol>
  * 
- * When an {@code UpdateSpec} is {@link CascadeBackEnd#save(UpdateSpec) saved},
+ * When an {@code UpdateSpec} is {@link PipelineBackEnd#save(UpdateSpec) saved},
  * the groups will be saved in the following order using the following
  * transactions:
  * <ol>
@@ -128,7 +128,7 @@ public class UpdateSpec {
     private Map<Key, JobInstanceRecord> jobInstanceMap = new HashMap<Key, JobInstanceRecord>(
         INITIAL_SIZE);
 
-    private <E extends CascadeModelObject> void put(Map<Key, E> map, E object) {
+    private <E extends PipelineModelObject> void put(Map<Key, E> map, E object) {
       Key key = object.getKey();
       map.put(object.getKey(), object);
     }

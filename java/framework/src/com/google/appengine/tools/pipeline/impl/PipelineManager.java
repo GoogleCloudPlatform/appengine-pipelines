@@ -25,7 +25,7 @@ import com.google.appengine.tools.pipeline.NoSuchObjectException;
 import com.google.appengine.tools.pipeline.OrphanedObjectException;
 import com.google.appengine.tools.pipeline.Value;
 import com.google.appengine.tools.pipeline.impl.backend.AppEngineBackEnd;
-import com.google.appengine.tools.pipeline.impl.backend.CascadeBackEnd;
+import com.google.appengine.tools.pipeline.impl.backend.PipelineBackEnd;
 import com.google.appengine.tools.pipeline.impl.backend.UpdateSpec;
 import com.google.appengine.tools.pipeline.impl.backend.UpdateSpec.Group;
 import com.google.appengine.tools.pipeline.impl.model.Barrier;
@@ -62,7 +62,7 @@ public class PipelineManager {
 
   private static final Logger logger = Logger.getLogger(PipelineManager.class.getName());
 
-  private static CascadeBackEnd backEnd = new AppEngineBackEnd();
+  private static PipelineBackEnd backEnd = new AppEngineBackEnd();
 
   /**
    * Creates and launches a new Pipeline
@@ -455,7 +455,7 @@ public class PipelineManager {
     }
   }
 
-  public static CascadeBackEnd getBackEnd() {
+  public static PipelineBackEnd getBackEnd() {
     return backEnd;
   }
 

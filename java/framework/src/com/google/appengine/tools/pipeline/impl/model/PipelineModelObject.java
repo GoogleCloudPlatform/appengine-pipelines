@@ -30,7 +30,7 @@ import java.util.Map;
  * 
  * @author rudominer@google.com (Mitch Rudominer)
  */
-public abstract class CascadeModelObject {
+public abstract class PipelineModelObject {
 
   public static final String ROOT_JOB_KEY_PROPERTY = "rootJobKey";
   private static final String GENERATOR_JOB_PROPERTY = "generatorJobKey";
@@ -88,7 +88,7 @@ public abstract class CascadeModelObject {
    *        object is part of the root job graph---i.e. the root job, or one of
    *        its barriers or slots.
    */
-  protected CascadeModelObject(
+  protected PipelineModelObject(
       Key rootJobKey, Key egParentKey, Key thisKey, Key generatorJobKey, String graphGUID) {
     this.key = thisKey;
     this.rootJobKey = rootJobKey;
@@ -96,7 +96,7 @@ public abstract class CascadeModelObject {
     this.graphGUID = graphGUID;
     if (null == rootJobKey) {
       if (this instanceof JobRecord) {
-        // We are constructing the root job of a new cascade
+        // We are constructing the root job of a new pipeline
         if (null != thisKey) {
           throw new IllegalArgumentException("rootJobKey is null and thisKey is not null");
         }
@@ -113,7 +113,7 @@ public abstract class CascadeModelObject {
       throw new IllegalArgumentException("You may not specify both thisKey and parentKey");
     }
     if (null == rootJobKey) {
-      // This is the root job of a new cascade
+      // This is the root job of a new pipeline
       this.rootJobKey = this.key;
     }
     if (generatorJobKey == null && graphGUID == null) {
@@ -145,7 +145,7 @@ public abstract class CascadeModelObject {
    *        object is part of the root job graph---i.e. the root job, or one of
    *        its barriers or slots.
    */
-  protected CascadeModelObject(Key rootJobKey, Key generatorJobKey, String graphGUID) {
+  protected PipelineModelObject(Key rootJobKey, Key generatorJobKey, String graphGUID) {
     this(rootJobKey, null, null, generatorJobKey, graphGUID);
   }
 
@@ -155,7 +155,7 @@ public abstract class CascadeModelObject {
    * @param entity An Entity obtained previously from a call to
    *        {@link #toEntity()}.
    */
-  protected CascadeModelObject(Entity entity) {
+  protected PipelineModelObject(Entity entity) {
     this(extractRootJobKey(entity), null, extractKey(entity), extractGeneratorJobKey(entity),
         extractGraphGUID(entity));
     String expectedEntityType = getDatastoreKind();

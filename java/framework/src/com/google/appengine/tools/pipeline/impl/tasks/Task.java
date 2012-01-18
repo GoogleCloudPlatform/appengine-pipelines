@@ -14,7 +14,7 @@
 
 package com.google.appengine.tools.pipeline.impl.tasks;
 
-import com.google.appengine.tools.pipeline.impl.backend.CascadeBackEnd;
+import com.google.appengine.tools.pipeline.impl.backend.PipelineBackEnd;
 import com.google.appengine.tools.pipeline.impl.backend.UpdateSpec;
 
 import java.util.Properties;
@@ -27,8 +27,8 @@ import java.util.Properties;
  * <p>
  * When enqueueing a task, construct a concrete subclass with the appropriate
  * data, and then add the task to an {@link UpdateSpec} and
- * {@link CascadeBackEnd#save(UpdateSpec) save}. Alternatively the task may be
- * enqueued directly using {@link CascadeBackEnd#enqueue(Task)}.
+ * {@link PipelineBackEnd#save(UpdateSpec) save}. Alternatively the task may be
+ * enqueued directly using {@link PipelineBackEnd#enqueue(Task)}.
  * <p>
  * When handling a task, construct a {@link Properties} object containing the
  * relevant parameters from the request and then invoke

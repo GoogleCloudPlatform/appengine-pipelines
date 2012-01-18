@@ -16,7 +16,7 @@ package com.google.appengine.tools.pipeline.impl.tasks;
 
 import com.google.appengine.api.datastore.Key;
 import com.google.appengine.api.datastore.KeyFactory;
-import com.google.appengine.tools.pipeline.impl.backend.CascadeBackEnd;
+import com.google.appengine.tools.pipeline.impl.backend.PipelineBackEnd;
 import com.google.appengine.tools.pipeline.impl.util.GUIDGenerator;
 
 import java.util.ArrayList;
@@ -51,7 +51,7 @@ import java.util.Properties;
  * the original Collection of Tasks. Finally each of the tasks in the collection
  * may be enqueued non-transactionally.
  * 
- * @see CascadeBackEnd#handleFanoutTask(FanoutTask)
+ * @see PipelineBackEnd#handleFanoutTask(FanoutTask)
  * 
  * @author rudominer@google.com (Mitch Rudominer)
  * 

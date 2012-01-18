@@ -26,7 +26,7 @@ import com.google.appengine.tools.pipeline.JobSetting.IntValuedSetting;
 import com.google.appengine.tools.pipeline.JobSetting.MaxAttempts;
 import com.google.appengine.tools.pipeline.JobSetting.WaitForSetting;
 import com.google.appengine.tools.pipeline.impl.FutureValueImpl;
-import com.google.appengine.tools.pipeline.impl.backend.CascadeBackEnd;
+import com.google.appengine.tools.pipeline.impl.backend.PipelineBackEnd;
 
 import java.util.Date;
 import java.util.LinkedList;
@@ -38,7 +38,7 @@ import java.util.List;
  * @author rudominer@google.com (Mitch Rudominer)
  * 
  */
-public class JobRecord extends CascadeModelObject implements JobInfo {
+public class JobRecord extends PipelineModelObject implements JobInfo {
 
   /**
    * 
@@ -51,7 +51,7 @@ public class JobRecord extends CascadeModelObject implements JobInfo {
 
   /**
    * This enum serves as an input parameter to the method
-   * {@link CascadeBackEnd#queryJob(Key, InflationType)}. When fetching an
+   * {@link PipelineBackEnd#queryJob(Key, InflationType)}. When fetching an
    * instance of {@code JobRecord} from the data store this enum specifies how
    * much auxiliary data should also be queried and used to inflate the instance
    * of {@code JobRecord}.
@@ -273,7 +273,7 @@ public class JobRecord extends CascadeModelObject implements JobInfo {
     return DATA_STORE_KIND;
   }
 
-  private static boolean checkForInflate(CascadeModelObject object, Key expectedGuid, String name) {
+  private static boolean checkForInflate(PipelineModelObject object, Key expectedGuid, String name) {
     if (null == object) {
       return false;
     }

@@ -31,7 +31,7 @@ import java.util.Map;
  * @author rudominer@google.com (Mitch Rudominer)
  * 
  */
-public class Slot extends CascadeModelObject {
+public class Slot extends PipelineModelObject {
 
   public static final String DATA_STORE_KIND = "slot";
   private static final String FILLED_PROPERTY = "filled";

@@ -46,7 +46,7 @@ import java.util.Map;
  * @author rudominer@google.com (Mitch Rudominer)
  * 
  */
-public class Barrier extends CascadeModelObject {
+public class Barrier extends PipelineModelObject {
 
   /**
    * The type of Barrier

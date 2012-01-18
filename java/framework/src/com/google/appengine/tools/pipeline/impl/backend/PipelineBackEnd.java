@@ -31,7 +31,7 @@ import java.io.IOException;
  * 
  * @author rudominer@google.com (Mitch Rudominer)
  */
-public interface CascadeBackEnd {
+public interface PipelineBackEnd {
 
 
   /**
