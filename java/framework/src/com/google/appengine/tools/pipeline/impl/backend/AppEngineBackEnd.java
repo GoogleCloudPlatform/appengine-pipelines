@@ -61,6 +61,9 @@ public class AppEngineBackEnd implements PipelineBackEnd {
 
   private static final Logger logger = Logger.getLogger(AppEngineBackEnd.class.getName());
 
+  // Arbitrary value for now; may need tuning.
+  private static final int MAX_ENTITIES_PER_GET = 100;
+
   private static Random random = new Random();
 
   private DatastoreService dataStore;
@@ -247,9 +250,6 @@ public class AppEngineBackEnd implements PipelineBackEnd {
     }
   }
 
-  /**
-   * {@inheritDoc}
-   */
   @Override
   public JobRecord queryJob(Key jobKey, JobRecord.InflationType inflationType)
       throws NoSuchObjectException {
@@ -341,8 +341,29 @@ public class AppEngineBackEnd implements PipelineBackEnd {
   }
 
   /**
-   * {@inheritDoc}
+   * Returns all entities specified by the given keys.
+   *
+   * @throws NoSuchObjectException if any entities don't exist
    */
+  private Map<Key, Entity> getAll(List<Key> keys) throws NoSuchObjectException {
+    Map<Key, Entity> out = new HashMap<Key, Entity>(keys.size());
+    int start = 0;
+    while (start < keys.size()) {
+      int end = Math.min(keys.size(), start + MAX_ENTITIES_PER_GET);
+      List<Key> batch = keys.subList(start, end);
+      Map<Key, Entity> results = dataStore.get(null, batch);
+      if (results.size() != batch.size()) {
+        List<Key> missing = new ArrayList<Key>(batch);
+        missing.removeAll(results.keySet());
+        logger.severe("Missing entities for keys: " + missing + " (and perhaps others)");
+        throw new NoSuchObjectException("" + missing.get(0));
+      }
+      out.putAll(results);
+      start = end;
+    }
+    return out;
+  }
+
   @Override
   public Slot querySlot(Key slotKey, boolean inflate) throws NoSuchObjectException {
     Entity entity;
@@ -353,23 +374,13 @@ public class AppEngineBackEnd implements PipelineBackEnd {
     }
     Slot slot = new Slot(entity);
     if (inflate) {
-      // Step 1. Query for all barriers that are waiting on this slot
-      Query query = new Query(Barrier.DATA_STORE_KIND);
-      query.addFilter(Barrier.WAITING_ON_KEYS_PROPERTY, Query.FilterOperator.EQUAL, slotKey);
-      PreparedQuery preparedQuery = dataStore.prepare(query);
-      int numExpectedBarriers = slot.getWaitingOnMeKeys().size();
-      Iterable<Entity> result = preparedQuery.asIterable(withLimit(numExpectedBarriers));
-      // Step 2. Convert to a map from key to barrier
-      Map<Key, Barrier> barrierMap = new HashMap<Key, Barrier>(20);
-      for (Entity e : result) {
-        Barrier barrier = new Barrier(e);
-        barrierMap.put(barrier.getKey(), barrier);
+      Map<Key, Entity> entities = getAll(slot.getWaitingOnMeKeys());
+      Map<Key, Barrier> barriers = new HashMap<Key, Barrier>(entities.size());
+      for (Map.Entry<Key, Entity> entry : entities.entrySet()) {
+        barriers.put(entry.getKey(), new Barrier(entry.getValue()));
       }
-      // Step 3. Inflate
-      slot.inflate(barrierMap);
-
-      // Step 4. Inflate each of the barriers.
-      inflateBarriers(barrierMap.values());
+      slot.inflate(barriers);
+      inflateBarriers(barriers.values());
     }
     return slot;
   }

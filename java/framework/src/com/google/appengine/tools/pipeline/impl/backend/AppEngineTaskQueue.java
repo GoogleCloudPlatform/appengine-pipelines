@@ -14,6 +14,7 @@
 
 package com.google.appengine.tools.pipeline.impl.backend;
 
+import com.google.appengine.api.backends.BackendServiceFactory;
 import com.google.appengine.api.taskqueue.Queue;
 import com.google.appengine.api.taskqueue.QueueFactory;
 import com.google.appengine.api.taskqueue.TaskOptions;
@@ -39,11 +40,8 @@ public class AppEngineTaskQueue implements PipelineTaskQueue {
 
   private static final int MAX_TASKS_PER_ENQUEUE = 100;
 
-  private Queue taskQueue;
-
-  {
-    taskQueue = QueueFactory.getDefaultQueue();
-  }
+  // TODO(ohler): make this a parameter
+  private final Queue taskQueue = QueueFactory.getDefaultQueue();
 
   @Override
   public void enqueue(Task task) {
@@ -69,6 +67,10 @@ public class AppEngineTaskQueue implements PipelineTaskQueue {
 
   private TaskOptions toTaskOptions(Task task) {
     TaskOptions taskOptions = TaskOptions.Builder.withUrl(TaskHandler.HANDLE_TASK_URL);
+    if (task.getOnBackend() != null) {
+      taskOptions.header("Host",
+          BackendServiceFactory.getBackendService().getBackendAddress(task.getOnBackend()));
+    }
     addProperties(taskOptions, task.toProperties());
     String taskName = task.getName();
     if (null != taskName) {

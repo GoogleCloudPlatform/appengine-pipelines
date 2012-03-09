@@ -33,7 +33,7 @@ import java.util.Map;
  */
 public class Slot extends PipelineModelObject {
 
-  public static final String DATA_STORE_KIND = "slot";
+  public static final String DATA_STORE_KIND = "pipeline-slot";
   private static final String FILLED_PROPERTY = "filled";
   private static final String VALUE_PROPERTY = "value";
   private static final String WAITING_ON_ME_PROPERTY = "waitingOnMe";

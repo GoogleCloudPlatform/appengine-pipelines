@@ -14,7 +14,6 @@
 
 package com.google.appengine.tools.pipeline.impl;
 
-import com.google.appengine.api.datastore.KeyFactory;
 import com.google.appengine.tools.pipeline.FutureValue;
 import com.google.appengine.tools.pipeline.impl.model.Slot;
 
@@ -38,12 +37,12 @@ public class FutureValueImpl<E> implements FutureValue<E> {
 
   @Override
   public String getSourceJobHandle() {
-    return KeyFactory.keyToString(slot.getSourceJobKey());
+    return slot.getSourceJobKey().getName();
   }
 
   @Override
   public String getPipelineHandle() {
-    return KeyFactory.keyToString(slot.getRootJobKey());
+    return slot.getRootJobKey().getName();
   }
 
   @Override

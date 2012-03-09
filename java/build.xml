@@ -43,6 +43,7 @@
 
   <target name="compile-framework" depends="init,download_sdk">
     <javac srcdir="${framework-src}" destdir="${build}" debug="on" debuglevel="lines,source">
+      <compilerarg value="-Xlint:all"/>
       <classpath>
         <path refid="sdkjars"/>
       </classpath>

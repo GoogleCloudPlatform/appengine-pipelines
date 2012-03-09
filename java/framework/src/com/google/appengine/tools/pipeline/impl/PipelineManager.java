@@ -35,6 +35,7 @@ import com.google.appengine.tools.pipeline.impl.model.JobRecord.State;
 import com.google.appengine.tools.pipeline.impl.model.PipelineObjects;
 import com.google.appengine.tools.pipeline.impl.model.Slot;
 import com.google.appengine.tools.pipeline.impl.model.SlotDescriptor;
+import com.google.appengine.tools.pipeline.impl.servlets.PipelineServlet;
 import com.google.appengine.tools.pipeline.impl.tasks.DeletePipelineTask;
 import com.google.appengine.tools.pipeline.impl.tasks.FanoutTask;
 import com.google.appengine.tools.pipeline.impl.tasks.FinalizeJobTask;
@@ -93,7 +94,7 @@ public class PipelineManager {
     // Save the Pipeline model objects and enqueue the tasks that start the
     // Pipeline executing.
     backEnd.save(updateSpec);
-    return KeyFactory.keyToString(jobRecord.getKey());
+    return jobRecord.getKey().getName();
   }
 
   /**
@@ -280,7 +281,7 @@ public class PipelineManager {
   }
 
   public static PipelineObjects queryFullPipeline(String rootJobHandle) {
-    Key rootJobKey = KeyFactory.stringToKey(rootJobHandle);
+    Key rootJobKey = KeyFactory.createKey(JobRecord.DATA_STORE_KIND, rootJobHandle);
     return backEnd.queryFullPipeline(rootJobKey);
   }
 
@@ -302,7 +303,7 @@ public class PipelineManager {
    */
   public static JobRecord getJob(String jobHandle) throws NoSuchObjectException {
     checkNonEmpty(jobHandle, "jobHandle");
-    Key key = KeyFactory.stringToKey(jobHandle);
+    Key key = KeyFactory.createKey(JobRecord.DATA_STORE_KIND, jobHandle);
     logger.finest("getJob: " + key.getName());
     return backEnd.queryJob(key, JobRecord.InflationType.FOR_OUTPUT);
   }
@@ -316,7 +317,7 @@ public class PipelineManager {
    */
   public static void stopJob(String jobHandle) throws NoSuchObjectException {
     checkNonEmpty(jobHandle, "jobHandle");
-    Key key = KeyFactory.stringToKey(jobHandle);
+    Key key = KeyFactory.createKey(JobRecord.DATA_STORE_KIND, jobHandle);
     JobRecord jobRecord = backEnd.queryJob(key, JobRecord.InflationType.NONE);
     jobRecord.setState(JobRecord.State.STOPPED);
     UpdateSpec updateSpec = new UpdateSpec(jobRecord.getRootJobKey());
@@ -349,7 +350,7 @@ public class PipelineManager {
   public static void deletePipelineRecords(String pipelineHandle, boolean force, boolean async)
       throws NoSuchObjectException, IllegalStateException {
     checkNonEmpty(pipelineHandle, "pipelineHandle");
-    Key key = KeyFactory.stringToKey(pipelineHandle);
+    Key key = KeyFactory.createKey(JobRecord.DATA_STORE_KIND, pipelineHandle);
     backEnd.deletePipeline(key, force, async);
   }
 
@@ -411,6 +412,7 @@ public class PipelineManager {
    * task, by returning a 200.
    */
   private static class AbandonTaskException extends RuntimeException {
+    private static final long serialVersionUID = 358437646006972459L;
   }
 
   /**
@@ -534,6 +536,8 @@ public class PipelineManager {
     JobRecord jobRecord = null;
     jobRecord = queryJobOrAbandonTask(jobKey, JobRecord.InflationType.FOR_RUN);
     Key rootJobKey = jobRecord.getRootJobKey();
+    logger.info("Running pipeline job " + jobKey.getName()
+        + "; UI at " + PipelineServlet.makeViewerUrl(rootJobKey, jobKey));
     JobRecord rootJobRecord = jobRecord;
     if (!rootJobKey.equals(jobKey)) {
       rootJobRecord = queryJobOrAbandonTask(rootJobKey, JobRecord.InflationType.NONE);
@@ -665,6 +669,7 @@ public class PipelineManager {
       int backoffSeconds = jobRecord.getBackoffSeconds();
       Task task = new RunJobTask(jobRecord.getKey(), attemptNumber);
       task.setDelaySeconds(backoffSeconds * (long) Math.pow(backoffFactor, attemptNumber));
+      task.setOnBackend(jobRecord.getOnBackend());
       backEnd.enqueue(task);
     }
     logger.log(Level.SEVERE, "An exception occurred while attempting to run " + jobRecord + ". "

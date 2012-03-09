@@ -24,6 +24,7 @@ import com.google.appengine.tools.pipeline.JobSetting.BackoffFactor;
 import com.google.appengine.tools.pipeline.JobSetting.BackoffSeconds;
 import com.google.appengine.tools.pipeline.JobSetting.IntValuedSetting;
 import com.google.appengine.tools.pipeline.JobSetting.MaxAttempts;
+import com.google.appengine.tools.pipeline.JobSetting.OnBackend;
 import com.google.appengine.tools.pipeline.JobSetting.WaitForSetting;
 import com.google.appengine.tools.pipeline.impl.FutureValueImpl;
 import com.google.appengine.tools.pipeline.impl.backend.PipelineBackEnd;
@@ -98,8 +99,8 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
     FOR_OUTPUT;
   }
 
+  public static final String DATA_STORE_KIND = "pipeline-job";
   // Data store entity property names
-  public static final String DATA_STORE_KIND = "job";
   private static final String JOB_INSTANCE_PROPERTY = "jobInstance";
   private static final String RUN_BARRIER_PROPERTY = "runBarrier";
   private static final String FINALIZE_BARRIER_PROPERTY = "finalizeBarrier";
@@ -113,6 +114,7 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
   private static final String MAX_ATTEMPTS_PROPERTY = "maxAttempts";
   private static final String BACKOFF_SECONDS_PROPERTY = "backoffSeconds";
   private static final String BACKOFF_FACTOR_PROPERTY = "backoffFactor";
+  private static final String ON_BACKEND_PROPERTY = "onBackend";
   private static final String CHILD_GRAPH_GUID_PROPERTY = "childGraphGuid";
 
   // persistent fields
@@ -130,6 +132,7 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
   private long maxAttempts = JobSetting.MaxAttempts.DEFAULT;
   private long backoffSeconds = JobSetting.BackoffSeconds.DEFAULT;
   private long backoffFactor = JobSetting.BackoffFactor.DEFAULT;
+  private String onBackend = null;
 
   // transient fields
   private Barrier runBarrierInflated;
@@ -169,6 +172,7 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
     this.maxAttempts = (Long) entity.getProperty(MAX_ATTEMPTS_PROPERTY);
     this.backoffSeconds = (Long) entity.getProperty(BACKOFF_SECONDS_PROPERTY);
     this.backoffFactor = (Long) entity.getProperty(BACKOFF_FACTOR_PROPERTY);
+    this.onBackend = (String) entity.getProperty(ON_BACKEND_PROPERTY);
   }
 
   /**
@@ -202,6 +206,9 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
     entity.setProperty(MAX_ATTEMPTS_PROPERTY, maxAttempts);
     entity.setProperty(BACKOFF_SECONDS_PROPERTY, backoffSeconds);
     entity.setProperty(BACKOFF_FACTOR_PROPERTY, backoffFactor);
+    if (null != onBackend) {
+      entity.setProperty(ON_BACKEND_PROPERTY, onBackend);
+    }
     return entity;
   }
 
@@ -263,6 +270,8 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
       } else {
         throw new RuntimeException("Unrecognized JobOption class " + setting.getClass().getName());
       }
+    } else if (setting instanceof OnBackend) {
+      onBackend = ((OnBackend) setting).getValue();
     } else {
       throw new RuntimeException("Unrecognized JobOption class " + setting.getClass().getName());
     }
@@ -273,7 +282,8 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
     return DATA_STORE_KIND;
   }
 
-  private static boolean checkForInflate(PipelineModelObject object, Key expectedGuid, String name) {
+  private static boolean checkForInflate(PipelineModelObject object, Key expectedGuid,
+      String name) {
     if (null == object) {
       return false;
     }
@@ -378,6 +388,10 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
 
   public int getMaxAttempts() {
     return (int) maxAttempts;
+  }
+
+  public String getOnBackend() {
+    return onBackend;
   }
 
   public void appendChildKey(Key key) {
