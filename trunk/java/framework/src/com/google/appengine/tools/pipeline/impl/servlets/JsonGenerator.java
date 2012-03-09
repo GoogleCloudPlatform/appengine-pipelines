@@ -111,14 +111,14 @@ public class JsonGenerator {
     Map<String, Map<String, Object>> jobMap =
         new HashMap<String, Map<String, Object>>(pipelineObjects.jobs.size());
     Map<String, Object> topLevel = new HashMap<String, Object>(3);
-    topLevel.put(ROOT_PIPELINE_ID, toString(pipelineObjects.rootJob.getKey()));
+    topLevel.put(ROOT_PIPELINE_ID, pipelineObjects.rootJob.getKey().getName());
     topLevel.put(SLOTS, slotMap);
     topLevel.put(PIPELINES, jobMap);
     for (Slot slot : pipelineObjects.slots.values()) {
       slotMap.put(toString(slot.getKey()), buildMapRepresentation(slot));
     }
     for (JobRecord jobRecord : pipelineObjects.jobs.values()) {
-      jobMap.put(toString(jobRecord.getKey()), buildMapRepresentation(jobRecord));
+      jobMap.put(jobRecord.getKey().getName(), buildMapRepresentation(jobRecord));
     }
     return topLevel;
   }
@@ -134,7 +134,7 @@ public class JsonGenerator {
     }
     Key sourceJobKey = slot.getSourceJobKey();
     if (null != sourceJobKey) {
-      map.put(SLOT_SOURCE_JOB, toString(sourceJobKey));
+      map.put(SLOT_SOURCE_JOB, sourceJobKey.getName());
     }
     return map;
   }
@@ -225,7 +225,7 @@ public class JsonGenerator {
     String[] arrayOfIds = new String[listOfKeys.size()];
     int i = 0;
     for (Key key : listOfKeys) {
-      arrayOfIds[i++] = toString(key);
+      arrayOfIds[i++] = key.getName();
     }
     return arrayOfIds;
   }

@@ -39,7 +39,7 @@ public interface JobSetting {
   }
 
   /**
-   * An abstract parent object for integer settings
+   * An abstract parent object for integer settings.
    */
   abstract class IntValuedSetting implements JobSetting {
     private int value;
@@ -49,6 +49,21 @@ public interface JobSetting {
     }
 
     public int getValue() {
+      return value;
+    }
+  }
+
+  /**
+   * An abstract parent object for String settings.
+   */
+  abstract class StringValuedSetting implements JobSetting {
+    private String value;
+
+    protected StringValuedSetting(String val) {
+      this.value = val;
+    }
+
+    public String getValue() {
       return value;
     }
   }
@@ -101,4 +116,16 @@ public interface JobSetting {
       super(attempts);
     }
   }
+
+  /**
+   * A setting for specifying what backend to run a job on.
+   */
+  final class OnBackend extends StringValuedSetting {
+    public static final String DEFAULT = null;
+
+    public OnBackend(String backend) {
+      super(backend);
+    }
+  }
+
 }

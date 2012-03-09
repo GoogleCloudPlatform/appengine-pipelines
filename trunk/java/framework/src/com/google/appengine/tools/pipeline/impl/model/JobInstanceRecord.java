@@ -28,7 +28,7 @@ import java.io.IOException;
  */
 public class JobInstanceRecord extends PipelineModelObject {
 
-  public static final String DATA_STORE_KIND = "jobInstanceRecord";
+  public static final String DATA_STORE_KIND = "pipeline-jobInstanceRecord";
   public static final String JOB_KEY_PROPERTY = "jobKey";
   public static final String JOB_CLASS_NAME_PROPERTY = "jobClassName";
   public static final String INSTANCE_BYTES_PROPERTY = "bytes";

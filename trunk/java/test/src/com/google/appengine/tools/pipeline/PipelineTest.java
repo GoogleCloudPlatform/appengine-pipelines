@@ -37,8 +37,21 @@ public class PipelineTest extends TestCase implements Serializable {
     taskQueueConfig.setCallbackClass(TestingTaskQueueCallback.class);
     taskQueueConfig.setDisableAutoTaskExecution(false);
     taskQueueConfig.setShouldCopyApiProxyEnvironment(true);
-    helper = new LocalServiceTestHelper(new LocalDatastoreServiceTestConfig(), taskQueueConfig);
+    helper = new LocalServiceTestHelper(
+        new LocalDatastoreServiceTestConfig()
+            .setDefaultHighRepJobPolicyUnappliedJobPercentage(
+                isHrdSafe() ? 100 : 0),
+        taskQueueConfig);
+  }
 
+  /**
+   * Whether this test will succeed even if jobs remain unapplied indefinitely.
+   *
+   * NOTE: This may be called from the constructor, i.e., before the object is
+   * fully initialized.
+   */
+  protected boolean isHrdSafe() {
+    return true;
   }
 
   @Override

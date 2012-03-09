@@ -51,6 +51,7 @@ public abstract class Task {
   protected String taskName;
   protected Type type;
   protected Long delaySeconds;
+  protected String onBackend;
 
   /**
    * This constructor is used on the sending side. That is, it is used to
@@ -110,6 +111,14 @@ public abstract class Task {
 
   public Long getDelaySeconds() {
     return delaySeconds;
+  }
+
+  public void setOnBackend(String backend) {
+    this.onBackend = backend;
+  }
+
+  public String getOnBackend() {
+    return onBackend;
   }
 
   public Properties toProperties() {

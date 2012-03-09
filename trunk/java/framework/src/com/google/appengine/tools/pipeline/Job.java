@@ -85,6 +85,8 @@ import java.util.List;
  */
 public abstract class Job<E> implements Serializable {
 
+  private static final long serialVersionUID = 868736209042268959L;
+
   private transient JobRecord thisJobRecord;
   private transient UpdateSpec updateSpec;
   private transient String currentRunGUID;
@@ -386,6 +388,15 @@ public abstract class Job<E> implements Serializable {
    */
   public static JobSetting.MaxAttempts maxAttempts(int attempts) {
     return new JobSetting.MaxAttempts(attempts);
+  }
+
+  /**
+   * Constructs a new {@code JobSetting.OnBackend}. This method is only
+   * syntactic sugar. {@code onBackend(x)} is equivalent to
+   * {@code new JobSetting.OnBackend(x)}.
+   */
+  public static JobSetting.OnBackend onBackend(String backend) {
+    return new JobSetting.OnBackend(backend);
   }
 
   /**

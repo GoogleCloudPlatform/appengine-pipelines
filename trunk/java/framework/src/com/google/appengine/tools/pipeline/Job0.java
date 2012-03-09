@@ -11,6 +11,7 @@
 // WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 // License for the specific language governing permissions and limitations under
 // the License.
+
 package com.google.appengine.tools.pipeline;
 
 /**
@@ -23,8 +24,10 @@ package com.google.appengine.tools.pipeline;
  */
 public abstract class Job0<T> extends Job<T> {
 
+  private static final long serialVersionUID = 951850681860721384L;
+
   /**
-   * User's must define this method in their job class.
+   * Users must define this method in their job class.
    */
   public abstract Value<T> run();
 }

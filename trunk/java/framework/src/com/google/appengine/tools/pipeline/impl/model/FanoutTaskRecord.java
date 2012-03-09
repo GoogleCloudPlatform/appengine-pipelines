@@ -25,7 +25,7 @@ import com.google.appengine.api.datastore.Key;
  */
 public class FanoutTaskRecord extends PipelineModelObject {
   
-  public static final String DATA_STORE_KIND = "fanoutTask";
+  public static final String DATA_STORE_KIND = "pipeline-fanoutTask";
   private static final String PAYLOAD_PROPERTY = "payload";
   
   private byte[] payload;

@@ -55,7 +55,7 @@ public class Barrier extends PipelineModelObject {
     RUN, FINALIZE
   }
 
-  public static final String DATA_STORE_KIND = "barrier";
+  public static final String DATA_STORE_KIND = "pipeline-barrier";
   private static final String TYPE_PROPERTY = "barrierType";
   private static final String JOB_KEY_PROPERTY = "jobKey";
   private static final String RELEASED_PROPERTY = "released";

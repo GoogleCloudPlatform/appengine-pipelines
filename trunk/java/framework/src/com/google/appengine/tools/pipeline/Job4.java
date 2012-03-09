@@ -28,8 +28,10 @@ package com.google.appengine.tools.pipeline;
  */
 public abstract class Job4<T, T1, T2, T3, T4> extends Job<T> {
 
+  private static final long serialVersionUID = 130764365467198452L;
+
   /**
-   * User's must define this method in their job class.
+   * Users must define this method in their job class.
    */
   public abstract Value<T> run(T1 param1, T2 param2, T3 param3, T4 param4);
 }
