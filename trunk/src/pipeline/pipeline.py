@@ -1041,17 +1041,13 @@ class After(object):
     """Initializer.
 
     Args:
-      *futures: One or more PipelineFutures that all subsequent pipelines
-        should follow.
+      *futures: PipelineFutures that all subsequent pipelines should follow.
+        May be empty, in which case this statement does nothing.
     """
-    if len(futures) == 0:
-      raise TypeError(
-          'Must pass one or more PipelineFuture instances to After()')
     self._futures = set(futures)
 
   def __enter__(self):
     """When entering a 'with' block."""
-    After._thread_init()
     After._local._after_all_futures.extend(self._futures)
 
   def __exit__(self, type, value, trace):
