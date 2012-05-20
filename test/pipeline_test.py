@@ -464,6 +464,21 @@ class PipelineTest(TestBase):
     self.assertRaises(pipeline.PipelineExistsError,
                       other_stage.start, idempotence_key='banana')
 
+  def testStartIdempotenceKeyIsRandomGarbage(self):
+    """Tests when the idempotence key binary garbage."""
+    idempotence_key = '\xfb\xcaOu\t72\xa2\x08\xc9\xb9\x82\xa1\xf4>\xba>SwL'
+    self.assertRaises(UnicodeDecodeError, idempotence_key.encode, 'utf-8')
+
+    stage = OutputlessPipeline()
+    stage.start(idempotence_key=idempotence_key)
+
+    other_stage = OutputlessPipeline()
+    self.assertRaises(pipeline.PipelineExistsError,
+                      other_stage.start, idempotence_key=idempotence_key)
+
+    result = OutputlessPipeline.from_id(idempotence_key)
+    self.assertTrue(result is not None)
+
   def testStartRetryParameters(self):
     """Tests setting retry backoff parameters before calling start()."""
     stage = OutputlessPipeline()

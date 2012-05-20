@@ -26,6 +26,7 @@ __all__ = [
 ]
 
 import datetime
+import hashlib
 import itertools
 import logging
 import os
@@ -485,6 +486,14 @@ class Pipeline(object):
       Pipeline sub-class instances or None if it could not be found.
     """
     pipeline_record = _pipeline_record
+
+    # Support pipeline IDs and idempotence_keys that are not unicode.
+    if not isinstance(pipeline_id, unicode):
+      try:
+        pipeline_id = pipeline_id.encode('utf-8')
+      except UnicodeDecodeError:
+        pipeline_id = hashlib.sha1(pipeline_id).hexdigest()
+
     pipeline_key = db.Key.from_path(_PipelineRecord.kind(), pipeline_id)
 
     if pipeline_record is None:
@@ -535,7 +544,7 @@ class Pipeline(object):
 
     Args:
       idempotence_key: The ID to use for this Pipeline and throughout its
-        asynchronous workflow to ensure the operations are idempotnent. If
+        asynchronous workflow to ensure the operations are idempotent. If
         empty a starting key will be automatically assigned.
       queue_name: What queue this Pipeline's workflow should execute on.
       base_path: The relative URL path to where the Pipeline API is
@@ -557,6 +566,12 @@ class Pipeline(object):
     """
     if not idempotence_key:
       idempotence_key = uuid.uuid1().hex
+    elif not isinstance(idempotence_key, unicode):
+      try:
+        idempotence_key.encode('utf-8')
+      except UnicodeDecodeError:
+        idempotence_key = hashlib.sha1(idempotence_key).hexdigest()
+
     pipeline_key = db.Key.from_path(_PipelineRecord.kind(), idempotence_key)
     context = _PipelineContext('', queue_name, base_path)
     future = PipelineFuture(self.output_names, force_strict=True)
@@ -1406,11 +1421,6 @@ class _PipelineContext(object):
     """
     if not isinstance(slot_key, db.Key):
       slot_key = db.Key(slot_key)
-    # TODO: This query may suffer from lag in the high-replication Datastore.
-    # Consider re-running notify_barriers a second time 10 seconds in the
-    # future to pick up the stragglers, or add child entities to the
-    # _SlotRecords that point back at dependent _BarrierRecord within a
-    # single entity group.
     query = (
         _BarrierRecord.all(cursor=cursor)
         .filter('blocking_slots =', slot_key))
