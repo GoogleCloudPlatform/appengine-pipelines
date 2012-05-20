@@ -1979,7 +1979,24 @@ class _PipelineContext(object):
       return
 
     if not pipeline_generator:
-      self.fill_slot(pipeline_key, caller_output.default, result)
+      # Catch any exceptions that are thrown when the pipeline's return
+      # value is being serialized. This ensures that serialization errors
+      # will cause normal abort/retry behavior.
+      try:
+        self.fill_slot(pipeline_key, caller_output.default, result)
+      except Exception, e:
+        retry_message = 'Bad return value. %s: %s' % (
+            e.__class__.__name__, str(e))
+        logging.exception(
+            'Generator %r#%s caused exception while serializing return '
+            'value %r. %s', pipeline_func, pipeline_key.name(), result,
+            retry_message)
+        self.transition_retry(pipeline_key, retry_message)
+        if pipeline_func.task_retry:
+          raise
+        else:
+          return
+
       expected_outputs = set(caller_output._output_dict.iterkeys())
       found_outputs = self.session_filled_output_names
       if expected_outputs != found_outputs:
@@ -2072,8 +2089,26 @@ class _PipelineContext(object):
     all_output_slots = set()
     for sub_stage in sub_stage_ordering:
       future = sub_stage_dict[sub_stage]
-      dependent_slots, output_slots, params_text, params_blob = _generate_args(
-          sub_stage, future, self.queue_name, self.base_path)
+
+      # Catch any exceptions that are thrown when the pipeline's parameters
+      # are being serialized. This ensures that serialization errors will
+      # cause normal retry/abort behavior.
+      try:
+        dependent_slots, output_slots, params_text, params_blob = \
+            _generate_args(sub_stage, future, self.queue_name, self.base_path)
+      except Exception, e:
+        retry_message = 'Bad child arguments. %s: %s' % (
+            e.__class__.__name__, str(e))
+        logging.exception(
+            'Generator %r#%s caused exception while serializing args for '
+            'child pipeline %r. %s', pipeline_func, pipeline_key.name(),
+            sub_stage, retry_message)
+        self.transition_retry(pipeline_key, retry_message)
+        if pipeline_func.task_retry:
+          raise
+        else:
+          return
+
       child_pipeline_key = db.Key.from_path(
           _PipelineRecord.kind(), uuid.uuid1().hex)
       all_output_slots.update(output_slots)
