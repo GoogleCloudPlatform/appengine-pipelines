@@ -56,6 +56,12 @@ class TestBase(unittest.TestCase):
     testutil.setup_for_testing(define_queues=['other'])
     super(TestBase, self).setUp()
 
+  def assertIn(self, the_thing, what_thing_should_be_in):
+    """Asserts that something is contained in something else."""
+    if the_thing not in what_thing_should_be_in:
+      raise AssertionError('Could not find %r in %r' % (
+                           the_thing, what_thing_should_be_in))
+
 
 class SlotTest(TestBase):
   """Tests for the Slot class."""
@@ -2745,6 +2751,36 @@ class TaskRunningTest(test_shared.TaskRunningMixin, TestBase):
     after_record = db.get(self.pipeline_key)
     self.assertEquals(_PipelineRecord.ABORTED, after_record.status)
 
+  def testPassBadValue(self):
+    """Tests when a pipeline passes a non-serializable value to a child."""
+    self.pipeline_record.class_path = '__main__.PassBadValue'
+    self.pipeline_record.status = _PipelineRecord.WAITING
+    db.put([self.pipeline_record, self.slot_record])
+    self.context.evaluate(self.pipeline_key, purpose=_BarrierRecord.START)
+
+    after_record = db.get(self.pipeline_key)
+    self.assertEquals(_PipelineRecord.WAITING, after_record.status)
+    self.assertEquals(1, after_record.current_attempt)
+    self.assertIn('Bad child arguments. TypeError', after_record.retry_message)
+    self.assertIn('is not JSON serializable', after_record.retry_message)
+    self.assertTrue(after_record.abort_message is None)
+    self.assertTrue(after_record.finalized_time is None)
+
+  def testReturnBadValue(self):
+    """Tests when a pipeline returns a non-serializable value."""
+    self.pipeline_record.class_path = '__main__.ReturnBadValue'
+    self.pipeline_record.status = _PipelineRecord.WAITING
+    db.put([self.pipeline_record, self.slot_record])
+    self.context.evaluate(self.pipeline_key, purpose=_BarrierRecord.START)
+
+    after_record = db.get(self.pipeline_key)
+    self.assertEquals(_PipelineRecord.WAITING, after_record.status)
+    self.assertEquals(1, after_record.current_attempt)
+    self.assertIn('Bad return value. TypeError', after_record.retry_message)
+    self.assertIn('is not JSON serializable', after_record.retry_message)
+    self.assertTrue(after_record.abort_message is None)
+    self.assertTrue(after_record.finalized_time is None)
+
 
 class HandlersPrivateTest(TestBase):
   """Tests that the pipeline request handlers are all private."""
@@ -3923,22 +3959,12 @@ class FunctionalTest(test_shared.TaskRunningMixin, TestBase):
   def testPassBadValue(self):
     """Tests when a pipeline passes a non-serializable value to a child."""
     stage = PassBadValue()
-    if self.test_mode:
-      self.assertRaises(TypeError, self.run_pipeline, stage)
-    else:
-      self.assertRaises(
-          TypeError, self.run_pipeline,
-          stage, _task_retry=False, _require_slots_filled=False)
+    self.assertRaises(TypeError, self.run_pipeline, stage)
 
   def testReturnBadValue(self):
     """Tests when a pipeline returns a non-serializable value."""
     stage = ReturnBadValue()
-    if self.test_mode:
-      self.assertRaises(TypeError, self.run_pipeline, stage)
-    else:
-      self.assertRaises(
-          TypeError, self.run_pipeline,
-          stage, _task_retry=False, _require_slots_filled=False)
+    self.assertRaises(TypeError, self.run_pipeline, stage)
 
   def testWithParams(self):
     """Tests when a pipeline uses the with_params helper."""
