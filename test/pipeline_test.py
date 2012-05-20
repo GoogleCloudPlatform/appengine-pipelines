@@ -536,6 +536,28 @@ class PipelineTest(TestBase):
     self.assertEquals(stage.outputs.two.key, other.outputs.two.key)
     self.assertEquals('blue', other.outputs.two.value)
 
+  def testFromIdReturnsOriginalClass(self):
+    """Tests that from_id() will always return the original class."""
+    stage = AsyncOutputlessPipeline()
+    stage.start()
+
+    other = pipeline.Pipeline.from_id(stage.pipeline_id)
+    self.assertTrue(isinstance(other, AsyncOutputlessPipeline))
+    self.assertTrue(type(other) is not pipeline.Pipeline)
+    self.assertTrue(other.async)  # Class variables preserved
+
+  def testFromIdCannotFindOriginalClass(self):
+    """Tests when from_id() cannot find the original class."""
+    stage = NothingPipeline()
+    stage.start()
+
+    pipeline_record = _PipelineRecord.get_by_key_name(stage.pipeline_id)
+    pipeline_record.class_path = 'does_not_exist.or_something'
+    pipeline_record.put()
+
+    other = pipeline.Pipeline.from_id(stage.pipeline_id)
+    self.assertTrue(type(other) is pipeline.Pipeline)
+
   def testFillString(self):
     """Tests filling a slot by name."""
     stage = NothingPipeline('one', 'two', three='red', four=1234)
