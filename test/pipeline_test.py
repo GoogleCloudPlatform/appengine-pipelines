@@ -990,9 +990,16 @@ class PipelineTest(TestBase):
 class OrderingTest(TestBase):
   """Tests for the Ordering classes."""
 
-  def testAfterMissing(self):
+  def testAfterEmpty(self):
     """Tests when no futures are passed to the After() constructor."""
-    self.assertRaises(TypeError, pipeline.After)
+    pipeline.After._after_all_futures = []
+    futures = []
+    after = pipeline.After(*futures)
+    self.assertEquals([], pipeline.After._local._after_all_futures)
+    after.__enter__()
+    self.assertEquals([], pipeline.After._local._after_all_futures)
+    self.assertFalse(after.__exit__(None, None, None))
+    self.assertEquals([], pipeline.After._local._after_all_futures)
 
   def testAfter(self):
     """Tests the After class."""
