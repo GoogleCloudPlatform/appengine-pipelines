@@ -1044,6 +1044,9 @@ class After(object):
       *futures: PipelineFutures that all subsequent pipelines should follow.
         May be empty, in which case this statement does nothing.
     """
+    for f in futures:
+      if not isinstance(f, PipelineFuture):
+        raise TypeError('May only pass PipelineFuture instances to After()')
     self._futures = set(futures)
 
   def __enter__(self):
