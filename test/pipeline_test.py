@@ -992,7 +992,7 @@ class OrderingTest(TestBase):
 
   def testAfterEmpty(self):
     """Tests when no futures are passed to the After() constructor."""
-    pipeline.After._after_all_futures = []
+    pipeline.After._local._after_all_futures = []
     futures = []
     after = pipeline.After(*futures)
     self.assertEquals([], pipeline.After._local._after_all_futures)
@@ -1001,10 +1001,15 @@ class OrderingTest(TestBase):
     self.assertFalse(after.__exit__(None, None, None))
     self.assertEquals([], pipeline.After._local._after_all_futures)
 
+  def testAfterParameterNotFuture(self):
+    """Tests when some other object is passed to the After() constructor."""
+    futures = [object(), object()]
+    self.assertRaises(TypeError, pipeline.After, *futures)
+
   def testAfter(self):
     """Tests the After class."""
-    pipeline.After._after_all_futures = []
-    futures = [object(), object(), object()]
+    pipeline.After._local._after_all_futures = []
+    futures = [pipeline.PipelineFuture([]), pipeline.PipelineFuture([])]
     after = pipeline.After(*futures)
     self.assertEquals([], pipeline.After._local._after_all_futures)
     after.__enter__()
@@ -1014,8 +1019,8 @@ class OrderingTest(TestBase):
 
   def testAfterNested(self):
     """Tests nested behavior of the After class."""
-    pipeline.After._after_all_futures = []
-    futures = [object(), object(), object()]
+    pipeline.After._local._after_all_futures = []
+    futures = [pipeline.PipelineFuture([]), pipeline.PipelineFuture([])]
 
     after = pipeline.After(*futures)
     self.assertEquals([], pipeline.After._local._after_all_futures)
@@ -1035,6 +1040,8 @@ class OrderingTest(TestBase):
 
   def testInOrder(self):
     """Tests the InOrder class."""
+    pipeline.InOrder._local._in_order_futures = set()
+    pipeline.InOrder._local._activated = False
     inorder = pipeline.InOrder()
     self.assertFalse(pipeline.InOrder._local._activated)
     self.assertEquals(set(), pipeline.InOrder._local._in_order_futures)
@@ -1057,6 +1064,8 @@ class OrderingTest(TestBase):
 
   def testInOrderNested(self):
     """Tests nested behavior of the InOrder class."""
+    pipeline.InOrder._local._in_order_futures = set()
+    pipeline.InOrder._local._activated = False
     inorder = pipeline.InOrder()
     self.assertFalse(pipeline.InOrder._local._activated)
     inorder.__enter__()
