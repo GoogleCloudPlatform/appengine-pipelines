@@ -1048,6 +1048,7 @@ class After(object):
 
   def __enter__(self):
     """When entering a 'with' block."""
+    After._thread_init()
     After._local._after_all_futures.extend(self._futures)
 
   def __exit__(self, type, value, trace):
