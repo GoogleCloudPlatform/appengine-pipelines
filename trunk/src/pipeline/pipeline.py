@@ -480,6 +480,9 @@ class Pipeline(object):
       _pipeline_record: Internal-only. The _PipelineRecord instance to use
         to instantiate this instance instead of fetching it from
         the datastore.
+
+    Returns:
+      Pipeline sub-class instances or None if it could not be found.
     """
     pipeline_record = _pipeline_record
     pipeline_key = db.Key.from_path(_PipelineRecord.kind(), pipeline_id)
@@ -489,16 +492,24 @@ class Pipeline(object):
     if pipeline_record is None:
       return None
 
+    try:
+      pipeline_func_class = mr_util.for_name(pipeline_record.class_path)
+    except ImportError, e:
+      logging.warning('Tried to find Pipeline %s#%s, but class could '
+                      'not be found. Using default Pipeline class instead.',
+                      pipeline_record.class_path, pipeline_id)
+      pipeline_func_class = cls
+
     params = pipeline_record.params
     arg_list, kwarg_dict = _dereference_args(
         pipeline_record.class_path, params['args'], params['kwargs'])
-    outputs = PipelineFuture(cls.output_names)
+    outputs = PipelineFuture(pipeline_func_class.output_names)
     outputs._inherit_outputs(
         pipeline_record.class_path,
         params['output_slots'],
         resolve_outputs=resolve_outputs)
 
-    stage = cls(*arg_list, **kwarg_dict)
+    stage = pipeline_func_class(*arg_list, **kwarg_dict)
     stage.backoff_seconds = params['backoff_seconds']
     stage.backoff_factor = params['backoff_factor']
     stage.max_attempts = params['max_attempts']
