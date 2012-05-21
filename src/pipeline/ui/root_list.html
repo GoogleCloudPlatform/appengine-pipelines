@@ -16,6 +16,7 @@
   <script type="text/javascript">
     $(document).ready(initRootList);
   </script>
+  <title>Root Pipelines</title>
 </head>
 <body>
 
@@ -23,7 +24,29 @@
 
 <div id="content">
 
-  <div id="root-list"><!-- Root list goes here --></div>
+  <h1 class="page-title">Root Pipelines</h1>
+
+  <table id="root-list" style="display: none">
+    <thead>
+      <tr>
+        <th>Class Path</th>
+        <th>Status</th>
+        <th>Start Time</th>
+        <th>Run Time</th>
+        <th>Links</th>
+      </tr>
+    </thead>
+    <tfoot>
+      <tr>
+        <td colspan="5">
+          <a href="#" id="next-link" style="display: none">Next &raquo;</a>
+        </td>
+      </tr>
+    </tfoot>
+    <tbody></tbody>
+  </table>
+
+  <div id="empty-list-message" style="display: none"></div>
 
 </div>
 
