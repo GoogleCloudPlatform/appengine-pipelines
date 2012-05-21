@@ -17,6 +17,7 @@
 """Status UI for Google App Engine Pipeline API."""
 
 import logging
+import os
 
 from google.appengine.api import users
 from google.appengine.ext import webapp
@@ -62,7 +63,8 @@ class _StatusUiHandler(webapp.RequestHandler):
   }
 
   def get(self, resource=''):
-    if _ENFORCE_AUTH:
+    import pipeline  # Break circular dependency
+    if pipeline._ENFORCE_AUTH:
       if users.get_current_user() is None:
         self.redirect(users.create_login_url(self.request.url))
         return
@@ -81,7 +83,7 @@ class _StatusUiHandler(webapp.RequestHandler):
 
     relative_path, content_type = self._RESOURCE_MAP[resource]
     path = os.path.join(os.path.dirname(__file__), relative_path)
-    if not _DEBUG:
+    if not pipeline._DEBUG:
       self.response.headers["Cache-Control"] = "public, max-age=300"
     self.response.headers["Content-Type"] = content_type
     self.response.out.write(open(path, 'rb').read())
