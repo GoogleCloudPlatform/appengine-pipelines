@@ -1,11 +1,6 @@
 /* Major page sections. */
 html, body {
-  padding: 0;
-  margin: 0;
-  width: 100%;
   overflow: hidden;
-  font-family: helvetica, sans-serif;
-  font-size: 14px;
 }
 #sidebar {
   top: 0;
