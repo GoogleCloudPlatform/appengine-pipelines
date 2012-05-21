@@ -4627,6 +4627,71 @@ class StatusTest(TestBase):
         expected,
         pipeline.get_status_tree(self.pipeline1_key.name()))
 
+  def testGetPipelineNames(self):
+    """Tests the get_pipeline_names function."""
+    names = pipeline.get_pipeline_names()
+    self.assertTrue(None not in names)  # No base-class Pipeline
+    self.assertIn('__main__.EchoSync', names)
+    self.assertIn('pipeline.common.Delay', names)
+
+  def testGetRootList(self):
+    """Tests the get_root_list function."""
+    stage = NothingPipeline('one', 'two', three='red', four=1234)
+    stage.start(idempotence_key='banana')
+    stage.set_status('This one has a message')
+
+    stage2 = EchoSync('one')
+    stage2.start(idempotence_key='lemon')
+
+    found = pipeline.get_root_list()
+    self.assertIn('cursor', found)
+
+    found_names = [
+        (p['pipelineId'], p['classPath']) for p in found['pipelines']]
+    expected = [
+        ('lemon', '__main__.EchoSync'),
+        ('banana', '__main__.NothingPipeline')
+    ]
+    self.assertEquals(expected, found_names)
+
+    self.assertEquals('This one has a message',
+                      found['pipelines'][1]['statusMessage'])
+
+  def testGetRootListCursor(self):
+    """Tests the count and cursor behavior of get_root_list."""
+    NothingPipeline().start(idempotence_key='banana')
+    NothingPipeline().start(idempotence_key='lemon')
+
+    # Find newest
+    found = pipeline.get_root_list(count=1)
+    self.assertIn('cursor', found)
+    self.assertEquals(1, len(found['pipelines']))
+    self.assertEquals('lemon', found['pipelines'][0]['pipelineId'])
+
+    # Find next newest
+    found = pipeline.get_root_list(count=1, cursor=found['cursor'])
+    self.assertIn('cursor', found)
+    self.assertEquals(1, len(found['pipelines']))
+    self.assertEquals('banana', found['pipelines'][0]['pipelineId'])
+
+    # Find nothing
+    found = pipeline.get_root_list(count=1, cursor=found['cursor'])
+    self.assertEquals(0, len(found['pipelines']))
+
+  def testGetRootListClassPath(self):
+    """Tests filtering a root list to a single class_path."""
+    NothingPipeline().start(idempotence_key='banana')
+    NothingPipeline().start(idempotence_key='lemon')
+    EchoSync('one').start(idempotence_key='tomato')
+
+    found = pipeline.get_root_list(class_path=NothingPipeline.class_path)
+    self.assertEquals(['__main__.NothingPipeline', '__main__.NothingPipeline'],
+                      [p['classPath'] for p in found['pipelines']])
+
+    found = pipeline.get_root_list(class_path=EchoSync.class_path)
+    self.assertEquals(['__main__.EchoSync'],
+                      [p['classPath'] for p in found['pipelines']])
+
 
 if __name__ == '__main__':
   logging.getLogger().setLevel(logging.DEBUG)
