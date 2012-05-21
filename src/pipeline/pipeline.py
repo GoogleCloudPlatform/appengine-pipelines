@@ -2984,7 +2984,6 @@ def get_root_list(class_path=None, cursor=None, count=50):
   Raises:
     PipelineStatusError if any input is bad.
   """
-  logging.error('Cursor is: %r', cursor)
   query = _PipelineRecord.all(cursor=cursor)
   if class_path:
     query.filter('class_path =', class_path)
