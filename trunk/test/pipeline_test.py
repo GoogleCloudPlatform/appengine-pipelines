@@ -4644,7 +4644,7 @@ class StatusTest(TestBase):
     stage2.start(idempotence_key='lemon')
 
     found = pipeline.get_root_list()
-    self.assertIn('cursor', found)
+    self.assertFalse('cursor' in found)  # No next page available
 
     found_names = [
         (p['pipelineId'], p['classPath']) for p in found['pipelines']]
@@ -4668,15 +4668,11 @@ class StatusTest(TestBase):
     self.assertEquals(1, len(found['pipelines']))
     self.assertEquals('lemon', found['pipelines'][0]['pipelineId'])
 
-    # Find next newest
+    # Find next newest, and no cursor should be returned.
     found = pipeline.get_root_list(count=1, cursor=found['cursor'])
-    self.assertIn('cursor', found)
+    self.assertFalse('cursor' in found)
     self.assertEquals(1, len(found['pipelines']))
     self.assertEquals('banana', found['pipelines'][0]['pipelineId'])
-
-    # Find nothing
-    found = pipeline.get_root_list(count=1, cursor=found['cursor'])
-    self.assertEquals(0, len(found['pipelines']))
 
   def testGetRootListClassPath(self):
     """Tests filtering a root list to a single class_path."""

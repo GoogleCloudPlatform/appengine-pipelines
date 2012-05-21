@@ -2978,11 +2978,13 @@ def get_root_list(class_path=None, cursor=None, count=50):
     Dictionary with the keys:
       pipelines: The list of Pipeline records in the same format as
         returned by get_status_tree, but with only the roots listed.
-      cursor: Cursor to pass back to this function to resume the query.
+      cursor: Cursor to pass back to this function to resume the query. Will
+        only be present if there is another page of results.
 
   Raises:
     PipelineStatusError if any input is bad.
   """
+  logging.error('Cursor is: %r', cursor)
   query = _PipelineRecord.all(cursor=cursor)
   if class_path:
     query.filter('class_path =', class_path)
@@ -3023,10 +3025,13 @@ def get_root_list(class_path=None, cursor=None, count=50):
     output['pipelineId'] = pipeline_record.key().name()
     results.append(output)
 
-  return {
-    'pipelines': results,
-    'cursor': query.cursor(),
-  }
+  result_dict = {}
+  cursor = query.cursor()
+  query.with_cursor(cursor)
+  if query.get(keys_only=True):
+    result_dict.update(cursor=cursor)
+  result_dict.update(pipelines=results)
+  return result_dict
 
 ################################################################################
 

@@ -20,9 +20,10 @@
 
 
 function initRootList() {
+  setButter('Loading...');
   $.ajax({
     type: 'GET',
-    url: 'rpc/list',
+    url: 'rpc/list' + window.location.search,
     dataType: 'text',
     error: function(request, textStatus) {
       getResponseDataJson(textStatus);
@@ -31,8 +32,43 @@ function initRootList() {
       var response = getResponseDataJson(null, data);
       if (response) {
         clearButter();
-        console.log(response);
+        initRootListDone(response);
       }
     }
   });
+}
+
+
+function initRootListDone(response) {
+  if (response.pipelines && response.pipelines.length > 0) {
+    $('#root-list').show();
+    if (response.cursor) {
+      $('#next-link').attr('href', '?cursor=' + response.cursor).show();
+    }
+
+    $.each(response.pipelines, function(index, infoMap) {
+      var row = $('<tr>');
+      $('<td class="class-path">').text(infoMap.classPath).appendTo(row);
+      $('<td class="status">').text(infoMap.status).appendTo(row);
+
+      var sinceSpan = $('<abbr class="timeago">');
+      var isoDate = getIso8601String(infoMap.startTimeMs);
+      sinceSpan.attr('title', isoDate);
+      sinceSpan.text(isoDate);
+      sinceSpan.timeago();
+      $('<td class="start-time">').append(sinceSpan).appendTo(row);
+
+      $('<td class="run-time">').text(getElapsedTimeString(
+          infoMap.startTimeMs, infoMap.endTimeMs)).appendTo(row);
+      $('<td class="links">')
+          .append(
+            $('<a>')
+                .attr('href', 'status?root=' + infoMap.pipelineId)
+                .text('Detail'))
+          .appendTo(row);
+      $('#root-list>tbody').append(row);
+    });
+  } else {
+    $('#empty-list-message').text('No pipelines found.').show();
+  }
 }
