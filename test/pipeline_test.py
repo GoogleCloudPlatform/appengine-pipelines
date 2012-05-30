@@ -4632,7 +4632,14 @@ class StatusTest(TestBase):
     names = pipeline.get_pipeline_names()
     self.assertTrue(None not in names)  # No base-class Pipeline
     self.assertIn('__main__.EchoSync', names)
-    self.assertIn('pipeline.common.Delay', names)
+
+    found = False
+    for name in names:
+      # Name may be relative to another module, like 'foo.pipeline.common...'
+      found = 'pipeline.common.Delay' in name
+      if found:
+        break
+    self.assertTrue(found)
 
   def testGetRootList(self):
     """Tests the get_root_list function."""
