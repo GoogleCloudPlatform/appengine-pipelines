@@ -37,15 +37,20 @@
     <pathelement path="${sdklibdir}/impl/appengine-api-stubs.jar"/>
   </path>
 
+  <path id="third_party">
+    <pathelement path="third_party/json.jar"/>
+  </path>
+
   <target name="init">
     <mkdir dir="${build}"/>
   </target>
 
-  <target name="compile-framework" depends="init,download_sdk">
+  <target name="compile-framework" depends="init,download_sdk,download_json_jar">
     <javac srcdir="${framework-src}" destdir="${build}" debug="on" debuglevel="lines,source">
       <compilerarg value="-Xlint:all"/>
       <classpath>
         <path refid="sdkjars"/>
+        <path refid="third_party"/>
       </classpath>
     </javac>
   </target>
@@ -115,6 +120,7 @@
       <classpath>
         <path refid="sdkjars"/>
         <path refid="testjars"/>
+        <path refid="third_party"/>
         <pathelement location="${dist}/lib/appengine-pipeline.jar"/>
         <pathelement location="${demo}/war/WEB-INF/classes"/>
         <pathelement location="${testbuild}"/>
@@ -132,6 +138,7 @@
       <classpath>
         <path refid="sdkjars"/>
         <path refid="testjars"/>
+        <path refid="third_party"/>
         <pathelement location="${dist}/lib/appengine-pipeline.jar"/>
         <pathelement location="${demo}/war/WEB-INF/classes"/>
         <pathelement location="${testbuild}"/>
@@ -160,6 +167,19 @@
     <get src="http://googleappengine.googlecode.com/files/${sdkfilename}"
          dest="${sdk}/${sdkfilename}"/>
     <unzip src="${sdk}/${sdkfilename}" dest="${sdk}"/>
+  </target>
+
+  <target name="check_json_jar_downloaded">
+    <available file="third_party/json.jar" property="json_jar_downloaded"/>
+  </target>
+
+  <target name="download_json_jar"
+          description="Downloads org.json jar"
+          depends="check_json_jar_downloaded"
+          unless="json_jar_downloaded">
+    <mkdir dir="third_party"/>
+    <get src="http://repo1.maven.org/maven2/org/json/json/20090211/json-20090211.jar"
+         dest="third_party/json.jar"/>
   </target>
 
   <!-- Separate target because downloading the SDK can be expensive and

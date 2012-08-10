@@ -98,6 +98,7 @@ public class JsonGenerator {
   // empty
   private static final String JOB_ABORT_MESSAGE = "abortMessage"; // For root
   private static final String DEFAULT_OUTPUT_NAME = "default";
+  private static final String JOB_STATUS_CONSOLE_URL = "statusConsoleUrl";
 
 
   private void buildJsonRepresentation() {
@@ -191,6 +192,9 @@ public class JsonGenerator {
     map.put(JOB_KWARGS, new HashMap<String, String>());
     map.put(JOB_LAST_RETRY_MESSAGE, "");
     map.put(JOB_ABORT_MESSAGE, "");
+    if (jobRecord.getStatusConsoleUrl() != null) {
+      map.put(JOB_STATUS_CONSOLE_URL, jobRecord.getStatusConsoleUrl());
+    }
     return map;
   }
 

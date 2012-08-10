@@ -116,6 +116,7 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
   private static final String BACKOFF_FACTOR_PROPERTY = "backoffFactor";
   private static final String ON_BACKEND_PROPERTY = "onBackend";
   private static final String CHILD_GRAPH_GUID_PROPERTY = "childGraphGuid";
+  private static final String STATUS_CONSOLE_URL = "statusConsoleUrl";
 
   // persistent fields
   private Key jobInstanceKey;
@@ -133,6 +134,7 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
   private long backoffSeconds = JobSetting.BackoffSeconds.DEFAULT;
   private long backoffFactor = JobSetting.BackoffFactor.DEFAULT;
   private String onBackend = null;
+  private String statusConsoleUrl = null;
 
   // transient fields
   private Barrier runBarrierInflated;
@@ -173,6 +175,7 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
     this.backoffSeconds = (Long) entity.getProperty(BACKOFF_SECONDS_PROPERTY);
     this.backoffFactor = (Long) entity.getProperty(BACKOFF_FACTOR_PROPERTY);
     this.onBackend = (String) entity.getProperty(ON_BACKEND_PROPERTY);
+    this.statusConsoleUrl = (String) entity.getProperty(STATUS_CONSOLE_URL);
   }
 
   /**
@@ -208,6 +211,9 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
     entity.setProperty(BACKOFF_FACTOR_PROPERTY, backoffFactor);
     if (null != onBackend) {
       entity.setProperty(ON_BACKEND_PROPERTY, onBackend);
+    }
+    if (null != statusConsoleUrl) {
+      entity.setProperty(STATUS_CONSOLE_URL, statusConsoleUrl);
     }
     return entity;
   }
@@ -392,6 +398,14 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
 
   public String getOnBackend() {
     return onBackend;
+  }
+
+  public String getStatusConsoleUrl() {
+    return statusConsoleUrl;
+  }
+
+  public void setStatusConsoleUrl(String statusConsoleUrl) {
+    this.statusConsoleUrl = statusConsoleUrl;
   }
 
   public void appendChildKey(Key key) {
