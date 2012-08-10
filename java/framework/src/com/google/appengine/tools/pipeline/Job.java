@@ -423,13 +423,24 @@ public abstract class Job<E> implements Serializable {
 
   /**
    * Returns the Key uniquely identifying the Pipeline that this job is a member
-   * of This is the same as the Key of the root Job of the Pipeline.
+   * of. This is the same as the Key of the root Job of the Pipeline.
    *
    * @return the Key uniquely identifying the Pipeline that this job is a member
    *         of
    */
   protected Key getPipelineKey() {
     return thisJobRecord.getRootJobKey();
+  }
+
+  /**
+   * Sets the status console URL for the job.  The Pipeline UI displays the page
+   * at this URL in an iframe.
+   *
+   * Currently, this takes effect only after the job completes, but this may
+   * change in future versions.
+   */
+  protected void setStatusConsoleUrl(String url) {
+    thisJobRecord.setStatusConsoleUrl(url);
   }
 
 }

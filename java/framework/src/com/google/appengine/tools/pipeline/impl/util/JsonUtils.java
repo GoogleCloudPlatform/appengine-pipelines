@@ -14,7 +14,7 @@
 
 package com.google.appengine.tools.pipeline.impl.util;
 
-import com.google.appengine.repackaged.org.json.*;
+import org.json.*;
 
 import java.util.ArrayList;
 import java.util.Collection;
