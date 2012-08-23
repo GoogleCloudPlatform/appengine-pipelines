@@ -11,13 +11,13 @@ Pipeline is a framework for building dynamic, complex workflows on Google App En
 
 ==Add the Pipeline library to you project==
 
-Build *appengine-pipeline.jar*
-  # svn checkout http://appengine-pipeline.googlecode.com/svn/trunk/
-  # cd trunk/java
-  # ant
-  # appengine-pipeline.jar will be in dist/lib
-
-Add *appengine-pipeline.jar* to your war/WEB-INF/lib directory.
+Build the pipeline library:
+{{{
+svn checkout http://appengine-pipeline.googlecode.com/svn/trunk/
+cd trunk/java
+ant
+}}}
+Copy `dist/lib/appengine-pipeline.jar` and `third_party/json.jar` to your `war/WEB-INF/lib` directory.
 
 Add a servlet mapping to your web.xml file:
 {{{
