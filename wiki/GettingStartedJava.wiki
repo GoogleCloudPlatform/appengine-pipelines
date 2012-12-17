@@ -9,7 +9,7 @@
 
 Pipeline is a framework for building dynamic, complex workflows on Google App Engine. This a user’s guide for the Java version of Pipeline.
 
-==Add the Pipeline library to you project==
+==Add the Pipeline library to your project==
 
 Build the pipeline library:
 {{{
