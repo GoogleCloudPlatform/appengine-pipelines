@@ -14,6 +14,8 @@
 
 package com.google.appengine.tools.pipeline;
 
+import com.google.appengine.tools.pipeline.impl.backend.AppEngineTaskQueueTest;
+
 import junit.framework.Test;
 import junit.framework.TestSuite;
 
@@ -36,6 +38,7 @@ public class AllTests {
     suite.addTestSuite(FutureListTest.class);
     suite.addTestSuite(GCDTest.class);
     suite.addTestSuite(RetryTest.class);
+    suite.addTestSuite(AppEngineTaskQueueTest.class);
     return suite;
   }
 

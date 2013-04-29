@@ -17,15 +17,20 @@ package com.google.appengine.tools.pipeline.impl.backend;
 import com.google.appengine.api.backends.BackendServiceFactory;
 import com.google.appengine.api.taskqueue.Queue;
 import com.google.appengine.api.taskqueue.QueueFactory;
+import com.google.appengine.api.taskqueue.TaskAlreadyExistsException;
+import com.google.appengine.api.taskqueue.TaskHandle;
 import com.google.appengine.api.taskqueue.TaskOptions;
 import com.google.appengine.tools.pipeline.impl.servlets.TaskHandler;
 import com.google.appengine.tools.pipeline.impl.tasks.Task;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Enumeration;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.logging.Logger;
 
 /**
@@ -38,7 +43,7 @@ public class AppEngineTaskQueue implements PipelineTaskQueue {
 
   private static final Logger logger = Logger.getLogger(AppEngineTaskQueue.class.getName());
 
-  private static final int MAX_TASKS_PER_ENQUEUE = 100;
+  static final int MAX_TASKS_PER_ENQUEUE = 100;
 
   // TODO(ohler): make this a parameter
   private final Queue taskQueue = QueueFactory.getDefaultQueue();
@@ -56,16 +61,51 @@ public class AppEngineTaskQueue implements PipelineTaskQueue {
       logger.finest("Enqueueing: " + task);
       taskOptionsList.add(toTaskOptions(task));
       if (taskOptionsList.size() >= MAX_TASKS_PER_ENQUEUE) {
-        taskQueue.add(taskOptionsList);
+        addToQueue(taskOptionsList);
         taskOptionsList = new LinkedList<TaskOptions>();
       }
     }
     if (taskOptionsList.size() > 0) {
-      taskQueue.add(taskOptionsList);
+      addToQueue(taskOptionsList);
     }
   }
+  
+  //VisibleForTesting
+  List<TaskHandle> addToQueue(List<TaskOptions> tasks) {
+    // The below code would improve efficiency in the happy case
+    // It is commented out for testing.
+    // Hopefully it will be superseded by a fix to b/8734634
+//    try {
+//      return taskQueue.add(tasks);
+//    } catch (TaskAlreadyExistsException e) {
+//      //Will be retried below
+//    } catch (TransientFailureException e) {
+//      //Will be retried below
+//    }
+    List<Future<TaskHandle>> futures = new ArrayList<Future<TaskHandle>>(tasks.size());
+    for (TaskOptions t : tasks) {
+      Future<TaskHandle> future = taskQueue.addAsync(t);
+      futures.add(future);
+    }
+    List<TaskHandle> result = new ArrayList<TaskHandle>(tasks.size());
+    for (Future<TaskHandle> f : futures) {
+      try {
+        result.add(f.get());
+      } catch (InterruptedException e) {
+        logger.throwing("AppEngineTaskQueue", "addToQueue", e);
+        Thread.currentThread().interrupt();
+        throw new RuntimeException(e);
+      } catch (ExecutionException e) {
+        if (!(e.getCause() instanceof TaskAlreadyExistsException)) {
+          throw new RuntimeException(e.getCause());
+        }
+      }
+    }
+    return result;
+  }
 
-  private TaskOptions toTaskOptions(Task task) {
+  //VisibleForTesting
+  TaskOptions toTaskOptions(Task task) {
     TaskOptions taskOptions = TaskOptions.Builder.withUrl(TaskHandler.HANDLE_TASK_URL);
     if (task.getOnBackend() != null) {
       taskOptions.header("Host",
@@ -82,7 +122,7 @@ public class AppEngineTaskQueue implements PipelineTaskQueue {
     }
     return taskOptions;
   }
-
+  
   @SuppressWarnings("unchecked")
   private static void addProperties(TaskOptions taskOptions, Properties properties) {
     Enumeration<String> paramNames = (Enumeration<String>) properties.propertyNames();
