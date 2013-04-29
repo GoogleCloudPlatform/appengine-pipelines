@@ -15,6 +15,7 @@
 package com.google.appengine.tools.pipeline;
 
 import com.google.appengine.repackaged.com.google.common.collect.Lists;
+import com.google.appengine.repackaged.com.google.common.collect.ImmutableList;
 import com.google.appengine.tools.development.testing.LocalDatastoreServiceTestConfig;
 import com.google.appengine.tools.development.testing.LocalServiceTestHelper;
 import com.google.appengine.tools.pipeline.impl.model.Barrier;
@@ -71,7 +72,7 @@ public class BarrierTest extends TestCase {
     public List<?> valueList;
 
     ListMarker(Object... elements) {
-      valueList = Lists.newUnmodifiableArrayList(elements);
+      valueList = ImmutableList.copyOf(elements);
     }
   }
 
