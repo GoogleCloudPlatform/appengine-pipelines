@@ -75,7 +75,8 @@ public class PipelineServiceImpl implements PipelineService {
   public <T1, T2, T3, T4, T5, T6> String startNewPipeline(
       Job6<?, T1, T2, T3, T4, T5, T6> jobInstance, T1 arg1, T2 arg2, T3 arg3, T4 arg4, T5 arg5,
       T6 arg6, JobSetting... settings) {
-    return PipelineManager.startNewPipeline(settings, jobInstance, arg1, arg2, arg3, arg4, arg5);
+    return PipelineManager.startNewPipeline(settings, jobInstance, arg1, arg2, arg3, arg4, arg5,
+        arg6);
   }
 
   @Override
