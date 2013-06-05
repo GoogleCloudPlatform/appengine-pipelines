@@ -488,14 +488,13 @@ public abstract class Job<E> implements Serializable {
   }
 
   /**
-   * Sets the status console URL for the job through reflection. The Pipeline UI
-   * displays the page at this URL in an iframe.
+   * Sets the status console URL for the job.  The Pipeline UI displays the page
+   * at this URL in an iframe.
    *
-   *  Currently, this takes effect only after the job completes, but this may
+   * Currently, this takes effect only after the job completes, but this may
    * change in future versions.
    */
-  @SuppressWarnings("unused")
-  private void setStatusConsoleUrl(String url) {
+  protected void setStatusConsoleUrl(String url) {
     thisJobRecord.setStatusConsoleUrl(url);
   }
 
