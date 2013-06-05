@@ -33,6 +33,9 @@ public abstract class Job5<T, T1, T2, T3, T4, T5> extends Job<T> {
 
   /**
    * Users must define this method in their job class.
+   * 
+   * @throws Exception in case of job failure.
    */
-  public abstract Value<T> run(T1 param1, T2 param2, T3 param3, T4 param4, T5 param5);
+  public abstract Value<T> run(T1 param1, T2 param2, T3 param3, T4 param4, T5 param5)
+      throws Exception;
 }

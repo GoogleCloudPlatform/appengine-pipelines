@@ -45,7 +45,8 @@ public abstract class Task {
    * The type of task. The Pipeline framework uses several types
    */
   public static enum Type {
-    HANDLE_SLOT_FILLED, RUN_JOB, FINALIZE_JOB, FAN_OUT, DELETE_PIPELINE
+    HANDLE_SLOT_FILLED, RUN_JOB, HANDLE_CHILD_EXCEPTION, CANCEL_JOB, FINALIZE_JOB, FAN_OUT,
+    DELETE_PIPELINE, FILL_SLOT_HANDLE_SLOT_FILLED
   }
 
   protected String taskName;
@@ -88,6 +89,12 @@ public abstract class Task {
         return new FanoutTask(properties);
       case DELETE_PIPELINE:
         return new DeletePipelineTask(properties);
+      case HANDLE_CHILD_EXCEPTION:
+        return new HandleChildExceptionTask(properties);
+      case CANCEL_JOB:
+        return new CancelJobTask(properties);
+      case FILL_SLOT_HANDLE_SLOT_FILLED:
+        return new FillSlotHandleSlotFilledTask(properties);
       default:
         throw new RuntimeException("Unrecognized task type: " + type);
     }

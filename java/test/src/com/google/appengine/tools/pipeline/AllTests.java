@@ -39,6 +39,8 @@ public class AllTests {
     suite.addTestSuite(GCDTest.class);
     suite.addTestSuite(RetryTest.class);
     suite.addTestSuite(AppEngineTaskQueueTest.class);
+    suite.addTestSuite(PipelinesErrorHandlingTest.class);
+    suite.addTestSuite(DelayedValueTest.class);
     return suite;
   }
 

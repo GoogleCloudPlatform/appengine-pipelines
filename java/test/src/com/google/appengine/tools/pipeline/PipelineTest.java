@@ -32,6 +32,8 @@ public class PipelineTest extends TestCase implements Serializable {
   protected transient LocalServiceTestHelper helper;
   protected transient ApiProxy.Environment apiProxyEnvironment;
 
+  private static StringBuffer traceBuffer;
+
   public PipelineTest() {
     LocalTaskQueueTestConfig taskQueueConfig = new LocalTaskQueueTestConfig();
     taskQueueConfig.setCallbackClass(TestingTaskQueueCallback.class);
@@ -54,9 +56,22 @@ public class PipelineTest extends TestCase implements Serializable {
     return true;
   }
 
+  protected static void trace(String what) {
+    if (traceBuffer.length() > 0) {
+      traceBuffer.append(' ');
+    }
+    traceBuffer.append(what);
+  }
+
+  protected static String trace() {
+    return traceBuffer.toString();
+  }
+
+
   @Override
   public void setUp() throws Exception {
     super.setUp();
+    traceBuffer = new StringBuffer();
     helper.setUp();
     apiProxyEnvironment = ApiProxy.getCurrentEnvironment();
     System
@@ -84,6 +99,10 @@ public class PipelineTest extends TestCase implements Serializable {
           throw new RuntimeException("Job stopped " + jobInfo.getError());
         case STOPPED_BY_REQUEST:
           throw new RuntimeException("Job stopped by request.");
+        case CANCELED_BY_REQUEST:
+          throw new RuntimeException("Job was canceled by request.");
+        default:
+          break;
       }
     }
   }

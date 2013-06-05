@@ -69,6 +69,8 @@ public class JsonGenerator {
   private static final String DONE_STATUS = "done";
   private static final String ABORTED_STATUS = "aborted";
   private static final String RETRY_STATUS = "retry";
+  private static final String CANCELED_STATUS = "canceled";
+
   // private static final String FINALIZING_STATUS = "finalizing";
   private static final String JOB_START_TIME = "startTimeMs";
   private static final String JOB_END_TIME = "endTimeMs";
@@ -159,6 +161,11 @@ public class JsonGenerator {
         break;
       case RETRY:
         statusString = RETRY_STATUS;
+        break;
+      case CANCELED:
+        statusString = CANCELED_STATUS;
+        break;
+      default:
         break;
     }
     map.put(JOB_STATUS, statusString);

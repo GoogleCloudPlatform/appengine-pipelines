@@ -14,7 +14,6 @@
 
 package com.google.appengine.tools.pipeline.impl.backend;
 
-import static com.google.appengine.api.datastore.FetchOptions.Builder.withLimit;
 import static com.google.appengine.tools.pipeline.impl.util.TestUtils.throwHereForTesting;
 
 import com.google.appengine.api.datastore.Blob;
@@ -29,6 +28,7 @@ import com.google.appengine.api.datastore.Query;
 import com.google.appengine.api.datastore.Transaction;
 import com.google.appengine.tools.pipeline.NoSuchObjectException;
 import com.google.appengine.tools.pipeline.impl.model.Barrier;
+import com.google.appengine.tools.pipeline.impl.model.ExceptionRecord;
 import com.google.appengine.tools.pipeline.impl.model.PipelineModelObject;
 import com.google.appengine.tools.pipeline.impl.model.FanoutTaskRecord;
 import com.google.appengine.tools.pipeline.impl.model.JobInstanceRecord;
@@ -88,6 +88,7 @@ public class AppEngineBackEnd implements PipelineBackEnd {
     putAll(group.getJobs());
     putAll(group.getSlots());
     putAll(group.getJobInstanceRecords());
+    putAll(group.getFailureRecords());
   }
 
   private void transactionallySaveAll(UpdateSpec.Transaction transactionSpec, Key rootJobKey,
@@ -260,6 +261,7 @@ public class AppEngineBackEnd implements PipelineBackEnd {
       Barrier finalizeBarrier = null;
       Slot outputSlot = null;
       JobInstanceRecord jobInstanceRecord = null;
+      ExceptionRecord failureRecord = null;
       switch (inflationType) {
         case FOR_RUN:
           runBarrier = queryBarrier(jobRecord.getRunBarrierKey(), true, true);
@@ -273,10 +275,12 @@ public class AppEngineBackEnd implements PipelineBackEnd {
           break;
         case FOR_OUTPUT:
           outputSlot = querySlot(jobRecord.getOutputSlotKey(), false);
+          Key failureKey = jobRecord.getExceptionKey();
+          failureRecord = queryFailure(failureKey);
           break;
         default:
       }
-      jobRecord.inflate(runBarrier, finalizeBarrier, outputSlot, jobInstanceRecord);
+      jobRecord.inflate(runBarrier, finalizeBarrier, outputSlot, jobInstanceRecord, failureRecord);
       logger.finest("Query returned: " + jobRecord);
       return jobRecord;
     } catch (EntityNotFoundException e) {
@@ -386,6 +390,20 @@ public class AppEngineBackEnd implements PipelineBackEnd {
   }
 
   @Override
+  public ExceptionRecord queryFailure(Key failureKey) throws NoSuchObjectException {
+    if (failureKey == null) {
+      return null;
+    }
+    Entity entity;
+    try {
+      entity = transactionallyQueryEntity(failureKey);
+    } catch (EntityNotFoundException e) {
+      throw new NoSuchObjectException(failureKey.toString(), e);
+    }
+    return new ExceptionRecord(entity);
+  }
+
+  @Override
   public Object serlializeValue(Object value) throws IOException {
     // return JsonUtils.toJson(value);
     return new Blob(SerializationUtils.serialize(value));
@@ -449,6 +467,7 @@ public class AppEngineBackEnd implements PipelineBackEnd {
     final Map<Key, Slot> slots = new HashMap<Key, Slot>();
     final Map<Key, Barrier> barriers = new HashMap<Key, Barrier>();
     final Map<Key, JobInstanceRecord> jobInstanceRecords = new HashMap<Key, JobInstanceRecord>();
+    Map<Key, ExceptionRecord> failureRecords = new HashMap<Key, ExceptionRecord>();
     putAll(barriers, new Instantiator<Barrier>() {
       @Override
       public Barrier newObject(Entity entity) {
@@ -474,7 +493,14 @@ public class AppEngineBackEnd implements PipelineBackEnd {
         return new JobInstanceRecord(entity);
       }
     }, JobInstanceRecord.DATA_STORE_KIND, rootJobKey);
-    return new PipelineObjects(rootJobKey, jobs, slots, barriers, jobInstanceRecords);
+    putAll(failureRecords, new Instantiator<ExceptionRecord>() {
+      @Override
+      public ExceptionRecord newObject(Entity entity) {
+        return new ExceptionRecord(entity);
+      }
+    }, ExceptionRecord.DATA_STORE_KIND, rootJobKey);
+    return new PipelineObjects(
+        rootJobKey, jobs, slots, barriers, jobInstanceRecords, failureRecords);
   }
 
   /**
@@ -553,6 +579,5 @@ public class AppEngineBackEnd implements PipelineBackEnd {
     deleteAll(JobInstanceRecord.DATA_STORE_KIND, rootJobKey);
     deleteAll(FanoutTaskRecord.DATA_STORE_KIND, rootJobKey);
   }
-
 
 }

@@ -150,5 +150,20 @@ public class FanoutTask extends Task {
     }
     return listOfTasks;
   }
+  
+
+  @Override
+  public String toString() {
+    String nameString = "";
+    if (null != taskName) {
+      nameString = ", name=" + taskName;
+    }
+    String delayString = "";
+    if (null != delaySeconds) {
+      delayString = ", delaySeconds=" + delaySeconds;
+    }
+    return type.toString() + "_TASK[key=" + recordKey + nameString  
+        + delayString + "]";
+  }
 
 }

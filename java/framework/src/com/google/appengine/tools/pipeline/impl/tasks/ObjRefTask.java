@@ -85,12 +85,13 @@ public abstract class ObjRefTask extends Task {
   public String toString() {
     String nameString = "";
     if (null != taskName) {
-      nameString = "taskName(" + taskName + ")";
+      nameString = ", name=" + taskName;
     }
     String delayString = "";
     if (null != delaySeconds) {
-      delayString = " delaySeconds=" + delaySeconds;
+      delayString = ", delaySeconds=" + delaySeconds;
     }
-    return type.toString() + "_TASK[" + key + "]" + nameString + delayString;
+    return type.toString() + "_TASK[key=" + key + nameString  
+        + delayString + "]";
   }
 }

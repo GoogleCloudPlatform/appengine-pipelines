@@ -37,7 +37,8 @@ public class PipelineObjects {
    * caller should not hold references to them.
    */
   public PipelineObjects(Key rootJobKey, Map<Key, JobRecord> jobs, Map<Key, Slot> slots,
-      Map<Key, Barrier> barriers, Map<Key, JobInstanceRecord> jobInstanceRecords) {
+      Map<Key, Barrier> barriers, Map<Key, JobInstanceRecord> jobInstanceRecords,
+      Map<Key, ExceptionRecord> failureRecords) {
     this.jobInstanceRecords = jobInstanceRecords;
     this.barriers = barriers;
     this.jobs = jobs;
@@ -48,8 +49,8 @@ public class PipelineObjects {
       }
     }
     if (null == rootJob) {
-      throw new IllegalArgumentException("None of the jobs were the root job with key "
-          + rootJobKey);
+      throw new IllegalArgumentException(
+          "None of the jobs were the root job with key " + rootJobKey);
     }
     for (Slot slot : slots.values()) {
       slot.inflate(barriers);
@@ -62,7 +63,12 @@ public class PipelineObjects {
       Barrier finalizeBarrier = barriers.get(jobRec.getFinalizeBarrierKey());
       Slot outputSlot = slots.get(jobRec.getOutputSlotKey());
       JobInstanceRecord jobInstanceRecord = jobInstanceRecords.get(jobRec.getJobInstanceKey());
-      jobRec.inflate(runBarrier, finalizeBarrier, outputSlot, jobInstanceRecord);
+      ExceptionRecord failureRecord = null;
+      Key failureKey = jobRec.getExceptionKey();
+      if (null != failureKey) {
+        failureRecord = failureRecords.get(failureKey);
+      }
+      jobRec.inflate(runBarrier, finalizeBarrier, outputSlot, jobInstanceRecord, failureRecord);
     }
   }
 

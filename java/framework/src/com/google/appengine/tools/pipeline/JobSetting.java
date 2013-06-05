@@ -27,13 +27,13 @@ public interface JobSetting {
    * represented by the given {@code FutureValue} has been filled.
    */
   final class WaitForSetting implements JobSetting {
-    private FutureValue<?> futureValue;
+    private Value<?> futureValue;
 
-    public WaitForSetting(FutureValue<?> fv) {
+    public WaitForSetting(Value<?> fv) {
       this.futureValue = fv;
     }
 
-    public FutureValue<?> getFutureValue() {
+    public Value<?> getValue() {
       return futureValue;
     }
   }

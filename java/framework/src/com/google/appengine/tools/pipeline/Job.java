@@ -57,7 +57,7 @@ import java.util.List;
  * <ol>
  * <li> {@link #futureList(List)}. Constructs a new {@link FutureList}
  * <li> {@link #immediate(Object)}. Constructs a new {@link ImmediateValue}
- * <li> {@link #waitFor(FutureValue)}. Constructs a new
+ * <li> {@link #waitFor(Value)}. Constructs a new
  * {@link JobSetting.WaitForSetting}.
  * <li> {@link #backOffFactor(int)}. Constructs a new
  * {@link JobSetting.BackoffFactor}.
@@ -77,6 +77,45 @@ import java.util.List;
  * futureCall(new MyThirdJob(), waitFor(s), waitFor(x), maxAttempts(5), backoffSeconds(5));
  * </code>
  * </pre>
+ * <p>
+ * A Job can provide an optional {@code handleFailure} method that is called
+ * when any unhandled exception is thrown from its run method.
+ * <p>
+ * Before delivering an exception to the job’s handleFailure method the
+ * Pipelines framework cancels all descendent jobs that originated from the
+ * parent’s run method. A descendant job is defined as a job that is either a
+ * child or the child of a child (and so on recursively) of the original job.
+ * This cancellation is important for a number of reasons.
+ * <ul>
+ * <li>
+ * It ensures that no descendant jobs are executed after the handleFailure
+ * method is called.</li>
+ * <li>
+ * It avoids having dangling jobs which wait for a FutureValue that is never be
+ * ready.</li>
+ * <li>It helps cleaning up external resources as failureHandlers of descendent
+ * jobs are called (with CancellationException) in case of cancellation request
+ * from their ancestor. If the descendent job with own failureHandler is a
+ * generator job that has its own descendents they are cancelled first before
+ * calling the failureHandler.</li>
+ * </ul>
+ * In case of simultaneous failures only the first one is delivered to the
+ * handleFailure and the other failed job will ignore the cancellation request
+ * caused by the first one. A handleFailure method can act as a generator. So
+ * failure handling can be as complex as necessary involving complex job graphs.
+ * A failure of a job that is a descendent of the handleFailure is handled in
+ * the same manner as a failure of a job originated in the run method. All
+ * failed job siblings originated in the handleFailure are cancelled and then
+ * exception is propagated to the enclosing scope which is either ancestor’s run
+ * or handleFailure.
+ * <p>
+ * {@code handleFailure} methods must have a single argument of type
+ * {@link Throwable} or any of its descendants. If more than one method is
+ * specified than the method that has most specific exception parameter that is
+ * parent of the thrown exception is called. If called the <code>Value</code>
+ * returned by {@code handleException(e)} method is used by the framework
+ * instead of the <code>Value</code> returned by <code>run</code>. {@code handleFailure}
+ * method is allowed to throw any exception.
  * <p>
  *
  * @author rudominer@google.com (Mitch Rudominer)
@@ -130,7 +169,7 @@ public abstract class Job<E> implements Serializable {
    *         may be passed in to further invocations of {@code futureCall()} in
    *         order to specify a data dependency.
    */
-  protected <T> FutureValue<T> futureCallUnchecked(JobSetting[] settings, Job<?> jobInstance,
+  public <T> FutureValue<T> futureCallUnchecked(JobSetting[] settings, Job<?> jobInstance,
       Object... params) {
     JobRecord childJobRecord =
         PipelineManager.registerNewJobRecord(updateSpec, settings, thisJobRecord, currentRunGUID,
@@ -152,7 +191,7 @@ public abstract class Job<E> implements Serializable {
    *         may be passed in to further invocations of {@code futureCall()} in
    *         order to specify a data dependency.
    */
-  protected <T> FutureValue<T> futureCall(Job0<T> jobInstance, JobSetting... settings) {
+  public <T> FutureValue<T> futureCall(Job0<T> jobInstance, JobSetting... settings) {
     return futureCallUnchecked(settings, jobInstance);
   }
 
@@ -171,7 +210,7 @@ public abstract class Job<E> implements Serializable {
    *         may be passed in to further invocations of {@code futureCall()} in
    *         order to specify a data dependency.
    */
-  protected <T, T1> FutureValue<T> futureCall(Job1<T, T1> jobInstance, Value<T1> v1,
+  public <T, T1> FutureValue<T> futureCall(Job1<T, T1> jobInstance, Value<T1> v1,
       JobSetting... settings) {
     return futureCallUnchecked(settings, jobInstance, v1);
   }
@@ -193,7 +232,7 @@ public abstract class Job<E> implements Serializable {
    *         may be passed in to further invocations of {@code futureCall()} in
    *         order to specify a data dependency.
    */
-  protected <T, T1, T2> FutureValue<T> futureCall(Job2<T, T1, T2> jobInstance, Value<T1> v1,
+  public <T, T1, T2> FutureValue<T> futureCall(Job2<T, T1, T2> jobInstance, Value<T1> v1,
       Value<T2> v2, JobSetting... settings) {
     return futureCallUnchecked(settings, jobInstance, v1, v2);
   }
@@ -217,7 +256,7 @@ public abstract class Job<E> implements Serializable {
    *         may be passed in to further invocations of {@code futureCall()} in
    *         order to specify a data dependency.
    */
-  protected <T, T1, T2, T3> FutureValue<T> futureCall(Job3<T, T1, T2, T3> jobInstance,
+  public <T, T1, T2, T3> FutureValue<T> futureCall(Job3<T, T1, T2, T3> jobInstance,
       Value<T1> v1, Value<T2> v2, Value<T3> v3, JobSetting... settings) {
     return futureCallUnchecked(settings, jobInstance, v1, v2, v3);
   }
@@ -243,7 +282,7 @@ public abstract class Job<E> implements Serializable {
    *         may be passed in to further invocations of {@code futureCall()} in
    *         order to specify a data dependency.
    */
-  protected <T, T1, T2, T3, T4> FutureValue<T> futureCall(Job4<T, T1, T2, T3, T4> jobInstance,
+  public <T, T1, T2, T3, T4> FutureValue<T> futureCall(Job4<T, T1, T2, T3, T4> jobInstance,
       Value<T1> v1, Value<T2> v2, Value<T3> v3, Value<T4> v4, JobSetting... settings) {
     return futureCallUnchecked(settings, jobInstance, v1, v2, v3, v4);
   }
@@ -272,7 +311,7 @@ public abstract class Job<E> implements Serializable {
    *         may be passed in to further invocations of {@code futureCall()} in
    *         order to specify a data dependency.
    */
-  protected <T, T1, T2, T3, T4, T5> FutureValue<T> futureCall(
+  public <T, T1, T2, T3, T4, T5> FutureValue<T> futureCall(
       Job5<T, T1, T2, T3, T4, T5> jobInstance, Value<T1> v1, Value<T2> v2, Value<T3> v3,
       Value<T4> v4, Value<T5> v5, JobSetting... settings) {
     return futureCallUnchecked(settings, jobInstance, v1, v2, v3, v4, v5);
@@ -303,7 +342,7 @@ public abstract class Job<E> implements Serializable {
    *         may be passed in to further invocations of {@code futureCall()} in
    *         order to specify a data dependency.
    */
-  protected <T, T1, T2, T3, T4, T5, T6> FutureValue<T> futureCall(
+  public <T, T1, T2, T3, T4, T5, T6> FutureValue<T> futureCall(
       Job6<T, T1, T2, T3, T4, T5, T6> jobInstance, Value<T1> v1, Value<T2> v2, Value<T3> v3,
       Value<T4> v4, Value<T5> v5, Value<T6> v6, JobSetting... settings) {
     return futureCallUnchecked(settings, jobInstance, v1, v2, v3, v4, v5, v6);
@@ -323,10 +362,26 @@ public abstract class Job<E> implements Serializable {
    *         may be passed in to further invocations of {@code futureCall()} in
    *         order to specify a data dependency.
    */
-  protected <F> PromisedValue<F> newPromise(Class<F> klass) {
+  public <F> PromisedValue<F> newPromise(Class<F> klass) {
     PromisedValueImpl<F> promisedValue =
         new PromisedValueImpl<F>(getPipelineKey(), thisJobRecord.getKey(), currentRunGUID);
     updateSpec.getNonTransactionalGroup().includeSlot(promisedValue.getSlot());
+    return promisedValue;
+  }
+
+  /**
+   * Invoke this method from within the {@code run} method of a <b>generator
+   * job</b> in order to get a {@link PromisedValue} that becomes ready after
+   * a specified delay.
+   *
+   * @param delaySeconds Minimal delay after which the returned value becomes ready.
+   * @return A {@code PromisedValue} that represents an empty value slot that
+   *         will be filled by the pipelines framework after the specified delay.
+   */
+  public Value<Void> newDelayedValue(long delaySeconds) {
+    PromisedValueImpl<Void> promisedValue = (PromisedValueImpl<Void>) newPromise(Void.class);
+    PipelineManager.registerDelayedValue(
+        delaySeconds, promisedValue.getSlot(), thisJobRecord.getRootJobKey());
     return promisedValue;
   }
 
@@ -350,7 +405,7 @@ public abstract class Job<E> implements Serializable {
    * @param fv The {@code FutureValue} to wait for
    * @return a new {@code WaitForSetting}.
    */
-  public static JobSetting.WaitForSetting waitFor(FutureValue<?> fv) {
+  public static JobSetting.WaitForSetting waitFor(Value<?> fv) {
     return new JobSetting.WaitForSetting(fv);
   }
 
@@ -417,7 +472,7 @@ public abstract class Job<E> implements Serializable {
    *
    * @return the Key uniquely identifying this job
    */
-  protected Key getJobKey() {
+  public Key getJobKey() {
     return thisJobRecord.getKey();
   }
 
@@ -428,18 +483,19 @@ public abstract class Job<E> implements Serializable {
    * @return the Key uniquely identifying the Pipeline that this job is a member
    *         of
    */
-  protected Key getPipelineKey() {
+  public Key getPipelineKey() {
     return thisJobRecord.getRootJobKey();
   }
 
   /**
-   * Sets the status console URL for the job.  The Pipeline UI displays the page
-   * at this URL in an iframe.
+   * Sets the status console URL for the job through reflection. The Pipeline UI
+   * displays the page at this URL in an iframe.
    *
-   * Currently, this takes effect only after the job completes, but this may
+   *  Currently, this takes effect only after the job completes, but this may
    * change in future versions.
    */
-  protected void setStatusConsoleUrl(String url) {
+  @SuppressWarnings("unused")
+  private void setStatusConsoleUrl(String url) {
     thisJobRecord.setStatusConsoleUrl(url);
   }
 

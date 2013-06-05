@@ -17,6 +17,7 @@ package com.google.appengine.tools.pipeline.impl.backend;
 import com.google.appengine.api.datastore.Key;
 import com.google.appengine.tools.pipeline.NoSuchObjectException;
 import com.google.appengine.tools.pipeline.impl.model.Barrier;
+import com.google.appengine.tools.pipeline.impl.model.ExceptionRecord;
 import com.google.appengine.tools.pipeline.impl.model.JobRecord;
 import com.google.appengine.tools.pipeline.impl.model.PipelineObjects;
 import com.google.appengine.tools.pipeline.impl.model.Slot;
@@ -90,6 +91,15 @@ public interface PipelineBackEnd {
    * @throws NoSuchObjectException
    */
   public Slot querySlot(Key key, boolean inflate) throws NoSuchObjectException;
+
+  /**
+   * Get the Failure with the given Key from the data store.
+   * 
+   * @param key The Key of the failure to fetch.
+   * @return A {@code FailureRecord}
+   * @throws NoSuchObjectException
+   */
+  public ExceptionRecord queryFailure(Key key) throws NoSuchObjectException;
 
   /**
    * Given an arbitrary Java Object, returns another object that encodes the
