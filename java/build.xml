@@ -97,21 +97,10 @@
 
   <target name="dist" depends="compile">
     <mkdir dir="${dist}"/>
-
-    <!-- Include the source code in the jar -->
-    <copy todir="${build}">
-      <fileset dir="${src}"/>
-    </copy>
-
-    <!-- Include UI elements in the jar -->
-    <mkdir dir="${build}/com/google/appengine/tools/pipeline/impl/servlets/ui"/>
-    <copy todir="${build}/com/google/appengine/tools/pipeline/impl/servlets/ui">
-      <fileset dir="${ui}">
-        <exclude name="**/.svn/**"/>
-      </fileset>
-    </copy>
-
-    <jar jarfile="${dist}/appengine-pipeline.jar" basedir="${build}"/>
+    <jar jarfile="${dist}/appengine-pipeline.jar" basedir="${build}">
+      <zipfileset dir="${src}"/>
+      <zipfileset dir="${ui}" prefix="com/google/appengine/tools/pipeline/impl/servlets/ui"/>
+    </jar>
     <copy todir="${dist}">
       <fileset dir="${lib_thirdparty}"/>
     </copy>
@@ -142,6 +131,7 @@
 
   <target name="test_small" depends="dependencies_test,dependencies_sdk,dist,test_compile">
     <junit filtertrace="off">
+      <test name="com.google.appengine.tools.pipeline.impl.backend.AppEngineTaskQueueTest"/>
       <test name="com.google.appengine.tools.pipeline.BarrierTest"/>
       <test name="com.google.appengine.tools.pipeline.DelayedValueTest"/>
       <test name="com.google.appengine.tools.pipeline.FanoutTaskTest"/>
@@ -205,7 +195,7 @@
         </fileset>
       </classpath>
       <doctitle>
-        <![CDATA[<h1>App Engine Pipeline Framework</h1>]]>
+        <![CDATA[<h1>Google App Engine Pipeline Framework</h1>]]>
       </doctitle>
       <bottom>
         <![CDATA[<i>Copyright &#169; 2011 Google Inc. All Rights Reserved.</i>]]>
@@ -228,7 +218,7 @@
       <fileset dir="${dist}"/>
       <fileset dir="${lib_sdk}"/>
     </copy>
-    <symlink link="${example_war}/javadoc" resource="${javadoc}"/>
+    <symlink link="${example_war}/javadoc" resource="${javadoc}" overwrite="true"/>
   </target>
 
   <target name="compile_example" depends="dependencies_test,dependencies_sdk,copy_libs_to_example">
