@@ -26,17 +26,17 @@ import pickle
 import sys
 import unittest
 import urllib
+import urlparse
 
 # Fix up paths for running tests.
 sys.path.insert(0, '../src/')
 
 from pipeline import simplejson
 
-from pipeline import testutil
 from pipeline import common
-from pipeline import models
 from pipeline import pipeline
 import test_shared
+from appengine_pipeline.test import testutil
 
 from google.appengine.api import mail
 from google.appengine.ext import blobstore
@@ -182,7 +182,7 @@ class PipelineFutureTest(TestBase):
     self.assertFalse(future.default._exists)
 
     future._inherit_outputs('mypipeline', already_defined)
-    
+
     self.assertEquals(already_defined['one'], str(future.one.key))
     self.assertEquals(already_defined['two'], str(future.two.key))
     self.assertEquals(already_defined['three'], str(future.three.key))
@@ -649,7 +649,7 @@ class PipelineTest(TestBase):
     result = stage.get_callback_url(one='red', two='blue', three=12345)
     self.assertEquals(
         '/_ah/pipeline/callback'
-        '?pipeline_id=banana&three=12345&two=blue&one=red',
+        '?one=red&pipeline_id=banana&three=12345&two=blue',
         result)
 
   def testGetCallbackTask(self):
@@ -664,7 +664,11 @@ class PipelineTest(TestBase):
         eta=now)
     self.assertEquals('/_ah/pipeline/callback', task.url)
     self.assertEquals(
-        'pipeline_id=banana&three=12345&two=blue&one=red', task.payload)
+        {'two': ['blue'],
+         'one': ['red'],
+         'pipeline_id': ['banana'],
+         'three': ['12345']},
+        urlparse.parse_qs(task.payload))
     self.assertEquals('POST', task.method)
     self.assertEquals('my-name', task.name)
     self.assertEquals(now, task.eta.replace(tzinfo=None))
@@ -1056,7 +1060,8 @@ class OrderingTest(TestBase):
     after = pipeline.After(*futures)
     self.assertEquals([], pipeline.After._local._after_all_futures)
     after.__enter__()
-    self.assertEquals(futures, pipeline.After._local._after_all_futures)
+    self.assertEquals(sorted(futures),
+                      sorted(pipeline.After._local._after_all_futures))
     self.assertFalse(after.__exit__(None, None, None))
     self.assertEquals([], pipeline.After._local._after_all_futures)
 
@@ -1068,16 +1073,19 @@ class OrderingTest(TestBase):
     after = pipeline.After(*futures)
     self.assertEquals([], pipeline.After._local._after_all_futures)
     after.__enter__()
-    self.assertEquals(futures, pipeline.After._local._after_all_futures)
+    self.assertEquals(sorted(futures),
+                      sorted(pipeline.After._local._after_all_futures))
 
     after2 = pipeline.After(*futures)
-    self.assertEquals(futures, pipeline.After._local._after_all_futures)
+    self.assertEquals(sorted(futures),
+                      sorted(pipeline.After._local._after_all_futures))
     after2.__enter__()
-    self.assertEquals(futures + futures,
-                      pipeline.After._local._after_all_futures)
+    self.assertEquals(sorted(futures + futures),
+                      sorted(pipeline.After._local._after_all_futures))
 
     self.assertFalse(after.__exit__(None, None, None))
-    self.assertEquals(futures, pipeline.After._local._after_all_futures)
+    self.assertEquals(sorted(futures),
+                      sorted(pipeline.After._local._after_all_futures))
     self.assertFalse(after.__exit__(None, None, None))
     self.assertEquals([], pipeline.After._local._after_all_futures)
 
@@ -1244,10 +1252,10 @@ class UtilitiesTest(TestBase):
       'two': ['hi'] * 100
     }
     self.assertEquals(
-        "{'two': ['hi', 'hi', 'hi', 'hi', 'hi', 'hi', 'hi', 'hi', 'hi', "
-        "'hi', 'hi', 'hi', 'hi', 'hi', 'hi', 'hi', 'hi', 'hi', 'hi', 'hi', "
-        "'hi', 'hi', 'hi', 'hi', 'hi', 'hi', 'hi', 'hi', 'hi', 'hi', 'hi', "
-        "'hi',... (619 bytes)",
+        "{'red': 1, 'two': ['hi', 'hi', 'hi', 'hi', 'hi', 'hi', 'hi', 'hi',"
+        " 'hi', 'hi', 'hi', 'hi', 'hi', 'hi', 'hi', 'hi', 'hi', 'hi', 'hi',"
+        " 'hi', 'hi', 'hi', 'hi', 'hi', 'hi', 'hi', 'hi', 'hi', 'hi', 'hi',"
+        " '... (619 bytes)",
         pipeline._short_repr(my_dict))
 
 
@@ -2977,8 +2985,8 @@ class CallbackHandlerTest(TestBase):
     handler.get()
     self.assertEquals((200, 'OK'), handler.response._Response__status)
     self.assertEquals(
-        "{'blue': u'two', 'red': u'one'}",
-        handler.response.out.getvalue())
+        {'red': u'one', 'blue': u'two'},
+        eval(handler.response.out.getvalue()))
     self.assertEquals('text/plain', handler.response.headers['Content-Type'])
 
 

@@ -21,6 +21,7 @@ from google.appengine.ext import blobstore
 
 # Relative imports
 import simplejson
+import util
 
 
 class _PipelineRecord(db.Model):
@@ -64,7 +65,8 @@ class _PipelineRecord(db.Model):
 
   # One of these two will be set, depending on the size of the params.
   params_text = db.TextProperty(name='params')
-  params_blob = blobstore.BlobReferenceProperty(indexed=False)
+  params_blob = blobstore.BlobReferenceProperty(
+      name='params_blob', indexed=False)
 
   status = db.StringProperty(choices=(WAITING, RUN, DONE, ABORTED),
                              default=WAITING)
@@ -95,7 +97,7 @@ class _PipelineRecord(db.Model):
     else:
       value_encoded = self.params_text
 
-    value = simplejson.loads(value_encoded)
+    value = simplejson.loads(value_encoded, cls=util.JsonDecoder)
     if isinstance(value, dict):
       kwargs = value.get('kwargs')
       if kwargs:
@@ -129,7 +131,8 @@ class _SlotRecord(db.Model):
 
   # One of these two will be set, depending on the size of the value.
   value_text = db.TextProperty(name='value')
-  value_blob = blobstore.BlobReferenceProperty(indexed=False)
+  value_blob = blobstore.BlobReferenceProperty(
+      name='value_blob', indexed=False)
 
   status = db.StringProperty(choices=(FILLED, WAITING), default=WAITING,
                              indexed=False)
@@ -150,9 +153,8 @@ class _SlotRecord(db.Model):
     else:
       encoded_value = self.value_text
 
-    self._value_decoded = simplejson.loads(encoded_value)
+    self._value_decoded = simplejson.loads(encoded_value, cls=util.JsonDecoder)
     return self._value_decoded
-
 
 
 class _BarrierRecord(db.Model):

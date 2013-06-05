@@ -23,7 +23,7 @@ import unittest
 # Fix up paths for running tests.
 sys.path.insert(0, '../src/')
 
-from pipeline import testutil
+from appengine_pipeline.test import testutil
 
 import main
 
