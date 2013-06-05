@@ -89,6 +89,11 @@ public class PipelineServiceImpl implements PipelineService {
   public void stopPipeline(String jobHandle) throws NoSuchObjectException {
     PipelineManager.stopJob(jobHandle);
   }
+  
+  @Override
+  public void cancelPipeline(String jobHandle) throws NoSuchObjectException {
+    PipelineManager.cancelJob(jobHandle);
+  }
 
   @Override
   public void deletePipelineRecords(String pipelineHandle) throws NoSuchObjectException,

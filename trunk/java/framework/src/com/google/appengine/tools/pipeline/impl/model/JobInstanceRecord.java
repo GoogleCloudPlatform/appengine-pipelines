@@ -42,16 +42,14 @@ public class JobInstanceRecord extends PipelineModelObject {
   private Job<?> jobInstance;
 
   public JobInstanceRecord(JobRecord job, Job<?> jobInstance) {
+    this(job, serializeJobInstance(jobInstance), jobInstance.getClass().getName());
+  }
+    
+  public JobInstanceRecord(JobRecord job, byte[] jobInstanceBytes, String jobInstanceClass) {
     super(job.rootJobKey, job.generatorJobKey, job.graphGUID);
     jobKey = job.key;
-    this.jobInstance = jobInstance;
-    this.jobClass = jobInstance.getClass().getName();
-    try {
-      instanceBytes = SerializationUtils.serialize(jobInstance);
-    } catch (IOException e) {
-      throw new RuntimeException("Exception while attempting to serialize the jobInstance "
-          + jobInstance, e);
-    }
+    this.jobClass = jobInstanceClass;
+    this.instanceBytes = jobInstanceBytes;
   }
 
   public JobInstanceRecord(Entity entity) {
@@ -94,4 +92,14 @@ public class JobInstanceRecord extends PipelineModelObject {
     return jobInstance;
   }
 
+  
+  static byte[] serializeJobInstance(Object jobInstance) {
+    try {
+      return SerializationUtils.serialize(jobInstance);
+    } catch (IOException e) {
+      throw new RuntimeException("Exception while attempting to serialize the jobInstance "
+          + jobInstance, e);
+    }  
+  }
+  
 }

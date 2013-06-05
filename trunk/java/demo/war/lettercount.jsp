@@ -100,6 +100,18 @@ Calculation stopped. An error occurred.
         <%=jobInfo.getError()%>
         <%
           break;
+    case CANCELED:
+%>
+Calculation canceled.
+<p>
+
+<form method="post">
+    <input name="<%=TEXT_PARAM_NAME%>" value="" type="hidden">
+    <input name="<%=PIPELINE_ID_PARAM_NAME%>" value="" type="hidden">
+    <input type="submit" value="Do it again">
+</form>
+        <%
+          break;        
         case STOPPED_BY_REQUEST:
 %>
     Calculation stopped by request;

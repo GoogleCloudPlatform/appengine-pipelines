@@ -14,7 +14,6 @@
 
 package com.google.appengine.tools.pipeline;
 
-
 /**
  * A service used to start and stop Pipeline jobs and query their status.
  * 
@@ -196,15 +195,29 @@ public interface PipelineService {
   String startNewPipelineUnchecked(Job<?> jobInstance, Object[] arguments, JobSetting... settings);
 
   /**
-   * Stop a Pipeline.
-   * 
-   * @param pipelineHandle The unique identifier returned from one of the method
+   * Stops pipeline execution without giving its code any chance to perform
+   * cleanup. Use {@link #cancelPipeline(String)} to request controlled pipeline
+   * termination.
+   *
+   * @param pipelineHandle The unique identifier returned from one of the
    *        {@code startNewPipeline()} methods
    * @throws NoSuchObjectException If the framework cannot find a Pipeline with
-   *         the given identifer.
+   *         the given identifier.
    */
   void stopPipeline(String pipelineHandle) throws NoSuchObjectException;
 
+  /**
+   * Cancel all pipeline jobs. If a cancelled job has
+   * {@code handleException(...)} defined it is called with
+   * {@link java.util.concurrent.CancellationException} giving it a chance to
+   * perform necessary cleanup.
+   *
+   * @param pipelineHandle The unique identifier returned from one of the
+   *        {@code startNewPipeline()} methods
+   * @throws NoSuchObjectException If the framework cannot find a Pipeline with
+   *         the given identifier.
+   */
+  void cancelPipeline(String pipelineHandle) throws NoSuchObjectException;
 
   /**
    * Delete all the records associated with a pipeline from the Datastore.

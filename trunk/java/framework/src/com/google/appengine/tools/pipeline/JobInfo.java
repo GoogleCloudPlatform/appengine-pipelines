@@ -27,7 +27,32 @@ public interface JobInfo {
    * The state of the job.
    */
   static enum State {
-    RUNNING, COMPLETED_SUCCESSFULLY, STOPPED_BY_REQUEST, STOPPED_BY_ERROR, WAITING_TO_RETRY
+    /**
+     * Job is currently executing.
+     */
+    RUNNING, 
+    /**
+     * Job has completed successfully.
+     */
+    COMPLETED_SUCCESSFULLY, 
+    /**
+     * Job was stopped through {@link PipelineService#stopPipeline(String)}.
+     */
+    STOPPED_BY_REQUEST, 
+    /**
+     * Job execution was stopped due to unhandled failure. 
+     */
+    STOPPED_BY_ERROR, 
+    /**
+     * Job has failed and is going to retry later.
+     */
+    WAITING_TO_RETRY,
+    /**
+     * Job was cancelled either through
+     * {@link PipelineService#cancelPipeline(String)} or due to unhandled
+     * failure in a sibling job.
+     */
+    CANCELED_BY_REQUEST
   }
 
   /**
@@ -48,5 +73,12 @@ public interface JobInfo {
    * null}
    */
   String getError();
+  
+  /**
+   * If the job's {@link State State} is {@link State#STOPPED_BY_ERROR
+   * STOPPED_BY_ERROR}, returns the error. Otherwise returns {@code
+   * null}
+   */
+  Throwable getException();
 
 }

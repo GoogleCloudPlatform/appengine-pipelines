@@ -16,6 +16,7 @@ package com.google.appengine.tools.pipeline.impl.backend;
 
 import com.google.appengine.api.datastore.Key;
 import com.google.appengine.tools.pipeline.impl.model.Barrier;
+import com.google.appengine.tools.pipeline.impl.model.ExceptionRecord;
 import com.google.appengine.tools.pipeline.impl.model.PipelineModelObject;
 import com.google.appengine.tools.pipeline.impl.model.JobInstanceRecord;
 import com.google.appengine.tools.pipeline.impl.model.JobRecord;
@@ -127,6 +128,7 @@ public class UpdateSpec {
     private Map<Key, Slot> slotMap = new HashMap<Key, Slot>(INITIAL_SIZE);
     private Map<Key, JobInstanceRecord> jobInstanceMap = new HashMap<Key, JobInstanceRecord>(
         INITIAL_SIZE);
+    private Map<Key, ExceptionRecord> failureMap = new HashMap<Key, ExceptionRecord>(INITIAL_SIZE);
 
     private <E extends PipelineModelObject> void put(Map<Key, E> map, E object) {
       Key key = object.getKey();
@@ -176,6 +178,15 @@ public class UpdateSpec {
     public Collection<JobInstanceRecord> getJobInstanceRecords() {
       return jobInstanceMap.values();
     }
+
+    public void includeException(ExceptionRecord failureRecord) {
+      put(failureMap, failureRecord);
+    }
+    
+    public Collection<ExceptionRecord> getFailureRecords() {
+      return failureMap.values();
+    }
+
   }
 
   /**
