@@ -11,13 +11,50 @@ Pipeline is a framework for building dynamic, complex workflows on Google App En
 
 ==Add the Pipeline library to your project==
 
-Build the pipeline library:
+=== Using Maven ===
+
+The library is available via the Maven Central repositories. Include the following dependency in your projects pom.xml file:
+
 {{{
-svn checkout http://appengine-pipeline.googlecode.com/svn/trunk/
-cd trunk/java
+<dependency>
+    <groupId>com.google.appengine.tools</groupId>
+    <artifactId>appengine-pipeline</artifactId>
+    <version>RELEASE</version>
+</dependency>
+}}}
+
+=== Using Ant with Ivy ===
+
+Add the following dependency to your project's ivy.xml file:
+
+{{{
+<dependency org="com.google.appengine.tools" name="appengine-pipeline" rev="latest.integration" />
+}}}
+
+=== Using Subversion ===
+Check out the !MapReduce code:
+
+{{{
+svn checkout http://appengine-pipeline.googlecode.com/svn/trunk/java
+}}}
+
+Then, build the code using `ant` or `maven` in the directory you just checked out:
+
+{{{
+cd java
 ant
 }}}
-Copy `dist/lib/appengine-pipeline.jar` and `third_party/json.jar` to your `war/WEB-INF/lib` directory.
+
+or
+
+{{{
+cd java
+mvn
+}}}
+
+After building the jars as above, copy them from the dist directory into your application's `WEB-INF/lib` directory.
+
+=== Mapping the Library into Your Application ===
 
 Add a servlet mapping to your web.xml file:
 {{{
