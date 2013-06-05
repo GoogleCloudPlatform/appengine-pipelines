@@ -94,7 +94,7 @@ Calculation stopped. An error occurred.
         <%=jobInfo.getError()%>
         <%
           break;
-    case CANCELED:
+    case CANCELED_BY_REQUEST:
 %>
 Calculation canceled.
 <p>
