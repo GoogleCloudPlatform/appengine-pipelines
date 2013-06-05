@@ -24,10 +24,10 @@ import unittest
 sys.path.insert(0, '../src/')
 
 
-from pipeline import testutil
 from pipeline import common
 from pipeline import pipeline
 import test_shared
+from appengine_pipeline.test import testutil
 
 
 class CommonTest(test_shared.TaskRunningMixin, unittest.TestCase):
@@ -307,17 +307,17 @@ class CommonTest(test_shared.TaskRunningMixin, unittest.TestCase):
     message5 = saved[4]
 
     self.assertEquals(
-        '/_ah/pipeline/callback?pipeline_id=knownid'
-            '&random_token=banana&choice=approve\n'
-        '/_ah/pipeline/callback?pipeline_id=knownid'
-            '&random_token=banana&choice=disapprove',
+        '/_ah/pipeline/callback?choice=approve&pipeline_id=knownid&'
+        'random_token=banana\n'
+        '/_ah/pipeline/callback?choice=disapprove&'
+        'pipeline_id=knownid&random_token=banana',
         message5.body)
 
     self.assertEquals(
-        '<a href="/_ah/pipeline/callback?pipeline_id=knownid&amp;'
-            'random_token=banana&amp;choice=approve">approve</a>\n'
-        '<a href="/_ah/pipeline/callback?pipeline_id=knownid&amp;'
-            'random_token=banana&amp;choice=disapprove">disapprove</a>',
+        '<a href="/_ah/pipeline/callback?choice=approve&amp;'
+        'pipeline_id=knownid&amp;random_token=banana">approve</a>\n'
+        '<a href="/_ah/pipeline/callback?choice=disapprove&amp;'
+        'pipeline_id=knownid&amp;random_token=banana">disapprove</a>',
         message5.html)
 
     if not self.test_mode:
