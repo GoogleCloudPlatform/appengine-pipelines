@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class OrphanedJobGraphTest extends PipelineTest {
 
+  @Override
   protected boolean isHrdSafe() {
     return false;
   }

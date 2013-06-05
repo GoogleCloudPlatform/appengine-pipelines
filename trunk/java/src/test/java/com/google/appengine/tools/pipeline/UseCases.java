@@ -64,7 +64,8 @@ public class UseCases {
     public Value<List<CustomerReport>> run() {
       DatastoreService dataStore = DatastoreServiceFactory.getDatastoreService();
       Query query = new Query();
-      query.addFilter("somProperty", Query.FilterOperator.EQUAL, "someValue");
+      query.setFilter(
+          new Query.FilterPredicate("somProperty", Query.FilterOperator.EQUAL, "someValue"));
       PreparedQuery preparedQuery = dataStore.prepare(query);
       List<FutureValue<CustomerReport>> listOfFutureValues =
           new LinkedList<FutureValue<CustomerReport>>();

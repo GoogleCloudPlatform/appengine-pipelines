@@ -377,7 +377,7 @@ public class PipelineManager {
    * @throws NoSuchObjectException If there is no Job with the given key.
    * @throws IllegalStateException If {@code force = false} and the specified
    *         pipeline is not in the {@link JobRecord.State#FINALIZED} or
-   *         {@link.JobRecord.State#STOPPED} state.
+   *         {@link JobRecord.State#STOPPED} state.
    */
   public static void deletePipelineRecords(String pipelineHandle, boolean force, boolean async)
       throws NoSuchObjectException, IllegalStateException {

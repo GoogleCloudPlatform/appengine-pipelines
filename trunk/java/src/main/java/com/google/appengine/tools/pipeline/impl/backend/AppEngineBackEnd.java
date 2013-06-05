@@ -438,8 +438,8 @@ public class AppEngineBackEnd implements PipelineBackEnd {
     if (keysOnly) {
       query.setKeysOnly();
     }
-    query.addFilter(PipelineModelObject.ROOT_JOB_KEY_PROPERTY, Query.FilterOperator.EQUAL,
-        rootJobKey);
+    query.setFilter(new Query.FilterPredicate(
+        PipelineModelObject.ROOT_JOB_KEY_PROPERTY, Query.FilterOperator.EQUAL, rootJobKey));
     PreparedQuery preparedQuery = dataStore.prepare(query);
     Iterable<Entity> returnValue;
     if (null != fetchOptions) {

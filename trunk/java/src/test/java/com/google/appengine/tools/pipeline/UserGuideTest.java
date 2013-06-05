@@ -80,10 +80,16 @@ public class UserGuideTest extends TestCase {
           return (E) jobInfo.getOutput();
         case RUNNING:
           break;
+        case WAITING_TO_RETRY:
+          break;
         case STOPPED_BY_ERROR:
           throw new RuntimeException("Job stopped " + jobInfo.getError());
         case STOPPED_BY_REQUEST:
           throw new RuntimeException("Job stopped by request.");
+        case CANCELED_BY_REQUEST:
+          throw new RuntimeException("Job cancelled by request.");
+        default:
+          throw new RuntimeException("Unknown Job state: " + jobInfo.getJobState());
       }
     }
   }

@@ -289,7 +289,7 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
    * @param jobInstance The non-null user-supplied instance of {@code Job} that
    *        implements the Job that the newly created JobRecord represents.
    * @param callExceptionHandler The flag that indicates that this job should call
-   *        {@link Job#handleException(Throwable)} instead of {@code run}.
+   *        {@code Job#handleException(Throwable)} instead of {@code run}.
    * @param settings Array of {@code JobSettings} to apply to the newly created
    *        JobRecord.
    */
@@ -514,7 +514,7 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
 
   /**
    * If true then this job is exception handler and
-   * {@link Job#handleException(Throwable)} should be called instead of <code>run
+   * {@code Job#handleException(Throwable)} should be called instead of <code>run
    * </code>.
    */
   public boolean isCallExceptionHandler() {

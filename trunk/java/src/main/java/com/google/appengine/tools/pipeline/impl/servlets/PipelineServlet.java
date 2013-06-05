@@ -17,8 +17,6 @@ package com.google.appengine.tools.pipeline.impl.servlets;
 import com.google.appengine.api.datastore.Key;
 import com.google.appengine.tools.pipeline.util.Pair;
 
-import java.util.logging.Logger;
-
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -34,8 +32,6 @@ import javax.servlet.http.HttpServletResponse;
  */
 @SuppressWarnings("serial")
 public class PipelineServlet extends HttpServlet {
-
-  private final Logger logger = Logger.getLogger(PipelineServlet.class.getName());
 
   // This must match the URL in web.xml
   public static final String BASE_URL = "/_ah/pipeline/";
