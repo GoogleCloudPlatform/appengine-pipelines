@@ -182,6 +182,14 @@ protected <T, T1, T2> FutureValue<T> futureCall(Job2<T, T1, T2> jobInstance, Val
 }}}
 There is a version of `futureCall` corresponding to each of the `Jobn` classes.  Each version of `futureCall` takes a job instance as its first argument. The version of futureCall corresponding to `Jobn` also takes n additional arguments that correspond to the n input parameters of the `run` method of `Jobn`. If a user passes either the wrong number or the wrong types of arguments to `futureCall`, the compiler will complain.
 
+==Error Handling==
+Pipelines supports error handling via exceptions! See the [ErrorHandling] page as well as the JavaDocs for more information.
+
+However the idea is that you can add a method called the handleException() to your job class and any exceptions generated matching the type declared as the parameter to the handleEception method that were thrown in the run() method or any sub Job's run method that it invoked will be caught there. 
+
+This method works just like a Java Catch block, where the run method is the corresponding try block. 
+
+
 ==Running Pipelines===
 Here is how the `ComplexJob` Pipeline would be run on the inputs 11, 5 and 7:
 {{{
