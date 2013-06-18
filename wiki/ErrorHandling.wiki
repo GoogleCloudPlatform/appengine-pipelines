@@ -1,10 +1,12 @@
 Failure Handling
 Any Job can provide an optional handleFailure method that is called when any unhandled exception is thrown from its run method. The difference between standard Java try-catch and GAE Pipelines Job failureHandler is that the latter is guaranteed to be called even for the generator jobs.  Let’s look at the following (invalid) attempt to deal with exceptions in CompexJob:
 
+https://appengine-pipeline.googlecode.com/svn/trunk/java/src/main/resources/ui/images/image00.png
 
 The reason the above attempt is not valid is that futureCall returns immediately. So by the time the try block is executed none of the invoked jobs have started executing. If any of them later fails there is no way to deliver the exception to the catch block. 
 Here is the correct way to handle failures thrown from any job scheduled from ComplexJob:
 
+https://appengine-pipeline.googlecode.com/svn/trunk/java/src/main/resources/ui/images/image01.png
 
 Before delivering an exception to the job’s handleFailure method the Pipelines framework cancels all descendent jobs that originated from the parent’s run method. A descendant job is defined as a job that is either a child or the child of a child (and so on recursively) of the original job. This cancellation is important for a number of reasons.
 It ensures that no descendant jobs are executed after the handleFailure method is called. 
