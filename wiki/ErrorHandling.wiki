@@ -1,0 +1,15 @@
+Failure Handling
+Any Job can provide an optional handleFailure method that is called when any unhandled exception is thrown from its run method. The difference between standard Java try-catch and GAE Pipelines Job failureHandler is that the latter is guaranteed to be called even for the generator jobs.  Let’s look at the following (invalid) attempt to deal with exceptions in CompexJob:
+
+
+The reason the above attempt is not valid is that futureCall returns immediately. So by the time the try block is executed none of the invoked jobs have started executing. If any of them later fails there is no way to deliver the exception to the catch block. 
+Here is the correct way to handle failures thrown from any job scheduled from ComplexJob:
+
+
+Before delivering an exception to the job’s handleFailure method the Pipelines framework cancels all descendent jobs that originated from the parent’s run method. A descendant job is defined as a job that is either a child or the child of a child (and so on recursively) of the original job. This cancellation is important for a number of reasons.
+It ensures that no descendant jobs are executed after the handleFailure method is called. 
+It avoids having dangling jobs which wait for a FutureValue that is never be ready. 
+It helps cleaning up external resources as failureHandlers of descendent jobs are called (with CancellationException) in case of cancellation request from their ancestor. If the descendent job with own failureHandler is a generator job that has its own descendents they are cancelled first before calling the failureHandler. 
+In the above example if any of the diffJobs fail another diffJob (if not yet executed), as well as multiJob and the last diffJob will be automatically cancelled before ComplexJob.handleFailure is called.
+In case of simultaneous failures only the first one is delivered to the handleFailure and the other failed job will ignore the cancellation request caused by the first one. 
+A handleFailure method can act as a generator. So failure handling can be as complex as necessary involving complex job graphs. A failure of a job that is a descendent of the handleFailure is handled in the same manner as a failure of a job originated in the run method. All failed job siblings originated in the handleFailure are cancelled and then exception is propagated to the enclosing scope which is either ancestor’s run or handleFailure. 
