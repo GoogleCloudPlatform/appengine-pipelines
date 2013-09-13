@@ -6,7 +6,7 @@ https://appengine-pipeline.googlecode.com/svn/trunk/java/src/main/resources/ui/i
 The reason the above attempt is not valid is that futureCall returns immediately. So by the time the try block is executed none of the invoked jobs have started executing. If any of them later fails there is no way to deliver the exception to the catch block. 
 Here is the correct way to handle failures thrown from any job scheduled from ComplexJob:
 
-https://appengine-pipeline.googlecode.com/svn/trunk/java/src/main/resources/ui/images/image01.png
+https://appengine-pipeline.googlecode.com/svn/images/ExceptionHandlingExample.png
 
 Before delivering an exception to the job’s handleFailure method the Pipelines framework cancels all descendent jobs that originated from the parent’s run method. A descendant job is defined as a job that is either a child or the child of a child (and so on recursively) of the original job. This cancellation is important for a number of reasons.
 It ensures that no descendant jobs are executed after the handleFailure method is called. 
