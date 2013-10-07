@@ -78,17 +78,17 @@ import java.util.List;
  * </code>
  * </pre>
  * <p>
- * A Job can provide an optional {@code handleFailure} method that is called
+ * A Job can provide an optional {@code handleException} method that is called
  * when any unhandled exception is thrown from its run method.
  * <p>
- * Before delivering an exception to the job’s handleFailure method the
+ * Before delivering an exception to the job’s handleException method the
  * Pipelines framework cancels all descendent jobs that originated from the
  * parent’s run method. A descendant job is defined as a job that is either a
  * child or the child of a child (and so on recursively) of the original job.
  * This cancellation is important for a number of reasons.
  * <ul>
  * <li>
- * It ensures that no descendant jobs are executed after the handleFailure
+ * It ensures that no descendant jobs are executed after the handleException
  * method is called.</li>
  * <li>
  * It avoids having dangling jobs which wait for a FutureValue that is never be
@@ -100,21 +100,21 @@ import java.util.List;
  * calling the failureHandler.</li>
  * </ul>
  * In case of simultaneous failures only the first one is delivered to the
- * handleFailure and the other failed job will ignore the cancellation request
- * caused by the first one. A handleFailure method can act as a generator. So
+ * handleException and the other failed job will ignore the cancellation request
+ * caused by the first one. A handleException method can act as a generator. So
  * failure handling can be as complex as necessary involving complex job graphs.
- * A failure of a job that is a descendent of the handleFailure is handled in
+ * A failure of a job that is a descendent of the handleException is handled in
  * the same manner as a failure of a job originated in the run method. All
- * failed job siblings originated in the handleFailure are cancelled and then
+ * failed job siblings originated in the handleException are cancelled and then
  * exception is propagated to the enclosing scope which is either ancestor’s run
- * or handleFailure.
+ * or handleException.
  * <p>
- * {@code handleFailure} methods must have a single argument of type
+ * {@code handleException} methods must have a single argument of type
  * {@link Throwable} or any of its descendants. If more than one method is
  * specified than the method that has most specific exception parameter that is
  * parent of the thrown exception is called. If called the <code>Value</code>
  * returned by {@code handleException(e)} method is used by the framework
- * instead of the <code>Value</code> returned by <code>run</code>. {@code handleFailure}
+ * instead of the <code>Value</code> returned by <code>run</code>. {@code handleException}
  * method is allowed to throw any exception.
  * <p>
  *
