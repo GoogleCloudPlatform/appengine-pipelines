@@ -1,11 +1,11 @@
 // Copyright 2011 Google Inc.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
 // the License at
-// 
+//
 // http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
 // WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -14,20 +14,24 @@
 
 package com.google.appengine.tools.pipeline;
 
+import java.io.Serializable;
+
 
 /**
  * A setting for specifying to the framework some aspect of a Job's execution.
- * 
+ *
  * @author rudominer@google.com (Mitch Rudominer)
  */
-public interface JobSetting {
+public interface JobSetting extends Serializable {
 
   /**
    * A setting for specifying that a Job should not be run until the value slot
    * represented by the given {@code FutureValue} has been filled.
    */
   final class WaitForSetting implements JobSetting {
-    private Value<?> futureValue;
+
+    private static final long serialVersionUID = 1961952679964049657L;
+    private final Value<?> futureValue;
 
     public WaitForSetting(Value<?> fv) {
       this.futureValue = fv;
@@ -42,7 +46,9 @@ public interface JobSetting {
    * An abstract parent object for integer settings.
    */
   abstract class IntValuedSetting implements JobSetting {
-    private int value;
+
+    private static final long serialVersionUID = -4853437803222515955L;
+    private final int value;
 
     protected IntValuedSetting(int val) {
       this.value = val;
@@ -57,7 +63,9 @@ public interface JobSetting {
    * An abstract parent object for String settings.
    */
   abstract class StringValuedSetting implements JobSetting {
-    private String value;
+
+    private static final long serialVersionUID = 7756646651569386669L;
+    private final String value;
 
     protected StringValuedSetting(String val) {
       this.value = val;
@@ -71,15 +79,17 @@ public interface JobSetting {
   /**
    * A setting for specifying how long to wait before retrying a failed job. The
    * wait time will be
-   * 
+   *
    * <pre>
    * <code>
    * backoffSeconds * backoffFactor ^ attemptNumber
    * </code>
    * </pre>
-   * 
+   *
    */
   final class BackoffSeconds extends IntValuedSetting {
+
+    private static final long serialVersionUID = -8900842071483349275L;
     public static final int DEFAULT = 15;
 
     public BackoffSeconds(int seconds) {
@@ -90,15 +100,17 @@ public interface JobSetting {
   /**
    * A setting for specifying how long to wait before retrying a failed job. The
    * wait time will be
-   * 
+   *
    * <pre>
    * <code>
    * backoffSeconds * backoffFactor ^ attemptNumber
    * </code>
    * </pre>
-   * 
+   *
    */
   final class BackoffFactor extends IntValuedSetting {
+
+    private static final long serialVersionUID = 5879098639819720213L;
     public static final int DEFAULT = 2;
 
     public BackoffFactor(int factor) {
@@ -110,6 +122,8 @@ public interface JobSetting {
    * A setting for specifying how many times to retry a failed job.
    */
   final class MaxAttempts extends IntValuedSetting {
+
+    private static final long serialVersionUID = 8389745591294068656L;
     public static final int DEFAULT = 3;
 
     public MaxAttempts(int attempts) {
@@ -121,6 +135,8 @@ public interface JobSetting {
    * A setting for specifying what backend to run a job on.
    */
   final class OnBackend extends StringValuedSetting {
+
+    private static final long serialVersionUID = -239968568113511744L;
     public static final String DEFAULT = null;
 
     public OnBackend(String backend) {

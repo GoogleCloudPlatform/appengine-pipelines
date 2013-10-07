@@ -1,11 +1,11 @@
 // Copyright 2011 Google Inc.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
 // the License at
-// 
+//
 // http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
 // WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -26,9 +26,9 @@ import javax.servlet.http.HttpServletResponse;
  * Servlet that handles all requests for the Pipeline framework.
  * Dispatches all requests to {@link TaskHandler}, {@link JsonHandler} or
  * {@link StaticContentHandler} as appropriate
- * 
+ *
  * @author rudominer@google.com (Mitch Rudominer)
- * 
+ *
  */
 @SuppressWarnings("serial")
 public class PipelineServlet extends HttpServlet {
@@ -59,17 +59,19 @@ public class PipelineServlet extends HttpServlet {
   }
 
   private Pair<String, RequestType> parseRequestType(HttpServletRequest req) {
-    String requestURI = req.getRequestURI();
-    String path = requestURI.substring(BASE_URL.length());
-    RequestType requestType = null;
+    String path = req.getPathInfo();
+    if (path == null) {
+      path = "";
+    } else {
+      // Take off the leading '/'
+      path = path.substring(1);
+    }
+    RequestType requestType = RequestType.HANDLE_STATIC;
     for (RequestType rt : RequestType.values()) {
       if (rt.matches(path)) {
         requestType = rt;
         break;
       }
-    }
-    if (null == requestType) {
-      requestType = RequestType.HANDLE_STATIC;
     }
     return new Pair<String, RequestType>(path, requestType);
   }
