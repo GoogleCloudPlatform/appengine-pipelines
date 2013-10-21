@@ -32,7 +32,7 @@ Add the following dependency to your project's ivy.xml file:
 }}}
 
 === Using Subversion ===
-Check out the !MapReduce code:
+Check out the pipelines code:
 
 {{{
 svn checkout http://appengine-pipeline.googlecode.com/svn/trunk/java
