@@ -6,7 +6,7 @@
   <name>App Engine Pipeline Framework</name>
   <description>Google App Engine API for connecting together complex workflows</description>
   <url>http://code.google.com/p/appengine-pipeline/</url>
-  <version>0.2-SNAPSHOT</version>
+  <version>0.3-SNAPSHOT</version>
   <packaging>jar</packaging>
   <licenses>
     <license>
