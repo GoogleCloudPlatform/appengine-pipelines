@@ -35,6 +35,7 @@ os.environ['APPLICATION_ID'] = TEST_APP_ID
 os.environ['CURRENT_VERSION_ID'] = TEST_VERSION_ID
 os.environ['HTTP_HOST'] = '%s.appspot.com' % TEST_APP_ID
 os.environ['DEFAULT_VERSION_HOSTNAME'] = os.environ['HTTP_HOST']
+os.environ['CURRENT_MODULE_ID'] = 'foo-module'
 
 
 def setup_for_testing(require_indexes=True, define_queues=[]):

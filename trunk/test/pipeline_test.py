@@ -1006,6 +1006,20 @@ class PipelineTest(TestBase):
     task_list = test_shared.get_tasks('default')
     self.assertEquals(2, len(task_list))
 
+  def testInheritTarget(self):
+    """Tests pipeline inherits task target if none is specified."""
+    stage = OutputlessPipeline()
+    self.assertEqual('my-version.foo-module', stage.target)
+    stage.start(idempotence_key='banana')
+
+    task_list = test_shared.get_tasks('default')
+    self.assertEquals(1, len(task_list))
+    start_task = task_list[0]
+    self.assertEquals('/_ah/pipeline/run', start_task['url'])
+    self.assertEquals(
+        'my-version.foo-module.my-app-id.appspot.com',
+        dict(start_task['headers'])['Host'])
+
   def testWithParams(self):
     """Tests the with_params helper method."""
     stage = OutputlessPipeline().with_params(target='my-cool-target')
@@ -1219,7 +1233,7 @@ class UtilitiesTest(TestBase):
             'backoff_factor': 2,
             'backoff_seconds': 15,
             'task_retry': False,
-            'target': None,
+            'target': 'my-version.foo-module',
         }, params)
 
     # When the parameters are big enough we need an external blob.
