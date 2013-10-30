@@ -455,6 +455,15 @@ public abstract class Job<E> implements Serializable {
   }
 
   /**
+   * Constructs a new {@code JobSetting.StatusConsoleUrl}. This method is only
+   * syntactic sugar. {@code statusConsoleUrl(x)} is equivalent to
+   * {@code new JobSetting.StatusConsoleUrl(x)}.
+   */
+  public static JobSetting.StatusConsoleUrl statusConsoleUrl(String statusConsoleUrl) {
+    return new JobSetting.StatusConsoleUrl(statusConsoleUrl);
+  }
+
+  /**
    * Constructs a new {@code FutureList}. This method is only syntactic sugar.
    * {@code futureList(listOfValues)} is equivalent to {@code new
    * FutureList(listOfValues)}.
@@ -488,11 +497,10 @@ public abstract class Job<E> implements Serializable {
   }
 
   /**
-   * Sets the status console URL for the job.  The Pipeline UI displays the page
-   * at this URL in an iframe.
+   * Allows a job to set it's  status console URL.
+   * The Pipeline UI displays the page at this URL in an iframe.
    *
-   * Currently, this takes effect only after the job completes, but this may
-   * change in future versions.
+   * To set this before the job runs use {@link JobSetting.StatusConsoleUrl}
    */
   protected void setStatusConsoleUrl(String url) {
     thisJobRecord.setStatusConsoleUrl(url);
