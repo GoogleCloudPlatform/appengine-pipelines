@@ -143,5 +143,14 @@ public interface JobSetting extends Serializable {
       super(backend);
     }
   }
+  
+  /**
+   * A setting specifying the job's status console URL.
+   */
+  final class StatusConsoleUrl extends StringValuedSetting {
+    public StatusConsoleUrl(String statusConsoleUrl) {
+      super(statusConsoleUrl);
+    }
+  }
 
 }
