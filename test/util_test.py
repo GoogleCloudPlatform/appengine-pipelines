@@ -2,6 +2,7 @@
 """Tests for util.py."""
 
 import datetime
+import os
 import sys
 import unittest
 
@@ -9,6 +10,8 @@ import unittest
 sys.path.insert(0, "../src/")
 
 from pipeline import util
+
+from google.appengine.api import taskqueue
 
 
 class JsonSerializationTest(unittest.TestCase):
@@ -20,3 +23,24 @@ class JsonSerializationTest(unittest.TestCase):
     new_obj = util.simplejson.loads(util.simplejson.dumps(
         obj, cls=util.JsonEncoder), cls=util.JsonDecoder)
     self.assertEquals(obj, new_obj)
+
+
+class GetTaskTargetTest(unittest.TestCase):
+
+  def setUp(self):
+    super(GetTaskTargetTest, self).setUp()
+    os.environ["CURRENT_VERSION_ID"] = "v7.1"
+    os.environ["CURRENT_MODULE_ID"] = "foo-module"
+
+  def testGetTaskTarget(self):
+    self.assertEqual("v7.foo-module", util._get_task_target())
+    task = taskqueue.Task(url="/relative_url",
+                          target=util._get_task_target())
+    self.assertEqual("v7.foo-module", task.target)
+
+  def testGetTaskTargetDefaultModule(self):
+    os.environ["CURRENT_MODULE_ID"] = "default"
+    self.assertEqual("v7", util._get_task_target())
+    task = taskqueue.Task(url="/relative_url",
+                          target=util._get_task_target())
+    self.assertEqual("v7", task.target)
