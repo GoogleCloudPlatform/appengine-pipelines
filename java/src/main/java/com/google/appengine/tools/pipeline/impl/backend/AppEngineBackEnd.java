@@ -29,11 +29,12 @@ import com.google.appengine.api.datastore.Transaction;
 import com.google.appengine.tools.pipeline.NoSuchObjectException;
 import com.google.appengine.tools.pipeline.impl.model.Barrier;
 import com.google.appengine.tools.pipeline.impl.model.ExceptionRecord;
-import com.google.appengine.tools.pipeline.impl.model.PipelineModelObject;
 import com.google.appengine.tools.pipeline.impl.model.FanoutTaskRecord;
 import com.google.appengine.tools.pipeline.impl.model.JobInstanceRecord;
 import com.google.appengine.tools.pipeline.impl.model.JobRecord;
+import com.google.appengine.tools.pipeline.impl.model.PipelineModelObject;
 import com.google.appengine.tools.pipeline.impl.model.PipelineObjects;
+import com.google.appengine.tools.pipeline.impl.model.ShardedValue;
 import com.google.appengine.tools.pipeline.impl.model.Slot;
 import com.google.appengine.tools.pipeline.impl.tasks.DeletePipelineTask;
 import com.google.appengine.tools.pipeline.impl.tasks.FanoutTask;
@@ -42,6 +43,7 @@ import com.google.appengine.tools.pipeline.impl.util.SerializationUtils;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.ConcurrentModificationException;
 import java.util.HashMap;
@@ -55,7 +57,7 @@ import java.util.logging.Logger;
 
 /**
  * @author rudominer@google.com (Mitch Rudominer)
- * 
+ *
  */
 public class AppEngineBackEnd implements PipelineBackEnd {
 
@@ -63,6 +65,7 @@ public class AppEngineBackEnd implements PipelineBackEnd {
 
   // Arbitrary value for now; may need tuning.
   private static final int MAX_ENTITIES_PER_GET = 100;
+  private static final int MAX_BLOB_BYTE_SIZE = 1000000;
 
   private static Random random = new Random();
 
@@ -319,7 +322,7 @@ public class AppEngineBackEnd implements PipelineBackEnd {
    * Given a {@link Collection} of {@link Barrier Barriers}, inflate each of the
    * {@link Barrier Barriers} so that {@link Barrier#getWaitingOnInflated()}
    * will not return null;
-   * 
+   *
    * @param barriers
    */
   private void inflateBarriers(Collection<Barrier> barriers) {
@@ -404,15 +407,56 @@ public class AppEngineBackEnd implements PipelineBackEnd {
   }
 
   @Override
-  public Object serlializeValue(Object value) throws IOException {
-    // return JsonUtils.toJson(value);
-    return new Blob(SerializationUtils.serialize(value));
+  public Object serlializeValue(PipelineModelObject model, Object value) throws IOException {
+    byte[] bytes = SerializationUtils.serialize(value);
+    if (bytes.length < MAX_BLOB_BYTE_SIZE) {
+      return new Blob(bytes);
+    }
+    int shardId = 0;
+    int offset = 0;
+    List<Entity> shardedValues = new ArrayList<>(bytes.length / MAX_BLOB_BYTE_SIZE + 1);
+    while (offset < bytes.length) {
+      int limit = offset + MAX_BLOB_BYTE_SIZE;
+      byte[] chunk = Arrays.copyOfRange(bytes, offset, Math.min(limit, bytes.length));
+      offset = limit;
+      shardedValues.add(new ShardedValue(model, "value", shardId++, chunk).toEntity());
+    }
+    Transaction tx = dataStore.beginTransaction();
+    List<Key> keys = dataStore.put(tx, shardedValues);
+    tx.commit();
+    return keys;
   }
 
   @Override
-  public Object deserializeValue(Object serializedVersion) throws IOException {
-    // return JsonUtils.fromJson((String) serliazedVersion);
-    return SerializationUtils.deserialize(((Blob) serializedVersion).getBytes());
+  public Object deserializeValue(PipelineModelObject model, Object serializedVersion)
+      throws IOException {
+    if (serializedVersion instanceof Blob) {
+      return SerializationUtils.deserialize(((Blob) serializedVersion).getBytes());
+    } else {
+      @SuppressWarnings("unchecked")
+      Iterable<Key> keys = (Iterable<Key>) serializedVersion;
+      Map<Key, Entity> entities = dataStore.get(keys);
+      ShardedValue[] shardedValues = new ShardedValue[entities.size()];
+      int totalSize = 0;
+      int index = 0;
+      for (Key key : keys) {
+        Entity entity = entities.get(key);
+        if (entity == null) {
+          throw new RuntimeException("Model " + model + " is missing a sharded value " + key);
+        }
+        ShardedValue shardedValue = new ShardedValue(entity);
+        shardedValues[index++] = shardedValue;
+        totalSize += shardedValue.getValue().length;
+      }
+      byte[] totalBytes = new byte[totalSize];
+      int offset = 0;
+      for (ShardedValue shardedValue : shardedValues) {
+        byte[] shardBytes = shardedValue.getValue();
+        System.arraycopy(shardBytes, 0, totalBytes, offset, shardBytes.length);
+        offset += shardBytes.length;
+      }
+      return SerializationUtils.deserialize(totalBytes);
+    }
   }
 
   @Override
@@ -506,7 +550,7 @@ public class AppEngineBackEnd implements PipelineBackEnd {
   /**
    * Delete up to N entities of the specified kind, with the specified
    * rootJobKey
-   * 
+   *
    * @return The number of entities deleted.
    */
   private int deleteN(String kind, Key rootJobKey, int n) {
@@ -532,7 +576,7 @@ public class AppEngineBackEnd implements PipelineBackEnd {
 
   /**
    * Delete all datastore entities corresponding to the given pipeline.
-   * 
+   *
    * @param rootJobKey The root job key identifying the pipeline
    * @param force If this parameter is not {@code true} then this method will
    *        throw an {@link IllegalStateException} if the specified pipeline is
@@ -575,6 +619,7 @@ public class AppEngineBackEnd implements PipelineBackEnd {
     }
     deleteAll(JobRecord.DATA_STORE_KIND, rootJobKey);
     deleteAll(Slot.DATA_STORE_KIND, rootJobKey);
+    deleteAll(ShardedValue.DATA_STORE_KIND, rootJobKey);
     deleteAll(Barrier.DATA_STORE_KIND, rootJobKey);
     deleteAll(JobInstanceRecord.DATA_STORE_KIND, rootJobKey);
     deleteAll(FanoutTaskRecord.DATA_STORE_KIND, rootJobKey);

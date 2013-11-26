@@ -19,6 +19,7 @@ import com.google.appengine.tools.pipeline.NoSuchObjectException;
 import com.google.appengine.tools.pipeline.impl.model.Barrier;
 import com.google.appengine.tools.pipeline.impl.model.ExceptionRecord;
 import com.google.appengine.tools.pipeline.impl.model.JobRecord;
+import com.google.appengine.tools.pipeline.impl.model.PipelineModelObject;
 import com.google.appengine.tools.pipeline.impl.model.PipelineObjects;
 import com.google.appengine.tools.pipeline.impl.model.Slot;
 import com.google.appengine.tools.pipeline.impl.tasks.FanoutTask;
@@ -29,7 +30,7 @@ import java.io.IOException;
 /**
  * An interface that gives access to data store and task queue operations that
  * must be performed during the execution of a Pipeline.
- * 
+ *
  * @author rudominer@google.com (Mitch Rudominer)
  */
 public interface PipelineBackEnd {
@@ -60,7 +61,7 @@ public interface PipelineBackEnd {
   /**
    * Get the JobRecord with the given Key from the data store, and optionally
    * also get some of the Barriers and Slots associated with it.
-   * 
+   *
    * @param key The key of the JobRecord to be fetched
    * @param inflationType Specifies the manner in which the returned JobRecord
    *        should be inflated.
@@ -76,7 +77,7 @@ public interface PipelineBackEnd {
    * Get the Slot with the given Key from the data store, and optionally also
    * get the Barriers that are waiting on the Slot, and the other Slots that
    * those Barriers are waiting on.
-   * 
+   *
    * @param key The Key of the slot to fetch.
    * @param inflate If this is {@code true} then the Barriers that are waiting
    *        on the Slot and the other Slots that those Barriers are waiting on
@@ -94,7 +95,7 @@ public interface PipelineBackEnd {
 
   /**
    * Get the Failure with the given Key from the data store.
-   * 
+   *
    * @param key The Key of the failure to fetch.
    * @return A {@code FailureRecord}
    * @throws NoSuchObjectException
@@ -104,30 +105,35 @@ public interface PipelineBackEnd {
   /**
    * Given an arbitrary Java Object, returns another object that encodes the
    * given object but that is guaranteed to be of a type supported by the App
-   * Engine Data Store. Use {@link #deserializeValue(Object)} to reverse this
+   * Engine Data Store. Use
+   * {@link #deserializeValue(PipelineModelObject, Object)} to reverse this
    * operation.
-   * 
+   *
+   * @param model The model that is associated with the value.
    * @param value An arbitrary Java object to serialize.
    * @return The serialized version of the object.
    * @throws IOException if any problem occurs
    */
-  public Object serlializeValue(Object value) throws IOException;
+  public Object serlializeValue(PipelineModelObject model, Object value) throws IOException;
 
   /**
-   * Reverses the operation performed by {@link #serlializeValue(Object)}.
-   * 
+   * Reverses the operation performed by
+   * {@link #serlializeValue(PipelineModelObject, Object)}.
+   *
+   * @param model The model that is associated with the serialized version.
    * @param serliazedVersion The serialized version of an object.
    * @return The deserialized version of the object.
    * @throws IOException if any problem occurs
    */
-  public Object deserializeValue(Object serliazedVersion) throws IOException;
+  public Object deserializeValue(PipelineModelObject model, Object serliazedVersion)
+      throws IOException;
 
   /**
    * Enqueues to the App Engine task queue the tasks encoded by the given
    * {@code FanoutTask}. This method is invoked from within the task handler for
    * a FanoutTask. See the comments at the top of {@link FanoutTask} for more
    * details.
-   * 
+   *
    * @param fanoutTask The FanoutTask to handle
    * @throws NoSuchObjectException If the
    *         {@link com.google.appengine.tools.pipeline.impl.model.FanoutTaskRecord}
@@ -144,7 +150,7 @@ public interface PipelineBackEnd {
 
   /**
    * Delete all datastore entities corresponding to the given pipeline.
-   * 
+   *
    * @param rootJobKey The root job key identifying the pipeline
    * @param force If this parameter is not {@code true} then this method will
    *        throw an {@link IllegalStateException} if the specified pipeline is
