@@ -16,7 +16,6 @@ package com.google.appengine.tools.pipeline.impl.model;
 
 import com.google.appengine.api.datastore.Entity;
 import com.google.appengine.api.datastore.Key;
-import com.google.appengine.api.datastore.KeyFactory;
 import com.google.appengine.tools.pipeline.impl.PipelineManager;
 
 import java.io.IOException;
@@ -27,9 +26,8 @@ import java.util.Map;
 
 /**
  * A slot to be filled in with a value.
- * 
+ *
  * @author rudominer@google.com (Mitch Rudominer)
- * 
  */
 public class Slot extends PipelineModelObject {
 
@@ -55,12 +53,6 @@ public class Slot extends PipelineModelObject {
     waitingOnMeKeys = new LinkedList<Key>();
   }
 
-  public static Slot dummyInstanceForTesting() {
-    Key dummyKey = KeyFactory.createKey("dummy", "dummy");
-    return new Slot(dummyKey, dummyKey, "abc");
-  }
-
-  @SuppressWarnings("unchecked")
   public Slot(Entity entity) {
     super(entity);
     this.filled = (Boolean) entity.getProperty(FILLED_PROPERTY);
@@ -68,7 +60,7 @@ public class Slot extends PipelineModelObject {
     this.sourceJobKey = (Key) entity.getProperty(SOURCE_JOB_KEY_PROPERTY);
     Object serializedVersion = entity.getProperty(VALUE_PROPERTY);
     try {
-      this.value = PipelineManager.getBackEnd().deserializeValue(serializedVersion);
+      this.value = PipelineManager.getBackEnd().deserializeValue(this, serializedVersion);
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
@@ -87,7 +79,7 @@ public class Slot extends PipelineModelObject {
     }
     try {
       entity.setUnindexedProperty(VALUE_PROPERTY,
-          PipelineManager.getBackEnd().serlializeValue(value));
+          PipelineManager.getBackEnd().serlializeValue(this, value));
     } catch (IOException e) {
       throw new RuntimeException(e);
     }

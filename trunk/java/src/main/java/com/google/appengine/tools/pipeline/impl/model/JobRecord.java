@@ -639,7 +639,7 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
     if (null == jobInstanceRecordInflated) {
       return "jobInstanceKey=" + jobInstanceKey;
     }
-    String jobClass = jobInstanceRecordInflated.getJobInstanceDeserialized().getClass().getName();
+    String jobClass = jobInstanceRecordInflated.getJobClass();
     return jobClass + (callExceptionHandler ? ".handleException" : ".run");
   }
 

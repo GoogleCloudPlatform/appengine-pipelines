@@ -1,11 +1,11 @@
 // Copyright 2011 Google Inc.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
 // the License at
-// 
+//
 // http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
 // WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -14,8 +14,10 @@
 
 package com.google.appengine.tools.pipeline;
 
-import com.google.appengine.repackaged.com.google.common.collect.Lists;
+import com.google.appengine.api.datastore.Key;
+import com.google.appengine.api.datastore.KeyFactory;
 import com.google.appengine.repackaged.com.google.common.collect.ImmutableList;
+import com.google.appengine.repackaged.com.google.common.collect.Lists;
 import com.google.appengine.tools.development.testing.LocalDatastoreServiceTestConfig;
 import com.google.appengine.tools.development.testing.LocalServiceTestHelper;
 import com.google.appengine.tools.pipeline.impl.model.Barrier;
@@ -28,7 +30,7 @@ import java.util.List;
 
 /**
  * @author rudominer@google.com (Mitch Rudominer)
- * 
+ *
  */
 public class BarrierTest extends TestCase {
 
@@ -90,20 +92,20 @@ public class BarrierTest extends TestCase {
       if (value instanceof ListMarker) {
         List<?> valueList = ((ListMarker) value).valueList;
         List<Slot> slotList = new ArrayList<Slot>(valueList.size());
-        Slot dummyListSlot = Slot.dummyInstanceForTesting();
+        Slot dummyListSlot = createDummySlot();
         dummyListSlot.fill(null);
         for (Object v : valueList) {
-          Slot slot = Slot.dummyInstanceForTesting();
+          Slot slot = createDummySlot();
           slot.fill(v);
           slotList.add(slot);
         }
         barrier.addListArgumentSlots(dummyListSlot, slotList);
       } else if (value instanceof PhantomMarker) {
-        Slot slot = Slot.dummyInstanceForTesting();
+        Slot slot = createDummySlot();
         slot.fill(((PhantomMarker) value).value);
         barrier.addPhantomArgumentSlot(slot);
       } else {
-        Slot slot = Slot.dummyInstanceForTesting();
+        Slot slot = createDummySlot();
         slot.fill(value);
         barrier.addRegularArgumentSlot(slot);
       }
@@ -120,4 +122,8 @@ public class BarrierTest extends TestCase {
     }
   }
 
+  public static Slot createDummySlot() {
+    Key dummyKey = KeyFactory.createKey("dummy", "dummy");
+    return new Slot(dummyKey, dummyKey, "abc");
+  }
 }
