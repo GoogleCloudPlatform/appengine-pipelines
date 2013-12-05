@@ -27,7 +27,7 @@ import java.util.Map;
 
 /**
  * The parent class of all Pipeline model objects.
- * 
+ *
  * @author rudominer@google.com (Mitch Rudominer)
  */
 public abstract class PipelineModelObject {
@@ -39,20 +39,20 @@ public abstract class PipelineModelObject {
   /**
    * Datastore key of this object
    */
-  protected Key key;
+  private final Key key;
 
   /**
    * Datastore key of the root job identifying the Pipeline to which this object
    * belongs.
    */
-  protected Key rootJobKey;
+  private final Key rootJobKey;
 
   /**
    * Datastore key of the generator job of this object. Your generator job is
    * the job whose run() method created you and the rest of your local job
    * graph. The generator of the objects in the root job graph is null.
    */
-  protected Key generatorJobKey;
+  private final Key generatorJobKey;
 
   /**
    * A GUID generated during the execution of a run() method of a generator job.
@@ -62,11 +62,11 @@ public abstract class PipelineModelObject {
    * orphaned. A child job graph is valid if its graphGUID is equal to the
    * childGraphGUID of its generator job.
    */
-  protected String graphGUID;
+  private final String graphGUID;
 
   /**
    * Construct a new PipelineModelObject from the provided data.
-   * 
+   *
    * @param rootJobKey The key of the root job for this pipeline. This must be
    *        non-null, except in the case that we are currently constructing the
    *        root job. In that case {@code thisKey} and {@code egParentKey} must
@@ -90,48 +90,33 @@ public abstract class PipelineModelObject {
    */
   protected PipelineModelObject(
       Key rootJobKey, Key egParentKey, Key thisKey, Key generatorJobKey, String graphGUID) {
-    this.key = thisKey;
+    if (null == rootJobKey) {
+      throw new IllegalArgumentException("rootJobKey is null");
+    }
+    if (generatorJobKey == null && graphGUID != null ||
+        generatorJobKey != null && graphGUID == null) {
+      throw new IllegalArgumentException(
+          "Either neither or both of generatorParentJobKey and graphGUID must be set.");
+    }
+
     this.rootJobKey = rootJobKey;
     this.generatorJobKey = generatorJobKey;
     this.graphGUID = graphGUID;
-    if (null == rootJobKey) {
-      if (this instanceof JobRecord) {
-        // We are constructing the root job of a new pipeline
-        if (null != thisKey) {
-          throw new IllegalArgumentException("rootJobKey is null and thisKey is not null");
-        }
-        if (null != egParentKey) {
-          throw new IllegalArgumentException("rootJobKey is null and parentKey is not null");
-        }
-      } else {
-        throw new IllegalArgumentException("rootJobKey is null");
-      }
-    }
-    if (null == key) {
-      this.key = generateKey(egParentKey, getDatastoreKind());
-    } else if (egParentKey != null) {
-      throw new IllegalArgumentException("You may not specify both thisKey and parentKey");
-    }
-    if (null == rootJobKey) {
-      // This is the root job of a new pipeline
-      this.rootJobKey = this.key;
-    }
-    if (generatorJobKey == null && graphGUID == null) {
-      // This is part of the root job graph
+    if (null == thisKey) {
+      key = generateKey(egParentKey, getDatastoreKind());
     } else {
-      if (generatorJobKey == null || graphGUID == null) {
-        throw new IllegalArgumentException(
-            "Either neither or both of generatorParentJobKey and graphGUID must be set.");
+      if (egParentKey != null) {
+        throw new IllegalArgumentException("You may not specify both thisKey and parentKey");
       }
+      key = thisKey;
     }
   }
-
 
   /**
    * Construct a new PipelineModelObject with the given rootJobKey,
    * generatorJobKey, and graphGUID, a newly generated key, and no entity group
    * parent.
-   * 
+   *
    * @param rootJobKey The key of the root job for this pipeline. This must be
    *        non-null, except in the case that we are currently constructing the
    *        root job. In that case this must be a {@link JobRecord}.
@@ -151,20 +136,20 @@ public abstract class PipelineModelObject {
 
   /**
    * Construct a new PipelineModelObject from the previously saved Entity.
-   * 
+   *
    * @param entity An Entity obtained previously from a call to
-   *        {@link #toEntity()}.
+   *    {@link #toEntity()}.
    */
   protected PipelineModelObject(Entity entity) {
     this(extractRootJobKey(entity), null, extractKey(entity), extractGeneratorJobKey(entity),
         extractGraphGUID(entity));
     String expectedEntityType = getDatastoreKind();
-    if (!getDatastoreKind().equals(extractType(entity))) {
-      throw new IllegalArgumentException("The entity is not of kind " + getDatastoreKind());
+    if (!expectedEntityType.equals(extractType(entity))) {
+      throw new IllegalArgumentException("The entity is not of kind " + expectedEntityType);
     }
   }
 
-  private static Key generateKey(Key parentKey, String kind) {
+  protected static Key generateKey(Key parentKey, String kind) {
     String name = GUIDGenerator.nextGUID();
     Key key;
     if (null == parentKey) {
@@ -225,10 +210,10 @@ public abstract class PipelineModelObject {
     return graphGUID;
   }
 
-  public abstract String getDatastoreKind();
+  protected abstract String getDatastoreKind();
 
   protected static <E> List<E> buildInflated(Collection<Key> listOfIds, Map<Key, E> pool) {
-    ArrayList<E> list = new ArrayList<E>(listOfIds.size());
+    ArrayList<E> list = new ArrayList<>(listOfIds.size());
     for (Key id : listOfIds) {
       E x = pool.get(id);
       if (null == x) {
@@ -242,10 +227,6 @@ public abstract class PipelineModelObject {
   @SuppressWarnings("unchecked")
   protected static <E> List<E> getListProperty(String propertyName, Entity entity) {
     List<E> list = (List<E>) entity.getProperty(propertyName);
-    if (null == list) {
-      list = new LinkedList<E>();
-    }
-    return list;
+    return list == null ? new LinkedList<E>() : list;
   }
-
 }

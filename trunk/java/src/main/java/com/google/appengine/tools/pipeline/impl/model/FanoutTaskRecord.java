@@ -1,11 +1,11 @@
 // Copyright 2011 Google Inc.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
 // the License at
-// 
+//
 // http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
 // WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -20,41 +20,43 @@ import com.google.appengine.api.datastore.Key;
 
 /**
  * A datastore entity for storing data necessary for a fan-out task
- * 
+ *
  * @author rudominer@google.com (Mitch Rudominer)
  */
 public class FanoutTaskRecord extends PipelineModelObject {
-  
+
   public static final String DATA_STORE_KIND = "pipeline-fanoutTask";
   private static final String PAYLOAD_PROPERTY = "payload";
-  
-  private byte[] payload;
-  
-  public FanoutTaskRecord(Key rootJobKey, byte[] payload){
+
+  private final byte[] payload;
+
+  public FanoutTaskRecord(Key rootJobKey, byte[] payload) {
     super(rootJobKey, null, null);
+    if (payload == null) {
+      throw new RuntimeException("Payload must not be null");
+    }
     this.payload = payload;
   }
-  
-  public FanoutTaskRecord(Entity entity){
+
+  public FanoutTaskRecord(Entity entity) {
     super(entity);
     Blob payloadBlob = (Blob) entity.getProperty(PAYLOAD_PROPERTY);
     payload = payloadBlob.getBytes();
   }
-  
+
   public byte[] getPayload() {
     return payload;
   }
 
-  
   @Override
-  public String getDatastoreKind() {
+  protected String getDatastoreKind() {
     return DATA_STORE_KIND;
   }
 
   @Override
   public Entity toEntity() {
     Entity entity = toProtoEntity();
-    entity.setProperty(PAYLOAD_PROPERTY, new Blob(payload));
+    entity.setUnindexedProperty(PAYLOAD_PROPERTY, new Blob(payload));
     return entity;
   }
 }

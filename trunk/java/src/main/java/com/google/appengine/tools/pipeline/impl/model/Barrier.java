@@ -42,9 +42,9 @@ import java.util.Map;
  * Released means that all of the slots are filled and so the action associated
  * with this barrier should be triggered.
  * </ul>
- * 
+ *
  * @author rudominer@google.com (Mitch Rudominer)
- * 
+ *
  */
 public class Barrier extends PipelineModelObject {
 
@@ -59,15 +59,15 @@ public class Barrier extends PipelineModelObject {
   private static final String TYPE_PROPERTY = "barrierType";
   private static final String JOB_KEY_PROPERTY = "jobKey";
   private static final String RELEASED_PROPERTY = "released";
-  public static final String WAITING_ON_KEYS_PROPERTY = "waitingOnKeys";
-  public static final String WAITING_ON_GROUP_SIZES_PROPERTY = "waitingOnGroupSizes";
+  private static final String WAITING_ON_KEYS_PROPERTY = "waitingOnKeys";
+  private static final String WAITING_ON_GROUP_SIZES_PROPERTY = "waitingOnGroupSizes";
 
   // persistent
-  private Type type;
-  private Key jobKey;
+  private final Type type;
+  private final Key jobKey;
   private boolean released;
-  private List<Key> waitingOnKeys;
-  private List<Long> waitingOnGroupSizes;
+  private final List<Key> waitingOnKeys;
+  private final List<Long> waitingOnGroupSizes;
 
   // transient
   private List<SlotDescriptor> waitingOnInflated;
@@ -87,6 +87,7 @@ public class Barrier extends PipelineModelObject {
         if (null == jobKey) {
           throw new IllegalArgumentException("jobKey is null");
         }
+        break;
     }
     return jobKey;
   }
@@ -95,9 +96,9 @@ public class Barrier extends PipelineModelObject {
     super(rootJobKey, getEgParentKey(type, jobKey), null, generatorJobKey, graphGUID);
     this.jobKey = jobKey;
     this.type = type;
-    this.waitingOnGroupSizes = new LinkedList<Long>();
-    this.waitingOnInflated = new LinkedList<SlotDescriptor>();
-    this.waitingOnKeys = new LinkedList<Key>();
+    waitingOnGroupSizes = new LinkedList<>();
+    waitingOnInflated = new LinkedList<>();
+    waitingOnKeys = new LinkedList<>();
   }
 
   public static Barrier dummyInstanceForTesting() {
@@ -106,38 +107,38 @@ public class Barrier extends PipelineModelObject {
   }
 
   public Barrier(Type type, JobRecord jobRecord) {
-    this(type, jobRecord.rootJobKey, jobRecord.key, jobRecord.generatorJobKey, jobRecord.graphGUID);
+    this(type, jobRecord.getRootJobKey(), jobRecord.getKey(), jobRecord.getGeneratorJobKey(),
+        jobRecord.getGraphGuid());
   }
 
-  @SuppressWarnings("unchecked")
   public Barrier(Entity entity) {
     super(entity);
-    this.jobKey = (Key) entity.getProperty(JOB_KEY_PROPERTY);
-    this.type = Type.valueOf((String) entity.getProperty(TYPE_PROPERTY));
-    this.released = (Boolean) entity.getProperty(RELEASED_PROPERTY);
-    this.waitingOnKeys = getListProperty(WAITING_ON_KEYS_PROPERTY, entity);
-    this.waitingOnGroupSizes = getListProperty(WAITING_ON_GROUP_SIZES_PROPERTY, entity);
+    jobKey = (Key) entity.getProperty(JOB_KEY_PROPERTY);
+    type = Type.valueOf((String) entity.getProperty(TYPE_PROPERTY));
+    released = (Boolean) entity.getProperty(RELEASED_PROPERTY);
+    waitingOnKeys = getListProperty(WAITING_ON_KEYS_PROPERTY, entity);
+    waitingOnGroupSizes = getListProperty(WAITING_ON_GROUP_SIZES_PROPERTY, entity);
   }
 
   @Override
   public Entity toEntity() {
     Entity entity = toProtoEntity();
     entity.setProperty(JOB_KEY_PROPERTY, jobKey);
-    entity.setProperty(TYPE_PROPERTY, type.toString());
-    entity.setProperty(RELEASED_PROPERTY, released);
-    entity.setProperty(WAITING_ON_KEYS_PROPERTY, waitingOnKeys);
-    entity.setProperty(WAITING_ON_GROUP_SIZES_PROPERTY, waitingOnGroupSizes);
+    entity.setUnindexedProperty(TYPE_PROPERTY, type.toString());
+    entity.setUnindexedProperty(RELEASED_PROPERTY, released);
+    entity.setUnindexedProperty(WAITING_ON_KEYS_PROPERTY, waitingOnKeys);
+    entity.setUnindexedProperty(WAITING_ON_GROUP_SIZES_PROPERTY, waitingOnGroupSizes);
     return entity;
   }
 
   @Override
-  public String getDatastoreKind() {
+  protected String getDatastoreKind() {
     return DATA_STORE_KIND;
   }
 
   public void inflate(Map<Key, Slot> pool) {
     int numSlots = waitingOnKeys.size();
-    waitingOnInflated = new ArrayList<SlotDescriptor>(numSlots);
+    waitingOnInflated = new ArrayList<>(numSlots);
     for (int i = 0; i < numSlots; i++) {
       Key key = waitingOnKeys.get(i);
       int groupSize = waitingOnGroupSizes.get(i).intValue();
@@ -184,12 +185,11 @@ public class Barrier extends PipelineModelObject {
     return argumentArray;
   }
 
-  // Visible for testing
   public List<Object> buildArgumentList() {
     if (null == waitingOnInflated) {
       throw new RuntimeException("" + this + " has not been inflated.");
     }
-    List<Object> argumentList = new LinkedList<Object>();
+    List<Object> argumentList = new LinkedList<>();
     ArrayList<Object> currentListArg = null;
     int currentListArgExpectedSize = -1;
     for (SlotDescriptor descriptor : waitingOnInflated) {
@@ -211,7 +211,7 @@ public class Barrier extends PipelineModelObject {
           // marker, its value is ignored. The list is comprised
           // of the next groupSize - 1 elements.
           currentListArgExpectedSize = descriptor.groupSize - 1;
-          currentListArg = new ArrayList<Object>(currentListArgExpectedSize);
+          currentListArg = new ArrayList<>(currentListArgExpectedSize);
           argumentList.add(currentListArg);
         } else if (descriptor.groupSize == 0) {
           // We are not in the midst of a list and this element is not part of
@@ -232,13 +232,13 @@ public class Barrier extends PipelineModelObject {
 
   private void addSlotDescriptor(SlotDescriptor slotDescr) {
     if (null == waitingOnInflated) {
-      waitingOnInflated = new LinkedList<SlotDescriptor>();
+      waitingOnInflated = new LinkedList<>();
     }
     waitingOnInflated.add(slotDescr);
     waitingOnGroupSizes.add((long) slotDescr.groupSize);
     Slot slot = slotDescr.slot;
     slot.addWaiter(this);
-    waitingOnKeys.add(slotDescr.slot.key);
+    waitingOnKeys.add(slotDescr.slot.getKey());
   }
 
   public void addRegularArgumentSlot(Slot slot) {
@@ -252,15 +252,16 @@ public class Barrier extends PipelineModelObject {
   /**
    * Adds multiple slots to this barrier's waiting-on list representing a single
    * Job argument of type list.
-   * 
+   *
    * @param slotList A list of slots that will be added to the barrier and used
    *        as the elements of the list Job argument.
+   * @throws IllegalArgumentException if intialSlot is not filled.
    */
   public void addListArgumentSlots(Slot initialSlot, List<Slot> slotList) {
-    int groupSize = slotList.size() + 1;
     if (!initialSlot.isFilled()) {
       throw new IllegalArgumentException("initialSlot must be filled");
     }
+    int groupSize = slotList.size() + 1;
     addSlotDescriptor(new SlotDescriptor(initialSlot, groupSize));
     for (Slot slot : slotList) {
       addSlotDescriptor(new SlotDescriptor(slot, groupSize));
@@ -269,9 +270,8 @@ public class Barrier extends PipelineModelObject {
 
   @Override
   public String toString() {
-    return "Barrier[" + key.getName() + ", " + type + ", released=" + released + ", "
+    return "Barrier[" + getKey().getName() + ", " + type + ", released=" + released + ", "
         + jobKey.getName() + ", waitingOn="
         + StringUtils.toStringParallel(waitingOnKeys, waitingOnGroupSizes) + "]";
   }
-
 }

@@ -14,10 +14,13 @@
 
 package com.google.appengine.tools.pipeline.impl.tasks;
 
-import com.google.appengine.tools.pipeline.impl.backend.PipelineBackEnd;
-import com.google.appengine.tools.pipeline.impl.backend.UpdateSpec;
+import com.google.appengine.tools.pipeline.impl.QueueSettings;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+import java.util.EnumSet;
 import java.util.Properties;
+import java.util.Set;
 
 /**
  * An App Engine Task Queue Task. This is the abstract base class for all
@@ -26,41 +29,152 @@ import java.util.Properties;
  * This class represents both a task to be enqueued and a task being handled.
  * <p>
  * When enqueueing a task, construct a concrete subclass with the appropriate
- * data, and then add the task to an {@link UpdateSpec} and
- * {@link PipelineBackEnd#save(UpdateSpec) save}. Alternatively the task may be
- * enqueued directly using {@link PipelineBackEnd#enqueue(Task)}.
+ * data, and then add the task to an
+ * {@link com.google.appengine.tools.pipeline.impl.backend.UpdateSpec} and
+ * {@link com.google.appengine.tools.pipeline.impl.backend.PipelineBackEnd#save save}.
+ * Alternatively the task may be enqueued directly using
+ * {@link com.google.appengine.tools.pipeline.impl.backend.PipelineBackEnd#enqueue(Task)}.
  * <p>
  * When handling a task, construct a {@link Properties} object containing the
- * relevant parameters from the request and then invoke
- * {@link #fromProperties(Properties)}.
- * 
- * 
+ * relevant parameters from the request, its name and then invoke
+ * {@link #fromProperties(String, Properties)}.
+ *
+ *
  * @author rudominer@google.com (Mitch Rudominer)
  */
 public abstract class Task {
 
   protected static final String TASK_TYPE_PARAMETER = "taskType";
 
+  private enum TaskProperty {
+
+    ON_BACKEND {
+      @Override
+      void setProperty(Task task, String value) {
+        task.getQueueSettings().setOnBackend(value);
+      }
+
+      @Override
+      String getProperty(Task task) {
+        return task.getQueueSettings().getOnBackend();
+      }
+    },
+    ON_MODULE {
+      @Override
+      void setProperty(Task task, String value) {
+        task.getQueueSettings().setOnModule(value);
+      }
+
+      @Override
+      String getProperty(Task task) {
+        return task.getQueueSettings().getOnModule();
+      }
+    },
+    MODULE_VERSION {
+      @Override
+      void setProperty(Task task, String value) {
+        task.getQueueSettings().setModuleVersion(value);
+      }
+
+      @Override
+      String getProperty(Task task) {
+        return task.getQueueSettings().getModuleVersion();
+      }
+    },
+    ON_QUEUE {
+      @Override
+      void setProperty(Task task, String value) {
+        task.getQueueSettings().setOnQueue(value);
+      }
+
+      @Override
+      String getProperty(Task task) {
+        return task.getQueueSettings().getOnQueue();
+      }
+    };
+
+    static final Set<TaskProperty> ALL = EnumSet.allOf(TaskProperty.class);
+
+    abstract void setProperty(Task task, String value);
+    abstract String getProperty(Task task);
+
+    void applyFrom(Task task, Properties properties) {
+      String value = properties.getProperty(name());
+      if (value != null) {
+        setProperty(task, value);
+      }
+    }
+
+    void addTo(Task task, Properties properties) {
+      String value = getProperty(task);
+      if (value != null) {
+        properties.setProperty(name(), value);
+      }
+    }
+  }
+
   /**
    * The type of task. The Pipeline framework uses several types
    */
   public static enum Type {
-    HANDLE_SLOT_FILLED, RUN_JOB, HANDLE_CHILD_EXCEPTION, CANCEL_JOB, FINALIZE_JOB, FAN_OUT,
-    DELETE_PIPELINE, FILL_SLOT_HANDLE_SLOT_FILLED
+
+    HANDLE_SLOT_FILLED(HandleSlotFilledTask.class),
+    RUN_JOB(RunJobTask.class),
+    HANDLE_CHILD_EXCEPTION(HandleChildExceptionTask.class),
+    CANCEL_JOB(CancelJobTask.class),
+    FINALIZE_JOB(FinalizeJobTask.class),
+    FAN_OUT(FanoutTask.class),
+    DELETE_PIPELINE(DeletePipelineTask.class),
+    FILL_SLOT_HANDLE_SLOT_FILLED(FillSlotHandleSlotFilledTask.class);
+
+    private final Constructor<? extends Task> taskConstructor;
+
+    Type(Class<? extends Task> taskClass) {
+      try {
+        taskConstructor = taskClass.getDeclaredConstructor(
+            getClass(), String.class, Properties.class);
+        taskConstructor.setAccessible(true);
+      } catch (NoSuchMethodException | SecurityException e) {
+        throw new RuntimeException("Invalid Task class " + taskClass, e);
+      }
+    }
+
+    public Task createInstance(String taskName, Properties properties) {
+      try {
+        return taskConstructor.newInstance(this, taskName, properties);
+      } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
+          | InvocationTargetException e) {
+        throw new RuntimeException("Unexpected exception while creating new instance for "
+            + taskConstructor.getDeclaringClass(), e);
+      }
+    }
   }
 
-  protected String taskName;
-  protected Type type;
-  protected Long delaySeconds;
-  protected String onBackend;
+  private final Type type;
+  private final String taskName;
+  private final QueueSettings queueSettings;
 
   /**
    * This constructor is used on the sending side. That is, it is used to
    * construct a task to be enqueued.
    */
-  protected Task(Type t, String name) {
-    this.type = t;
-    this.taskName = name;
+  protected Task(Type type, String taskName, QueueSettings queueSettings) {
+    if (type == null) {
+      throw new IllegalArgumentException("type must not be null");
+    }
+    if (queueSettings == null) {
+      throw new IllegalArgumentException("queueSettings must not be null");
+    }
+    this.type = type;
+    this.taskName = taskName;
+    this.queueSettings = queueSettings;
+  }
+
+  protected Task(Type type, String taskName, Properties properties) {
+    this(type, taskName, new QueueSettings());
+    for (TaskProperty taskProperty : TaskProperty.ALL) {
+      taskProperty.applyFrom(this, properties);
+    }
   }
 
   /**
@@ -71,33 +185,14 @@ public abstract class Task {
    * contain the properties specified by the concrete subclass of this class
    * corresponding to the task type.
    */
-  public static Task fromProperties(Properties properties) {
+  public static Task fromProperties(String taskName, Properties properties) {
     String taskTypeString = properties.getProperty(TASK_TYPE_PARAMETER);
     if (null == taskTypeString) {
       throw new IllegalArgumentException(TASK_TYPE_PARAMETER + " property is missing: "
           + properties.toString());
     }
     Type type = Type.valueOf(taskTypeString);
-    switch (type) {
-      case HANDLE_SLOT_FILLED:
-        return new HandleSlotFilledTask(properties);
-      case RUN_JOB:
-        return new RunJobTask(properties);
-      case FINALIZE_JOB:
-        return new FinalizeJobTask(properties);
-      case FAN_OUT:
-        return new FanoutTask(properties);
-      case DELETE_PIPELINE:
-        return new DeletePipelineTask(properties);
-      case HANDLE_CHILD_EXCEPTION:
-        return new HandleChildExceptionTask(properties);
-      case CANCEL_JOB:
-        return new CancelJobTask(properties);
-      case FILL_SLOT_HANDLE_SLOT_FILLED:
-        return new FillSlotHandleSlotFilledTask(properties);
-      default:
-        throw new RuntimeException("Unrecognized task type: " + type);
-    }
+    return type.createInstance(taskName, properties);
   }
 
   public Type getType() {
@@ -108,35 +203,31 @@ public abstract class Task {
     return taskName;
   }
 
-  public void setName(String name) {
-    taskName = name;
+  public QueueSettings getQueueSettings() {
+    return queueSettings;
   }
 
-  public void setDelaySeconds(long seconds) {
-    this.delaySeconds = seconds;
-  }
-
-  public Long getDelaySeconds() {
-    return delaySeconds;
-  }
-
-  public void setOnBackend(String backend) {
-    this.onBackend = backend;
-  }
-
-  public String getOnBackend() {
-    return onBackend;
-  }
-
-  public Properties toProperties() {
+  public final Properties toProperties() {
     Properties properties = new Properties();
     properties.setProperty(TASK_TYPE_PARAMETER, type.toString());
+    for (TaskProperty taskProperty : TaskProperty.ALL) {
+      taskProperty.addTo(this, properties);
+    }
     addProperties(properties);
     return properties;
   }
 
+  @Override
+  public String toString() {
+    String value = getType() + "_TASK[name=" + getName() + "queueSettings=" + getQueueSettings();
+    String extraProperties = propertiesAsString();
+    if (extraProperties != null && !extraProperties.isEmpty()) {
+      value += ", " + extraProperties;
+    }
+    return value + "]";
+  }
+
+  protected abstract String propertiesAsString();
+
   protected abstract void addProperties(Properties properties);
-
-
-
 }

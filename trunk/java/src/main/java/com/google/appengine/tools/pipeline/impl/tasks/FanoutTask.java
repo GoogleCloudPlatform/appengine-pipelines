@@ -16,12 +16,11 @@ package com.google.appengine.tools.pipeline.impl.tasks;
 
 import com.google.appengine.api.datastore.Key;
 import com.google.appengine.api.datastore.KeyFactory;
-import com.google.appengine.tools.pipeline.impl.backend.PipelineBackEnd;
+import com.google.appengine.tools.pipeline.impl.QueueSettings;
 import com.google.appengine.tools.pipeline.impl.util.GUIDGenerator;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Enumeration;
 import java.util.List;
 import java.util.Properties;
 
@@ -31,10 +30,10 @@ import java.util.Properties;
  * The purpose of this class is to get around two limitations in App Engine:
  * <ol>
  * <li>Only a small number (currently 5) of task queue tasks is permitted to be
- * part of of a data store transaction
+ * part of of a data store transaction.
  * <li>Named task queue tasks may not be part of a data store transaction.
  * </ol>
- * 
+ *
  * This task is used as part of a strategy to get around those limitations:
  * Instead of enqueueing a set of tasks, a single {@code FanoutTask} may be
  * enqueued that, when handled, will cause a collection of other tasks to be
@@ -50,11 +49,9 @@ import java.util.Properties;
  * the static method {@link #decodeTasks(byte[])} may be used to reconstitute
  * the original Collection of Tasks. Finally each of the tasks in the collection
  * may be enqueued non-transactionally.
- * 
- * @see PipelineBackEnd#handleFanoutTask(FanoutTask)
- * 
+ *
+ * @see com.google.appengine.tools.pipeline.impl.backend.PipelineBackEnd#handleFanoutTask
  * @author rudominer@google.com (Mitch Rudominer)
- * 
  */
 public class FanoutTask extends Task {
 
@@ -64,47 +61,45 @@ public class FanoutTask extends Task {
   private static final String TASK_SEPERATOR = ";;";
   private static final String RECORD_KEY_PROPERTY = "recordKey";
 
-  private Key recordKey;
-  
+  private final Key recordKey;
+
   /**
    * Construct a new FanoutTask that contains the given data store Key. This
    * constructor is used to construct an instance to be enqueued.
    */
-  public FanoutTask(Key recordKey) {
-    super(Type.FAN_OUT, null);
+  public FanoutTask(Key recordKey, QueueSettings queueSettings) {
+    super(Type.FAN_OUT, null, queueSettings.clone());
     this.recordKey = recordKey;
   }
-  
+
   /**
    * Construct a new FanoutTask from the given Properties. This constructor
    * is used to construct an instance that is being handled.
    */
-  public FanoutTask(Properties properties) {
-    super(Type.FAN_OUT, null);
-    String keyString = properties.getProperty(RECORD_KEY_PROPERTY);
-    recordKey = KeyFactory.stringToKey(keyString);
+  public FanoutTask(Type type, String taskName, Properties properties) {
+    super(type, taskName, properties);
+    this.recordKey = KeyFactory.stringToKey(properties.getProperty(RECORD_KEY_PROPERTY));
   }
 
   @Override
   protected void addProperties(Properties properties) {
     properties.setProperty(RECORD_KEY_PROPERTY, KeyFactory.keyToString(recordKey));
   }
-  
- 
+
   public Key getRecordKey() {
     return recordKey;
   }
 
   public static byte[] encodeTasks(Collection<Task> taskList) {
-    StringBuilder builder = new StringBuilder(1024);
-    boolean firstTask = true;
-    for (Task task : taskList) {
-      if (!firstTask) {
-        builder.append(TASK_SEPERATOR);
-      }
-      firstTask = false;
-      encodeTask(builder, task);
+    if (taskList.isEmpty()) {
+      return new byte[0];
     }
+    StringBuilder builder = new StringBuilder(1024);
+    for (Task task : taskList) {
+      encodeTask(builder, task);
+      builder.append(TASK_SEPERATOR);
+    }
+    builder.setLength(builder.length() - TASK_SEPERATOR.length());
     return builder.toString().getBytes();
   }
 
@@ -113,30 +108,25 @@ public class FanoutTask extends Task {
     builder.append(taskName);
     builder.append(TASK_NAME_DELIMITTER);
     Properties taskProps = task.toProperties();
-    Enumeration<?> propNames = taskProps.propertyNames();
-    boolean firstProperty = true;
-    while (propNames.hasMoreElements()) {
-      if (!firstProperty) {
+    if (!taskProps.isEmpty()) {
+      for (String propName : taskProps.stringPropertyNames()) {
+        String value = taskProps.getProperty(propName);
+        builder.append(propName).append(KEY_VALUE_SEPERATOR).append(value);
         builder.append(PROPERTY_SEPERATOR);
       }
-      firstProperty = false;
-      String propName = (String) propNames.nextElement();
-      String value = taskProps.getProperty(propName);
-      builder.append(propName).append(KEY_VALUE_SEPERATOR).append(value);
+      builder.setLength(builder.length() - PROPERTY_SEPERATOR.length());
     }
   }
 
   public static List<Task> decodeTasks(byte[] encodedBytes) {
     String encodedListOfTasks = new String(encodedBytes);
     String[] encodedTaskArray = encodedListOfTasks.split(TASK_SEPERATOR);
-    int numTasks = encodedTaskArray.length;
-    List<Task> listOfTasks = new ArrayList<Task>(numTasks);
+    List<Task> listOfTasks = new ArrayList<>(encodedTaskArray.length);
     for (String encodedTask : encodedTaskArray) {
       String[] nameAndProperties = encodedTask.split(TASK_NAME_DELIMITTER);
       String taskName = nameAndProperties[0];
       String encodedProperties = nameAndProperties[1];
       String[] encodedPropertyArray = encodedProperties.split(PROPERTY_SEPERATOR);
-      int numProperties = encodedPropertyArray.length;
       Properties taskProperties = new Properties();
       for (String encodedProperty : encodedPropertyArray) {
         String[] keyValuePair = encodedProperty.split(KEY_VALUE_SEPERATOR);
@@ -144,26 +134,14 @@ public class FanoutTask extends Task {
         String value = keyValuePair[1];
         taskProperties.setProperty(key, value);
       }
-      Task task = Task.fromProperties(taskProperties);
-      task.setName(taskName);
+      Task task = Task.fromProperties(taskName, taskProperties);
       listOfTasks.add(task);
     }
     return listOfTasks;
   }
-  
 
   @Override
-  public String toString() {
-    String nameString = "";
-    if (null != taskName) {
-      nameString = ", name=" + taskName;
-    }
-    String delayString = "";
-    if (null != delaySeconds) {
-      delayString = ", delaySeconds=" + delaySeconds;
-    }
-    return type.toString() + "_TASK[key=" + recordKey + nameString  
-        + delayString + "]";
+  public String propertiesAsString() {
+    return "key=" + recordKey;
   }
-
 }

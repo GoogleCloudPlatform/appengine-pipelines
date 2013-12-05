@@ -1,11 +1,11 @@
 // Copyright 2011 Google Inc.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
 // the License at
-// 
+//
 // http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
 // WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -30,15 +30,16 @@ import java.util.logging.Logger;
 /**
  * A {@code LocalTaskQueueCallback} for use in tests that make use of the
  * Pipeline framework.
- * 
+ *
  * @author rudominer@google.com (Mitch Rudominer)
  */
+@SuppressWarnings("serial")
 public class TestingTaskQueueCallback implements LocalTaskQueueCallback {
   Logger logger = Logger.getLogger(TestingTaskQueueCallback.class.getName());
 
   /**
    * Execute the provided url fetch request.
-   * 
+   *
    * @param req The url fetch request
    * @return The HTTP status code of the fetch.
    */
@@ -46,18 +47,20 @@ public class TestingTaskQueueCallback implements LocalTaskQueueCallback {
   public int execute(URLFetchServicePb.URLFetchRequest req) {
     String taskName = null;
     int retryCount = -1;
+    String queueName = null;
     for (URLFetchRequest.Header pbHeader : req.getHeaderList()) {
       String headerName = pbHeader.getKey();
       String headerValue = pbHeader.getValue();
       if (TaskHandler.TASK_NAME_REQUEST_HEADER.equalsIgnoreCase(headerName)) {
         taskName = headerValue;
-      }
-      if (TaskHandler.TASK_RETRY_COUNT_HEADER.equalsIgnoreCase(headerName)) {
+      } else if (TaskHandler.TASK_RETRY_COUNT_HEADER.equalsIgnoreCase(headerName)) {
         try {
           retryCount = Integer.parseInt(headerValue);
         } catch (Exception e) {
           // ignore
         }
+      } else if (TaskHandler.TASK_QUEUE_NAME_HEADER.equalsIgnoreCase(headerName)) {
+        queueName = headerValue;
       }
     }
     String requestBody = req.getPayload().toStringUtf8();
@@ -72,9 +75,9 @@ public class TestingTaskQueueCallback implements LocalTaskQueueCallback {
         String decodedValue = URLDecoder.decode(value, "UTF8");
         properties.put(name, decodedValue);
       }
-      task = Task.fromProperties(properties);
-      if (null != taskName) {
-        task.setName(taskName);
+      task = Task.fromProperties(taskName, properties);
+      if (queueName != null && task.getQueueSettings().getOnQueue() == null) {
+        task.getQueueSettings().setOnQueue(queueName);
       }
       PipelineManager.processTask(task);
 

@@ -1,11 +1,11 @@
 // Copyright 2011 Google Inc.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
 // the License at
-// 
+//
 // http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
 // WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -14,7 +14,9 @@
 
 package com.google.appengine.tools.pipeline.impl.util;
 
-import org.json.*;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -25,7 +27,7 @@ import java.util.Map;
 
 /**
  * @author rudominer@google.com (Mitch Rudominer)
- * 
+ *
  */
 public class JsonUtils {
 
@@ -83,19 +85,19 @@ public class JsonUtils {
     if (x instanceof JSONObject) {
       JSONObject jsonObject = (JSONObject) x;
       String[] names = JSONObject.getNames(jsonObject);
-      int numNames = (null == names ? 0 : names.length);
-      HashMap<String, Object> map = new HashMap<String, Object>(numNames);
-      if (numNames > 0) {
-        for (String name : names) {
-          Object value = jsonObject.get(name);
-          map.put(name, convert(value));
-        }
+      if (names == null || names.length == 0) {
+        return new HashMap<>(0);
+      }
+      HashMap<String, Object> map = new HashMap<>(names.length);
+      for (String name : names) {
+        Object value = jsonObject.get(name);
+        map.put(name, convert(value));
       }
       return map;
     } else if (x instanceof JSONArray) {
       JSONArray jsonArray = (JSONArray) x;
       int length = jsonArray.length();
-      List<Object> list = new ArrayList<Object>(length);
+      List<Object> list = new ArrayList<>(length);
       for (int i = 0; i < length; i++) {
         list.add(convert(jsonArray.get(i)));
       }
@@ -105,7 +107,6 @@ public class JsonUtils {
     }
   }
 
-  @SuppressWarnings("unchecked")
   private static String recursiveToString(Object y) {
     StringBuilder builder = new StringBuilder(512);
     if (null == y) {
@@ -167,7 +168,7 @@ public class JsonUtils {
     debugPrint(x);
     debugPrint(null);
 
-    Map<String, Integer> map = new HashMap<String, Integer>();
+    Map<String, Integer> map = new HashMap<>();
     map.put("first", 5);
     map.put("second", 7);
     debugPrint(map);
@@ -175,12 +176,12 @@ public class JsonUtils {
     int[] array = new int[] {5, 7};
     debugPrint(array);
 
-    ArrayList<Integer> arrayList = new ArrayList<Integer>(2);
+    ArrayList<Integer> arrayList = new ArrayList<>(2);
     arrayList.add(5);
     arrayList.add(7);
     debugPrint(arrayList);
 
-    Collection<Integer> collection = new HashSet<Integer>(2);
+    Collection<Integer> collection = new HashSet<>(2);
     collection.add(5);
     collection.add(7);
     debugPrint(collection);
@@ -188,13 +189,13 @@ public class JsonUtils {
     Object object = new Object();
     debugPrint(object);
 
-    Map<String, String> map1 = new HashMap<String, String>();
+    Map<String, String> map1 = new HashMap<>();
     map1.put("a", "hello");
     map1.put("b", "goodbye");
 
     Object[] array2 = new Object[] {17, "yes", "no", map1};
 
-    Map<String, Object> map2 = new HashMap<String, Object>();
+    Map<String, Object> map2 = new HashMap<>();
     map2.put("first", 5.4);
     map2.put("second", array2);
     map2.put("third", map1);
@@ -220,5 +221,4 @@ public class JsonUtils {
     debugPrint(new MyBean());
 
   }
-
 }

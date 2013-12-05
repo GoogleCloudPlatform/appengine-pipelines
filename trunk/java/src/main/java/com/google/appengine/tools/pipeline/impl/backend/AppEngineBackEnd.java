@@ -27,6 +27,7 @@ import com.google.appengine.api.datastore.PreparedQuery;
 import com.google.appengine.api.datastore.Query;
 import com.google.appengine.api.datastore.Transaction;
 import com.google.appengine.tools.pipeline.NoSuchObjectException;
+import com.google.appengine.tools.pipeline.impl.QueueSettings;
 import com.google.appengine.tools.pipeline.impl.model.Barrier;
 import com.google.appengine.tools.pipeline.impl.model.ExceptionRecord;
 import com.google.appengine.tools.pipeline.impl.model.FanoutTaskRecord;
@@ -66,19 +67,18 @@ public class AppEngineBackEnd implements PipelineBackEnd {
   // Arbitrary value for now; may need tuning.
   private static final int MAX_ENTITIES_PER_GET = 100;
   private static final int MAX_BLOB_BYTE_SIZE = 1000000;
+  private static final Random random = new Random();
 
-  private static Random random = new Random();
+  private final DatastoreService dataStore;
+  private final AppEngineTaskQueue taskQueue;
 
-  private DatastoreService dataStore;
-  private AppEngineTaskQueue taskQueue;
-
-  {
+  public AppEngineBackEnd() {
     dataStore = DatastoreServiceFactory.getDatastoreService();
     taskQueue = new AppEngineTaskQueue();
   }
 
   private void putAll(Collection<? extends PipelineModelObject> objects) {
-    List<Entity> entityList = new ArrayList<Entity>(objects.size());
+    List<Entity> entityList = new ArrayList<>(objects.size());
     for (PipelineModelObject x : objects) {
       logger.finest("Storing: " + x);
       entityList.add(x.toEntity());
@@ -94,8 +94,8 @@ public class AppEngineBackEnd implements PipelineBackEnd {
     putAll(group.getFailureRecords());
   }
 
-  private void transactionallySaveAll(UpdateSpec.Transaction transactionSpec, Key rootJobKey,
-      Key jobKey, JobRecord.State... expectedStates) {
+  private void transactionallySaveAll(UpdateSpec.Transaction transactionSpec,
+      QueueSettings queueSettings, Key rootJobKey, Key jobKey, JobRecord.State... expectedStates) {
     Transaction transaction = dataStore.beginTransaction();
     try {
       if (jobKey != null && expectedStates != null) {
@@ -117,7 +117,8 @@ public class AppEngineBackEnd implements PipelineBackEnd {
         }
         if (!stateIsExpected) {
           logger.finest("Job " + jobRecord + " is not in one of the expected states: "
-              + expectedStates + " and so transactionallySaveAll() will not continue.");
+              + Arrays.asList(expectedStates)
+              + " and so transactionallySaveAll() will not continue.");
           return;
         }
       }
@@ -134,7 +135,7 @@ public class AppEngineBackEnd implements PipelineBackEnd {
           // enqueue fails then the FanoutTaskRecord is orphaned. But
           // the Pipeline is still consistent.
           dataStore.put(null, ftRecord.toEntity());
-          FanoutTask fannoutTask = new FanoutTask(ftRecord.getKey());
+          FanoutTask fannoutTask = new FanoutTask(ftRecord.getKey(), queueSettings);
           taskQueue.enqueue(fannoutTask);
         }
       }
@@ -146,15 +147,13 @@ public class AppEngineBackEnd implements PipelineBackEnd {
     }
   }
 
-  private abstract class Operation {
+  private abstract class Operation implements Runnable {
 
-    private String name;
+    private final String name;
 
     Operation(String name) {
       this.name = name;
     }
-
-    public abstract void perform();
 
     public String getName() {
       return name;
@@ -165,7 +164,7 @@ public class AppEngineBackEnd implements PipelineBackEnd {
     int attempts = 1;
     while (true) {
       try {
-        operation.perform();
+        operation.run();
         return;
       } catch (ConcurrentModificationException e) {
         String logMessage =
@@ -174,8 +173,8 @@ public class AppEngineBackEnd implements PipelineBackEnd {
         if (attempts++ < 5) {
           logger.finest(logMessage + " Trying again.");
           try {
-            // Sleep between 0.2 and 4.2 seconds
-            Thread.sleep((long) ((random.nextFloat() + 0.05) * 4000.0));
+            // Sleep between 0.08 to 5.04 seconds, considering attempts
+            Thread.sleep((long) ((random.nextFloat() + 0.05) * attempts * 800.0));
           } catch (InterruptedException f) {
             // ignore
           }
@@ -193,19 +192,19 @@ public class AppEngineBackEnd implements PipelineBackEnd {
   }
 
   @Override
-  public void saveWithJobStateCheck(final UpdateSpec updateSpec, final Key jobKey,
-      final JobRecord.State... expectedStates) {
+  public void saveWithJobStateCheck(final UpdateSpec updateSpec, final QueueSettings queueSettings,
+      final Key jobKey, final JobRecord.State... expectedStates) {
     tryFiveTimes(new Operation("save") {
       @Override
-      public void perform() {
+      public void run() {
         saveAll(updateSpec.getNonTransactionalGroup());
       }
     });
     for (final UpdateSpec.Transaction transactionSpec : updateSpec.getTransactions()) {
       tryFiveTimes(new Operation("save") {
         @Override
-        public void perform() {
-          transactionallySaveAll(transactionSpec, updateSpec.getRootJobKey(), null);
+        public void run() {
+          transactionallySaveAll(transactionSpec, queueSettings, updateSpec.getRootJobKey(), null);
         }
       });
     }
@@ -215,16 +214,16 @@ public class AppEngineBackEnd implements PipelineBackEnd {
 
     tryFiveTimes(new Operation("save") {
       @Override
-      public void perform() {
-        transactionallySaveAll(updateSpec.getFinalTransaction(), updateSpec.getRootJobKey(),
-            jobKey, expectedStates);
+      public void run() {
+        transactionallySaveAll(updateSpec.getFinalTransaction(), queueSettings,
+            updateSpec.getRootJobKey(), jobKey, expectedStates);
       }
     });
   }
 
   @Override
-  public void save(final UpdateSpec updateSpec) {
-    saveWithJobStateCheck(updateSpec, null);
+  public void save(UpdateSpec updateSpec, QueueSettings queueSettings) {
+    saveWithJobStateCheck(updateSpec, queueSettings, null);
   }
 
   private Entity queryEntity(Key key) throws EntityNotFoundException {
@@ -235,18 +234,6 @@ public class AppEngineBackEnd implements PipelineBackEnd {
     Transaction transaction = dataStore.beginTransaction();
     try {
       return queryEntity(key);
-    } finally {
-      if (transaction.isActive()) {
-        transaction.rollback();
-      }
-    }
-  }
-
-  @SuppressWarnings("unused")
-  private Map<Key, Entity> transactionallyQueryEntities(Collection<Key> keys) {
-    Transaction transaction = dataStore.beginTransaction();
-    try {
-      return dataStore.get(keys);
     } finally {
       if (transaction.isActive()) {
         transaction.rollback();
@@ -305,7 +292,7 @@ public class AppEngineBackEnd implements PipelineBackEnd {
     }
     Barrier barrier = new Barrier(entity);
     if (inflate) {
-      Collection<Barrier> barriers = new ArrayList<Barrier>(1);
+      Collection<Barrier> barriers = new ArrayList<>(1);
       barriers.add(barrier);
       inflateBarriers(barriers);
     }
@@ -327,7 +314,7 @@ public class AppEngineBackEnd implements PipelineBackEnd {
    */
   private void inflateBarriers(Collection<Barrier> barriers) {
     // Step 1. Build the set of keys corresponding to the slots.
-    Set<Key> keySet = new HashSet<Key>(barriers.size() * 5);
+    Set<Key> keySet = new HashSet<>(barriers.size() * 5);
     for (Barrier barrier : barriers) {
       for (Key key : barrier.getWaitingOnKeys()) {
         keySet.add(key);
@@ -336,7 +323,7 @@ public class AppEngineBackEnd implements PipelineBackEnd {
     // Step 2. Query the datastore for the Slot entities
     Map<Key, Entity> entityMap = dataStore.get(keySet);
     // Step 3. Convert into map from key to Slot
-    Map<Key, Slot> slotMap = new HashMap<Key, Slot>(entityMap.size());
+    Map<Key, Slot> slotMap = new HashMap<>(entityMap.size());
     for (Key key : entityMap.keySet()) {
       Slot s = new Slot(entityMap.get(key));
       slotMap.put(key, s);
@@ -353,17 +340,17 @@ public class AppEngineBackEnd implements PipelineBackEnd {
    * @throws NoSuchObjectException if any entities don't exist
    */
   private Map<Key, Entity> getAll(List<Key> keys) throws NoSuchObjectException {
-    Map<Key, Entity> out = new HashMap<Key, Entity>(keys.size());
+    Map<Key, Entity> out = new HashMap<>(keys.size());
     int start = 0;
     while (start < keys.size()) {
       int end = Math.min(keys.size(), start + MAX_ENTITIES_PER_GET);
       List<Key> batch = keys.subList(start, end);
       Map<Key, Entity> results = dataStore.get(null, batch);
       if (results.size() != batch.size()) {
-        List<Key> missing = new ArrayList<Key>(batch);
+        List<Key> missing = new ArrayList<>(batch);
         missing.removeAll(results.keySet());
         logger.severe("Missing entities for keys: " + missing + " (and perhaps others)");
-        throw new NoSuchObjectException("" + missing.get(0));
+        throw new NoSuchObjectException(String.valueOf(missing.get(0)));
       }
       out.putAll(results);
       start = end;
@@ -382,7 +369,7 @@ public class AppEngineBackEnd implements PipelineBackEnd {
     Slot slot = new Slot(entity);
     if (inflate) {
       Map<Key, Entity> entities = getAll(slot.getWaitingOnMeKeys());
-      Map<Key, Barrier> barriers = new HashMap<Key, Barrier>(entities.size());
+      Map<Key, Barrier> barriers = new HashMap<>(entities.size());
       for (Map.Entry<Key, Entity> entry : entities.entrySet()) {
         barriers.put(entry.getKey(), new Barrier(entry.getValue()));
       }
@@ -419,7 +406,7 @@ public class AppEngineBackEnd implements PipelineBackEnd {
       int limit = offset + MAX_BLOB_BYTE_SIZE;
       byte[] chunk = Arrays.copyOfRange(bytes, offset, Math.min(limit, bytes.length));
       offset = limit;
-      shardedValues.add(new ShardedValue(model, "value", shardId++, chunk).toEntity());
+      shardedValues.add(new ShardedValue(model, shardId++, chunk).toEntity());
     }
     Transaction tx = dataStore.beginTransaction();
     List<Key> keys = dataStore.put(tx, shardedValues);
@@ -507,11 +494,11 @@ public class AppEngineBackEnd implements PipelineBackEnd {
 
   @Override
   public PipelineObjects queryFullPipeline(final Key rootJobKey) {
-    final Map<Key, JobRecord> jobs = new HashMap<Key, JobRecord>();
-    final Map<Key, Slot> slots = new HashMap<Key, Slot>();
-    final Map<Key, Barrier> barriers = new HashMap<Key, Barrier>();
-    final Map<Key, JobInstanceRecord> jobInstanceRecords = new HashMap<Key, JobInstanceRecord>();
-    Map<Key, ExceptionRecord> failureRecords = new HashMap<Key, ExceptionRecord>();
+    final Map<Key, JobRecord> jobs = new HashMap<>();
+    final Map<Key, Slot> slots = new HashMap<>();
+    final Map<Key, Barrier> barriers = new HashMap<>();
+    final Map<Key, JobInstanceRecord> jobInstanceRecords = new HashMap<>();
+    Map<Key, ExceptionRecord> failureRecords = new HashMap<>();
     putAll(barriers, new Instantiator<Barrier>() {
       @Override
       public Barrier newObject(Entity entity) {
@@ -558,8 +545,8 @@ public class AppEngineBackEnd implements PipelineBackEnd {
       throw new IllegalArgumentException("n must be positive");
     }
     logger.info("Deleting  " + n + " " + kind + "s with rootJobKey=" + rootJobKey);
-    List<Key> keyList = new LinkedList<Key>();
-    FetchOptions fetchOptions = FetchOptions.Builder.withLimit(n).chunkSize(Math.min(n, 500));
+    List<Key> keyList = new LinkedList<>();
+    FetchOptions fetchOptions = FetchOptions.Builder.withLimit(n).chunkSize(500);
     for (Entity entity : queryAll(kind, rootJobKey, true, fetchOptions)) {
       keyList.add(entity.getKey());
     }
@@ -579,41 +566,38 @@ public class AppEngineBackEnd implements PipelineBackEnd {
    *
    * @param rootJobKey The root job key identifying the pipeline
    * @param force If this parameter is not {@code true} then this method will
-   *        throw an {@link IllegalStateException} if the specified pipeline is
-   *        not in the
-   *        {@link com.google.appengine.tools.pipeline.impl.model.JobRecord.State#FINALIZED}
-   *        or
-   *        {@link com.google.appengine.tools.pipeline.impl.model.JobRecord.State#STOPPED}
-   *        state.
+   *        throw an {@link IllegalStateException} if the specified pipeline is not in the
+   *        {@link com.google.appengine.tools.pipeline.impl.model.JobRecord.State#FINALIZED} or
+   *        {@link com.google.appengine.tools.pipeline.impl.model.JobRecord.State#STOPPED} state.
    * @param async If this parameter is {@code true} then instead of performing
    *        the delete operation synchronously, this method will enqueue a task
    *        to perform the operation.
-   * @throws NoSuchObjectException If there is no Job with the given key.
    * @throws IllegalStateException If {@code force = false} and the specified
    *         pipeline is not in the
-   *         {@link com.google.appengine.tools.pipeline.impl.model.JobRecord.State#FINALIZED}
-   *         or
-   *         {@link com.google.appengine.tools.pipeline.impl.model.JobRecord.State#STOPPED}
-   *         state.
+   *         {@link com.google.appengine.tools.pipeline.impl.model.JobRecord.State#FINALIZED} or
+   *         {@link com.google.appengine.tools.pipeline.impl.model.JobRecord.State#STOPPED} state.
    */
   @Override
   public void deletePipeline(Key rootJobKey, boolean force, boolean async)
-      throws NoSuchObjectException, IllegalStateException {
-
+      throws IllegalStateException {
     if (!force) {
-      JobRecord rootJobRecord = queryJob(rootJobKey, JobRecord.InflationType.NONE);
-      switch (rootJobRecord.getState()) {
-        case FINALIZED:
-        case STOPPED:
-          break;
-        default:
-          throw new IllegalStateException("Pipeline is still running: " + rootJobRecord);
+      try {
+        JobRecord rootJobRecord = queryJob(rootJobKey, JobRecord.InflationType.NONE);
+        switch (rootJobRecord.getState()) {
+          case FINALIZED:
+          case STOPPED:
+            break;
+          default:
+            throw new IllegalStateException("Pipeline is still running: " + rootJobRecord);
+        }
+      } catch (NoSuchObjectException ex) {
+        // Consider missing rootJobRecord as a non-active job and allow further delete
       }
     }
     if (async) {
       // We do all the checks above before bothering to enqueue a task.
       // They will have to be done again when the task is processed.
-      DeletePipelineTask task = new DeletePipelineTask(rootJobKey, null, force);
+      DeletePipelineTask task = new DeletePipelineTask(rootJobKey, force, new QueueSettings());
       taskQueue.enqueue(task);
       return;
     }
@@ -624,5 +608,4 @@ public class AppEngineBackEnd implements PipelineBackEnd {
     deleteAll(JobInstanceRecord.DATA_STORE_KIND, rootJobKey);
     deleteAll(FanoutTaskRecord.DATA_STORE_KIND, rootJobKey);
   }
-
 }

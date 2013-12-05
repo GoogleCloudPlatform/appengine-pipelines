@@ -43,36 +43,36 @@ public class Slot extends PipelineModelObject {
   private Date fillTime;
   private Object value;
   private Key sourceJobKey;
-  private List<Key> waitingOnMeKeys;
+  private final List<Key> waitingOnMeKeys;
 
   // transient
   private List<Barrier> waitingOnMeInflated;
 
   public Slot(Key rootJobKey, Key generatorJobKey, String graphGUID) {
     super(rootJobKey, generatorJobKey, graphGUID);
-    waitingOnMeKeys = new LinkedList<Key>();
+    waitingOnMeKeys = new LinkedList<>();
   }
 
   public Slot(Entity entity) {
     super(entity);
-    this.filled = (Boolean) entity.getProperty(FILLED_PROPERTY);
-    this.fillTime = (Date) entity.getProperty(FILL_TIME_PROPERTY);
-    this.sourceJobKey = (Key) entity.getProperty(SOURCE_JOB_KEY_PROPERTY);
+    filled = (Boolean) entity.getProperty(FILLED_PROPERTY);
+    fillTime = (Date) entity.getProperty(FILL_TIME_PROPERTY);
+    sourceJobKey = (Key) entity.getProperty(SOURCE_JOB_KEY_PROPERTY);
     Object serializedVersion = entity.getProperty(VALUE_PROPERTY);
     try {
-      this.value = PipelineManager.getBackEnd().deserializeValue(this, serializedVersion);
+      value = PipelineManager.getBackEnd().deserializeValue(this, serializedVersion);
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
-    this.waitingOnMeKeys = getListProperty(WAITING_ON_ME_PROPERTY, entity);
+    waitingOnMeKeys = getListProperty(WAITING_ON_ME_PROPERTY, entity);
   }
 
   @Override
   public Entity toEntity() {
     Entity entity = toProtoEntity();
-    entity.setProperty(FILLED_PROPERTY, filled);
+    entity.setUnindexedProperty(FILLED_PROPERTY, filled);
     if (null != fillTime) {
-      entity.setProperty(FILL_TIME_PROPERTY, fillTime);
+      entity.setUnindexedProperty(FILL_TIME_PROPERTY, fillTime);
     }
     if (null != sourceJobKey) {
       entity.setProperty(SOURCE_JOB_KEY_PROPERTY, sourceJobKey);
@@ -88,7 +88,7 @@ public class Slot extends PipelineModelObject {
   }
 
   @Override
-  public String getDatastoreKind() {
+  protected String getDatastoreKind() {
     return DATA_STORE_KIND;
   }
 
@@ -97,9 +97,9 @@ public class Slot extends PipelineModelObject {
   }
 
   public void addWaiter(Barrier waiter) {
-    waitingOnMeKeys.add(waiter.key);
+    waitingOnMeKeys.add(waiter.getKey());
     if (null == waitingOnMeInflated) {
-      waitingOnMeInflated = new LinkedList<Barrier>();
+      waitingOnMeInflated = new LinkedList<>();
     }
     waitingOnMeInflated.add(waiter);
   }
@@ -113,7 +113,7 @@ public class Slot extends PipelineModelObject {
   }
 
   /**
-   * Will return {@code Null} if this slot is not filled.
+   * Will return {@code null} if this slot is not filled.
    */
   public Date getFillTime() {
     return fillTime;
@@ -124,7 +124,7 @@ public class Slot extends PipelineModelObject {
   }
 
   public void setSourceJobKey(Key key) {
-    this.sourceJobKey = key;
+    sourceJobKey = key;
   }
 
   public void fill(Object value) {
@@ -146,8 +146,7 @@ public class Slot extends PipelineModelObject {
 
   @Override
   public String toString() {
-    return "Slot[" + key.getName() + ", value=" + value + ", filled=" + filled + ", waitingOnMe="
-        + waitingOnMeKeys + "]";
+    return "Slot[" + getKey().getName() + ", value=" + value + ", filled=" + filled
+        + ", waitingOnMe=" + waitingOnMeKeys + "]";
   }
-
 }

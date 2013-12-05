@@ -15,55 +15,35 @@
 package com.google.appengine.tools.pipeline.impl.tasks;
 
 import com.google.appengine.api.datastore.Key;
-import com.google.appengine.tools.pipeline.impl.model.Slot;
+import com.google.appengine.tools.pipeline.impl.QueueSettings;
 
 import java.util.Properties;
 
 /**
  * A subclass of {@link ObjRefTask} used to request that the Pipeline framework
  * handle the fact that the specified slot has been filled.
- * 
+ *
  * @author rudominer@google.com (Mitch Rudominer)
- * 
+ *
  */
 public class HandleSlotFilledTask extends ObjRefTask {
-  
+
   /**
    * This constructor is used on the sending side. That is, it is used to
    * construct a {@code HandleSlotFilledTask}to be enqueued.
    * <p>
-   * 
+   *
    * @param slotKey The key of the Slot whose filling is to be handled
    */
-  public HandleSlotFilledTask(Key slotKey) {
-    super(Type.HANDLE_SLOT_FILLED, "handleSlotFilled", slotKey);
+  public HandleSlotFilledTask(Key slotKey, QueueSettings queueSettings) {
+    super(Type.HANDLE_SLOT_FILLED, "handleSlotFilled", slotKey, queueSettings);
   }
 
-  /**
-   * This constructor is used on the sending side. That is, it is used to
-   * construct a {@code HandleSlotFilledTask} to be enqueued.
-   * <p>
-   * 
-   * @param slot The Slot whose filling is to be handled
-   */
-  public HandleSlotFilledTask(Slot slot) {
-    this(slot.getKey());
-  }
-  
-  /**
-   * This constructor is used on the receiving side. That is, it is used to
-   * construct a {@code HandleSlotFilledTask} from an HttpRequest sent from the
-   * App Engine task queue.
-   * 
-   * @param properties See the requirements on {@code properties} specified
-   * in the parent class constructor.
-   */
-  public HandleSlotFilledTask(Properties properties) {
-    super(Type.HANDLE_SLOT_FILLED, properties);
+  protected HandleSlotFilledTask(Type type, String taskName, Properties properties) {
+    super(type, taskName, properties);
   }
 
   public Key getSlotKey() {
-    return key;
+    return getKey();
   }
-
 }

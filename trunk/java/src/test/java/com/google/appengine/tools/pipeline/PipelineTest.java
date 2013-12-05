@@ -1,11 +1,11 @@
 // Copyright 2011 Google Inc.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
 // the License at
-// 
+//
 // http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
 // WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -14,6 +14,8 @@
 
 package com.google.appengine.tools.pipeline;
 
+import static com.google.appengine.tools.pipeline.impl.util.GUIDGenerator.USE_SIMPLE_GUIDS_FOR_DEBUGGING;
+
 import com.google.appengine.tools.development.testing.LocalDatastoreServiceTestConfig;
 import com.google.appengine.tools.development.testing.LocalServiceTestHelper;
 import com.google.appengine.tools.development.testing.LocalTaskQueueTestConfig;
@@ -21,13 +23,11 @@ import com.google.apphosting.api.ApiProxy;
 
 import junit.framework.TestCase;
 
-import java.io.Serializable;
-
 /**
  * @author rudominer@google.com (Mitch Rudominer)
- * 
+ *
  */
-public class PipelineTest extends TestCase implements Serializable {
+public class PipelineTest extends TestCase {
 
   protected transient LocalServiceTestHelper helper;
   protected transient ApiProxy.Environment apiProxyEnvironment;
@@ -43,7 +43,7 @@ public class PipelineTest extends TestCase implements Serializable {
         new LocalDatastoreServiceTestConfig()
             .setDefaultHighRepJobPolicyUnappliedJobPercentage(
                 isHrdSafe() ? 100 : 0),
-        taskQueueConfig);
+        taskQueueConfig, new LocalModulesServiceTestConfig());
   }
 
   /**
@@ -67,15 +67,13 @@ public class PipelineTest extends TestCase implements Serializable {
     return traceBuffer.toString();
   }
 
-
   @Override
   public void setUp() throws Exception {
     super.setUp();
     traceBuffer = new StringBuffer();
     helper.setUp();
     apiProxyEnvironment = ApiProxy.getCurrentEnvironment();
-    System
-        .setProperty("com.google.appengine.api.pipeline.use-simple-guids-for-debugging", "true");
+    System.setProperty(USE_SIMPLE_GUIDS_FOR_DEBUGGING, "true");
   }
 
   @Override
@@ -84,7 +82,6 @@ public class PipelineTest extends TestCase implements Serializable {
     super.tearDown();
   }
 
-  @SuppressWarnings("unchecked")
   protected Object waitForJobToComplete(String pipelineId) throws Exception {
     PipelineService service = PipelineServiceFactory.newPipelineService();
     while (true) {
@@ -106,7 +103,4 @@ public class PipelineTest extends TestCase implements Serializable {
       }
     }
   }
-
-
-
 }

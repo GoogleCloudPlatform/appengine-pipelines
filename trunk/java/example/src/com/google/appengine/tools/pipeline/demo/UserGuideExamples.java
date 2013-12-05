@@ -17,7 +17,13 @@ import com.google.appengine.tools.pipeline.Value;
  */
 public class UserGuideExamples {
 
+  /**
+   * Job to calculate (x - y) * (x - z) - 2
+   */
   public static class ComplexJob extends Job3<Integer, Integer, Integer, Integer> {
+
+    private static final long serialVersionUID = -3659971121199420049L;
+
     @Override
     public Value<Integer> run(Integer x, Integer y, Integer z) {
       DiffJob diffJob = new DiffJob();
@@ -30,21 +36,39 @@ public class UserGuideExamples {
     }
   }
 
+  /**
+   * Job for calculating x - y.
+   */
   public static class DiffJob extends Job2<Integer, Integer, Integer> {
+
+    private static final long serialVersionUID = -623601952335794286L;
+
     @Override
     public Value<Integer> run(Integer a, Integer b) {
       return immediate(a - b);
     }
   }
 
+  /**
+   * Job for calculating x * y
+   */
   public static class MultJob extends Job2<Integer, Integer, Integer> {
+
+    private static final long serialVersionUID = -3272045240539122024L;
+
     @Override
     public Value<Integer> run(Integer a, Integer b) {
       return immediate(a * b);
     }
   }
-  
+
+  /**
+   * An example job that consumes data from external-source/user.
+   */
   public static class ExternalAgentJob extends Job1<Integer, String> {
+
+    private static final long serialVersionUID = -8312140484895836265L;
+
     @Override
     public Value<Integer> run(String userEmail) {
       // Invoke ComplexJob on three promised values
@@ -52,7 +76,7 @@ public class UserGuideExamples {
       PromisedValue<Integer> y = newPromise(Integer.class);
       PromisedValue<Integer> z = newPromise(Integer.class);
       FutureValue<Integer> intermediate = futureCall(new ComplexJob(), x, y, z);
-      
+
       // Kick off the process of retrieving the data from the external agent
       getIntFromUser("Please give 1st int", userEmail, x.getHandle());
       getIntFromUser("Please give 2nd int", userEmail, y.getHandle());
@@ -66,8 +90,9 @@ public class UserGuideExamples {
       return futureCall(new MultJob(), intermediate, oneMoreInt);
     }
 
-    public static void getIntFromUser(String prompt, String userEmail, 
-                                                     String promiseHandle) {
+    @SuppressWarnings("unused")
+    public static void getIntFromUser(
+        String prompt, String userEmail, String promiseHandle) {
       // 1. Send the user an e-mail containing the prompt.
       // 2. Ask user to submit one more integer on some web page.
       // 3. promiseHandle is a query string argument
@@ -75,19 +100,30 @@ public class UserGuideExamples {
     }
   }
 
+  /**
+   * A job that fills a promised value by ExternalAgentJob.
+   */
   public static class PromptJob extends Job2<Integer, Integer, String> {
+
+    private static final long serialVersionUID = -1556508205879799996L;
+
     @Override
     public Value<Integer> run(Integer intermediate, String userEmail) {
       String prompt =
-          "The intermediate result is " + intermediate + "." 
+          "The intermediate result is " + intermediate + "."
                + " Please give one more int";
       PromisedValue<Integer> oneMoreInt = newPromise(Integer.class);
       ExternalAgentJob.getIntFromUser(prompt, userEmail, oneMoreInt.getHandle());
       return oneMoreInt;
     }
   }
-  
+
+  /**
+   * An example for a generator job that creates 2 child jobs that run sequentially.
+   */
   public static class ExampleWaitForJob extends Job0<Void> {
+    private static final long serialVersionUID = 2902489882639841399L;
+
     @Override
     public Value<Void> run() {
       FutureValue<Void> a = futureCall(new JobA());
@@ -95,21 +131,32 @@ public class UserGuideExamples {
       return null;
     }
   }
-  
+
+  /**
+   * Dummy job.
+   */
   public static class JobA extends Job0<Void> {
+
+    private static final long serialVersionUID = 2566124209015132825L;
+
     @Override
     public Value<Void> run() {
       //Do something...
       return null;
     }
   }
-  
+
+  /**
+   * Dummy job.
+   */
   public static class JobB extends Job0<Void> {
+
+    private static final long serialVersionUID = 8128100793415469657L;
+
     @Override
     public Value<Void> run() {
       // Do something...
       return null;
     }
   }
-
 }

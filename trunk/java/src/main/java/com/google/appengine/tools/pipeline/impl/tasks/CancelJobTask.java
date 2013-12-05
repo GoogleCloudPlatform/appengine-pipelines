@@ -15,6 +15,7 @@
 package com.google.appengine.tools.pipeline.impl.tasks;
 
 import com.google.appengine.api.datastore.Key;
+import com.google.appengine.tools.pipeline.impl.QueueSettings;
 
 import java.util.Properties;
 
@@ -23,20 +24,18 @@ import java.util.Properties;
  * canceled.
  *
  * @author maximf@google.com (Maxim Fateev)
- *
  */
 public class CancelJobTask extends ObjRefTask {
 
-  public CancelJobTask(Key jobKey) {
-    super(Type.CANCEL_JOB, "cancelJob", jobKey);
+  public CancelJobTask(Key jobKey, QueueSettings queueSettings) {
+    super(Type.CANCEL_JOB, "cancelJob", jobKey, queueSettings);
   }
 
-  public CancelJobTask(Properties properties) {
-    super(Type.CANCEL_JOB, properties);
+  protected CancelJobTask(Type type, String taskName, Properties properties) {
+    super(type, taskName, properties);
   }
 
   public Key getJobKey() {
-    return key;
+    return getKey();
   }
-
 }

@@ -35,16 +35,16 @@ public class JobInstanceRecord extends PipelineModelObject {
   private static final String INSTANCE_VALUE_PROPERTY = "value";
 
   // persistent
-  private Key jobKey;
-  private String jobClass;
-  private Object value;
+  private final Key jobKey;
+  private final String jobClass;
+  private final Object value;
 
   // transient
   private Job<?> jobInstance;
 
   public JobInstanceRecord(JobRecord job, Job<?> jobInstance) {
-    super(job.rootJobKey, job.generatorJobKey, job.graphGUID);
-    jobKey = job.key;
+    super(job.getRootJobKey(), job.getGeneratorJobKey(), job.getGraphGuid());
+    jobKey = job.getKey();
     jobClass = jobInstance.getClass().getName();
     try {
       value = PipelineManager.getBackEnd().serlializeValue(this, jobInstance);
@@ -69,13 +69,13 @@ public class JobInstanceRecord extends PipelineModelObject {
   public Entity toEntity() {
     Entity entity = toProtoEntity();
     entity.setProperty(JOB_KEY_PROPERTY, jobKey);
-    entity.setProperty(JOB_CLASS_NAME_PROPERTY, jobClass);
+    entity.setUnindexedProperty(JOB_CLASS_NAME_PROPERTY, jobClass);
     entity.setUnindexedProperty(INSTANCE_VALUE_PROPERTY, value);
     return entity;
   }
 
   @Override
-  public String getDatastoreKind() {
+  protected String getDatastoreKind() {
     return DATA_STORE_KIND;
   }
 
@@ -92,7 +92,8 @@ public class JobInstanceRecord extends PipelineModelObject {
       try {
         jobInstance = (Job<?>) PipelineManager.getBackEnd().deserializeValue(this, value);
       } catch (IOException e) {
-        throw new RuntimeException(e);
+        throw new RuntimeException(
+            "Exception while attempting to deserialize jobInstance for " + jobKey, e);
       }
     }
     return jobInstance;

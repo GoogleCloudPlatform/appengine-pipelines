@@ -1,11 +1,11 @@
 // Copyright 2011 Google Inc.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
 // the License at
-// 
+//
 // http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
 // WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -31,12 +31,12 @@ import java.util.Map;
 /**
  * This class is responsible for generating the Json that is consumed by the
  * JavaScript file status.js.
- * 
+ *
  * @author rudominer@google.com (Mitch Rudominer)
  */
 public class JsonGenerator {
 
-  private PipelineObjects pipelineObjects;
+  private final PipelineObjects pipelineObjects;
   private String jsonRepresentation;
 
   public JsonGenerator(PipelineObjects pipelineObjects) {
@@ -79,13 +79,13 @@ public class JsonGenerator {
   private static final String JOB_ARGS = "args";
   // Dictionary of output slot dictionaries.
   private static final String JOB_OUTPUTS = "outputs";
-  // Queue on which this pipeline isrunning.
+  // Queue on which this pipeline is running.
   private static final String JOB_QUEUE_NAME = "queueName";
   // List of Slot Ids after which this pipeline runs.
   private static final String JOB_AFTER_SLOT_KEYS = "afterSlotKeys";
   // Number of the current attempt, starting at 1.
   private static final String JOB_CURRENT_ATTEMPT = "currentAttempt";
-  // Maximum number of atttempts before aborting
+  // Maximum number of attempts before aborting
   private static final String JOB_MAX_ATTEMPTS = "maxAttempts";
   // Constant factor for backoff before retrying
   private static final String JOB_BACKOFF_SECONDS = "backoffSeconds";
@@ -93,15 +93,12 @@ public class JsonGenerator {
   private static final String JOB_BACKOFF_FACTOR = "backoffFactor";
   // Dictionary of keyword argument slot dictionaries.
   private static final String JOB_KWARGS = "kwargs";
-  // Why the pipeline failed during the last retry, if there was a failure; may
-  // be empty
+  // Why the pipeline failed during the last retry, if there was a failure; may be empty
   private static final String JOB_LAST_RETRY_MESSAGE = "lastRetryMessage";
-  // For root pipelines, why the pipeline was aborted if it was aborted; may be
-  // empty
+  // For root pipelines, why the pipeline was aborted if it was aborted; may be empty
   private static final String JOB_ABORT_MESSAGE = "abortMessage"; // For root
   private static final String DEFAULT_OUTPUT_NAME = "default";
   private static final String JOB_STATUS_CONSOLE_URL = "statusConsoleUrl";
-
 
   private void buildJsonRepresentation() {
     Map<String, Object> mapRepresentation = toMapRepresentation();
@@ -109,11 +106,9 @@ public class JsonGenerator {
   }
 
   private Map<String, Object> toMapRepresentation() {
-    Map<String, Map<String, Object>> slotMap =
-        new HashMap<String, Map<String, Object>>(pipelineObjects.slots.size());
-    Map<String, Map<String, Object>> jobMap =
-        new HashMap<String, Map<String, Object>>(pipelineObjects.jobs.size());
-    Map<String, Object> topLevel = new HashMap<String, Object>(3);
+    Map<String, Map<String, Object>> slotMap = new HashMap<>(pipelineObjects.slots.size());
+    Map<String, Map<String, Object>> jobMap = new HashMap<>(pipelineObjects.jobs.size());
+    Map<String, Object> topLevel = new HashMap<>(4);
     topLevel.put(ROOT_PIPELINE_ID, pipelineObjects.rootJob.getKey().getName());
     topLevel.put(SLOTS, slotMap);
     topLevel.put(PIPELINES, jobMap);
@@ -127,7 +122,7 @@ public class JsonGenerator {
   }
 
   private Map<String, Object> buildMapRepresentation(Slot slot) {
-    Map<String, Object> map = new HashMap<String, Object>(4);
+    Map<String, Object> map = new HashMap<>(5);
     String statusString = (slot.isFilled() ? FILLED_STATUS : WAITING_STATUS);
     map.put(SLOT_STATUS, statusString);
     map.put(SLOT_VALUE, slot.getValue());
@@ -143,7 +138,7 @@ public class JsonGenerator {
   }
 
   private Map<String, Object> buildMapRepresentation(JobRecord jobRecord) {
-    Map<String, Object> map = new HashMap<String, Object>(5);
+    Map<String, Object> map = new HashMap<>(5);
     map.put(JOB_CLASS, jobRecord.getJobInstanceInflated().getJobClass());
     String statusString = null;
     switch (jobRecord.getState()) {
@@ -178,13 +173,13 @@ public class JsonGenerator {
       map.put(JOB_END_TIME, endTime.getTime());
     }
     map.put(JOB_CHILDREN, buildArrayRepresentation(jobRecord.getChildKeys()));
-    List<Map<String, Object>> argumentListRepresentation = new LinkedList<Map<String, Object>>();
-    List<String> waitingOnRepresentation = new LinkedList<String>();
+    List<Map<String, Object>> argumentListRepresentation = new LinkedList<>();
+    List<String> waitingOnRepresentation = new LinkedList<>();
     populateJobArgumentRepresentation(argumentListRepresentation, waitingOnRepresentation,
         jobRecord.getRunBarrierInflated().getWaitingOnInflated());
     map.put(JOB_ARGS, argumentListRepresentation);
     map.put(JOB_AFTER_SLOT_KEYS, waitingOnRepresentation);
-    Map<String, String> allOutputs = new HashMap<String, String>();
+    Map<String, String> allOutputs = new HashMap<>();
     String outputSlotId = toString(jobRecord.getOutputSlotKey());
     // Python Pipeline has the notion of multiple outputs with a distinguished
     // output named "default". We don't have that notion. We have only
@@ -220,7 +215,7 @@ public class JsonGenerator {
   }
 
   private Map<String, Object> buildArgumentRepresentation(Slot slot) {
-    Map<String, Object> map = new HashMap<String, Object>(2);
+    Map<String, Object> map = new HashMap<>(3);
     if (slot.isFilled()) {
       map.put("type", "value");
       map.put("value", slot.getValue());

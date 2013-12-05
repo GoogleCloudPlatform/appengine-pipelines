@@ -37,15 +37,15 @@ public class PipelineServlet extends HttpServlet {
   public static final String BASE_URL = "/_ah/pipeline/";
 
   public static String makeViewerUrl(Key rootJobKey, Key jobKey) {
-    // TODO(ohler): Make this a full copy&paste-ready URL including domain.
-    return BASE_URL + "status.html?root=" + rootJobKey.getName()
-        + "#pipeline-" + jobKey.getName();
+    // TODO(user): BASE_URL could be replaced with ServletContext#getContextPath
+    return BASE_URL + "status.html?root=" + rootJobKey.getName() + "#pipeline-" + jobKey.getName();
   }
 
   private static enum RequestType {
 
-    HANDLE_TASK(TaskHandler.PATH_COMPONENT), GET_JSON(JsonHandler.PATH_COMPONENT), HANDLE_STATIC(
-        "");
+    HANDLE_TASK(TaskHandler.PATH_COMPONENT),
+    GET_JSON(JsonHandler.PATH_COMPONENT),
+    HANDLE_STATIC("");
 
     private String pathComponent;
 
@@ -60,12 +60,7 @@ public class PipelineServlet extends HttpServlet {
 
   private Pair<String, RequestType> parseRequestType(HttpServletRequest req) {
     String path = req.getPathInfo();
-    if (path == null) {
-      path = "";
-    } else {
-      // Take off the leading '/'
-      path = path.substring(1);
-    }
+    path = path == null ? "" : path.substring(1); // Take off the leading '/'
     RequestType requestType = RequestType.HANDLE_STATIC;
     for (RequestType rt : RequestType.values()) {
       if (rt.matches(path)) {
@@ -73,7 +68,7 @@ public class PipelineServlet extends HttpServlet {
         break;
       }
     }
-    return new Pair<String, RequestType>(path, requestType);
+    return Pair.of(path, requestType);
   }
 
   @Override
@@ -84,21 +79,20 @@ public class PipelineServlet extends HttpServlet {
   @Override
   public void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException {
     Pair<String, RequestType> pair = parseRequestType(req);
-    RequestType requestType = pair.second;
-    String path = pair.first;
+    RequestType requestType = pair.getSecond();
+    String path = pair.getFirst();
     switch (requestType) {
       case HANDLE_TASK:
-        TaskHandler.doPost(req, resp);
+        TaskHandler.doPost(req);
         break;
       case GET_JSON:
         JsonHandler.doGet(req, resp);
         break;
       case HANDLE_STATIC:
-        StaticContentHandler.doGet(req, resp, path);
+        StaticContentHandler.doGet(resp, path);
         break;
       default:
         throw new ServletException("Unknown request type: " + requestType);
     }
   }
-
 }

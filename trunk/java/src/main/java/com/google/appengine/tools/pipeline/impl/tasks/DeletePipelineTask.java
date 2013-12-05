@@ -15,34 +15,34 @@
 package com.google.appengine.tools.pipeline.impl.tasks;
 
 import com.google.appengine.api.datastore.Key;
+import com.google.appengine.tools.pipeline.impl.QueueSettings;
 
 import java.util.Properties;
 
 /**
  * A subclass of {@code ObjRefTask} used for the purpose of requesting
  * that the pipeline with the specified root job key should be deleted.
- * 
+ *
  * @author rudominer@google.com (Mitch Rudominer)
  */
 public class DeletePipelineTask extends ObjRefTask {
-  
+
   /**
    * A parameter specifying that the Pipeline should be deleted no matter
    *  what state it is in.
    */
   public static final String FORCE_PARAM = "force";
 
-  private boolean force;
+  private final boolean force;
 
-  public DeletePipelineTask(Key rootJobKey, String namePrefix, boolean force) {
-    super(Type.DELETE_PIPELINE, "deletePipeline", rootJobKey);
+  public DeletePipelineTask(Key rootJobKey, boolean force, QueueSettings queueSettings) {
+    super(Type.DELETE_PIPELINE, "deletePipeline", rootJobKey, queueSettings);
     this.force = force;
   }
 
-  public DeletePipelineTask(Properties properties) {
-    super(Type.DELETE_PIPELINE, properties);
-    String forceProperty = properties.getProperty(FORCE_PARAM);
-    force = (null == forceProperty ? false : Boolean.parseBoolean(forceProperty));
+  protected DeletePipelineTask(Type type, String taskName, Properties properties) {
+    super(type, taskName, properties);
+    force = Boolean.parseBoolean(properties.getProperty(FORCE_PARAM));
   }
 
   @Override
@@ -51,12 +51,16 @@ public class DeletePipelineTask extends ObjRefTask {
     properties.setProperty(FORCE_PARAM, Boolean.toString(force));
   }
 
+  @Override
+  public String propertiesAsString() {
+    return super.propertiesAsString() + ", force=" + force;
+  }
+
   public Key getRootJobKey() {
-    return key;
+    return getKey();
   }
 
   public boolean shouldForce() {
     return force;
   }
-
 }

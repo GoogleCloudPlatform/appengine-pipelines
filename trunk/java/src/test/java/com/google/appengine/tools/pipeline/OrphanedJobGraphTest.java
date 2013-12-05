@@ -17,7 +17,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * A test of the ability of the Pipeline framework to handle orphaned jobs.
- * 
+ *
  * @author rudominer@google.com (Mitch Rudominer)
  */
 public class OrphanedJobGraphTest extends PipelineTest {
@@ -48,7 +48,7 @@ public class OrphanedJobGraphTest extends PipelineTest {
    * time and it will succeed. Only the third child job graph is non-orphaned
    * and should be activated by tasks and run. The orphaned jobs will be cleaned
    * up when the Pipeline is deleted.
-   * 
+   *
    */
   public void testOrphanedJobGraph() throws Exception {
     doOrphanedJobGraphTest(false);
@@ -73,7 +73,7 @@ public class OrphanedJobGraphTest extends PipelineTest {
   /**
    * Performs the common testing logic for {@link #testOrphanedJobGraph()} and
    * {@link #testOrphanedJobGraphWithPromisedValue()}.
-   * 
+   *
    * @param usePromisedValue Should the child job be activated via a promised
    *        value. If this is {@code false} then the child job is activated via
    *        an immediate value.
@@ -145,7 +145,8 @@ public class OrphanedJobGraphTest extends PipelineTest {
     AppEngineBackEnd backend = new AppEngineBackEnd();
     Iterable<Entity> jobs = backend.queryAll(JobRecord.DATA_STORE_KIND, rootJobKey, true, null);
     numJobs = 0;
-    for (Entity entity : jobs) {
+    // TODO(user): replace with Iterables.size once b/11899553 is fixed
+    for (@SuppressWarnings("unused") Entity entity : jobs) {
       numJobs++;
     }
     assertEquals(0, numJobs);
@@ -156,6 +157,7 @@ public class OrphanedJobGraphTest extends PipelineTest {
    * is attempted, leaving an orphaned child job graph each time. It will
    * succeed the third time. The job also counts the number of times it was run.
    */
+  @SuppressWarnings("serial")
   private static class GeneratorJob extends Job0<Void> {
 
     public static AtomicInteger runCount = new AtomicInteger(0);
@@ -191,6 +193,7 @@ public class OrphanedJobGraphTest extends PipelineTest {
   /**
    * This job simply counts the number of times it was run.
    */
+  @SuppressWarnings("serial")
   private static class ChildJob extends Job1<Void, Integer> {
     public static AtomicInteger runCount = new AtomicInteger(0);
 
@@ -199,9 +202,8 @@ public class OrphanedJobGraphTest extends PipelineTest {
       runCount.incrementAndGet();
       return null;
     }
-
   }
-  
+
   /**
    * A {@code Runnable} for invoking the method
    * {@link PipelineService#submitPromisedValue(String, Object)}.
@@ -230,7 +232,5 @@ public class OrphanedJobGraphTest extends PipelineTest {
         orphanedObjectExcetionCount.incrementAndGet();
       }
     }
-
   }
-
 }

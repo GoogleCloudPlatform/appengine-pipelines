@@ -33,8 +33,8 @@ public interface JobSetting extends Serializable {
     private static final long serialVersionUID = 1961952679964049657L;
     private final Value<?> futureValue;
 
-    public WaitForSetting(Value<?> fv) {
-      this.futureValue = fv;
+    public WaitForSetting(Value<?> value) {
+      futureValue = value;
     }
 
     public Value<?> getValue() {
@@ -50,8 +50,8 @@ public interface JobSetting extends Serializable {
     private static final long serialVersionUID = -4853437803222515955L;
     private final int value;
 
-    protected IntValuedSetting(int val) {
-      this.value = val;
+    protected IntValuedSetting(int value) {
+      this.value = value;
     }
 
     public int getValue() {
@@ -67,8 +67,8 @@ public interface JobSetting extends Serializable {
     private static final long serialVersionUID = 7756646651569386669L;
     private final String value;
 
-    protected StringValuedSetting(String val) {
-      this.value = val;
+    protected StringValuedSetting(String value) {
+      this.value = value;
     }
 
     public String getValue() {
@@ -143,14 +143,42 @@ public interface JobSetting extends Serializable {
       super(backend);
     }
   }
-  
+
+  /**
+   * A setting for specifying what module to run a job on.
+   */
+  final class OnModule extends StringValuedSetting {
+
+    private static final long serialVersionUID = 3877411731586475273L;
+    public static final String DEFAULT = null;
+
+    public OnModule(String module) {
+      super(module);
+    }
+  }
+
+  /**
+   * A setting for specifying which queue to run a job on.
+   */
+  final class OnQueue extends StringValuedSetting {
+
+    private static final long serialVersionUID = -5010485721032395432L;
+    public static final String DEFAULT = null;
+
+    public OnQueue(String backend) {
+      super(backend);
+    }
+  }
+
   /**
    * A setting specifying the job's status console URL.
    */
   final class StatusConsoleUrl extends StringValuedSetting {
+
+    private static final long serialVersionUID = -3079475300434663590L;
+
     public StatusConsoleUrl(String statusConsoleUrl) {
       super(statusConsoleUrl);
     }
   }
-
 }

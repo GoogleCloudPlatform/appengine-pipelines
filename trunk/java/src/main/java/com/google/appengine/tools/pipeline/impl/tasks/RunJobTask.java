@@ -15,35 +15,44 @@
 package com.google.appengine.tools.pipeline.impl.tasks;
 
 import com.google.appengine.api.datastore.Key;
+import com.google.appengine.tools.pipeline.impl.QueueSettings;
 
 import java.util.Properties;
 
 /**
  * A subclass of {@link ObjRefTask} used to request that the job
  * with the specified key should be run.
- * 
+ *
  * @author rudominer@google.com (Mitch Rudominer)
- * 
  */
 public class RunJobTask extends ObjRefTask {
 
-  public RunJobTask(Key jobKey, Integer attemptNumber) {
-    super(Type.RUN_JOB, "runJob", jobKey);
+  private final Integer attemptNumber;
+
+  public RunJobTask(Key jobKey, Integer attemptNumber, QueueSettings queueSettings) {
+    super(Type.RUN_JOB, "runJob", jobKey, queueSettings);
+    this.attemptNumber = attemptNumber;
+  }
+
+  public RunJobTask(Key jobKey, QueueSettings queueSettings) {
+    this(jobKey, null, queueSettings);
+  }
+
+  protected RunJobTask(Type type, String taskName, Properties properties) {
+    super(type, taskName, properties);
+    attemptNumber = null;
+  }
+
+  @Override
+  public String getName() {
+    String name = super.getName();
     if (null != attemptNumber) {
-      taskName = taskName + "-attemptNumber-" + attemptNumber;
+      name = name + "-attemptNumber-" + attemptNumber;
     }
-  }
-
-  public RunJobTask(Key jobKey) {
-    this(jobKey, null);
-  }
-
-  public RunJobTask(Properties properties) {
-    super(Type.RUN_JOB, properties);
+    return name;
   }
 
   public Key getJobKey() {
-    return key;
+    return getKey();
   }
-
 }
