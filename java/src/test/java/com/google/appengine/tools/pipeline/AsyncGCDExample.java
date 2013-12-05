@@ -18,15 +18,14 @@ package com.google.appengine.tools.pipeline;
 import com.google.appengine.tools.pipeline.demo.GCDExample;
 
 /**
- * 
+ *
  * @author rudominer@google.com (Mitch Rudominer)
- * 
+ *
  */
 public class AsyncGCDExample {
 
   /**
    * A Callback
-   * 
    */
   public static interface Callback {
     public int getFirstInt();
@@ -46,6 +45,7 @@ public class AsyncGCDExample {
    * thread in which we ask the user for his name. 4. After the user responds,
    * print a message on the console with the results.
    */
+  @SuppressWarnings("serial")
   public static class PrintGCDJob extends Job0<Void> {
     @Override
     public Value<Void> run() {
@@ -90,6 +90,7 @@ public class AsyncGCDExample {
    * Prints a prompt on the console asking the user for his name, and then
    * starts a new thread which waits for the user to enter his name.
    */
+  @SuppressWarnings("serial")
   public static class AskUserForNameJob extends Job0<String> {
     @Override
     public Value<String> run() {
@@ -120,6 +121,7 @@ public class AsyncGCDExample {
   /**
    * Prints result message to console
    */
+  @SuppressWarnings("serial")
   public static class PrintResultJob extends Job4<Void, String, Integer, Integer, Integer> {
     @Override
     public Value<Void> run(String userName, Integer a, Integer b, Integer gcd) {
@@ -129,7 +131,4 @@ public class AsyncGCDExample {
       return null;
     }
   }
-
-
-
 }

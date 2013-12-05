@@ -16,6 +16,7 @@ package com.google.appengine.tools.pipeline.impl.tasks;
 
 import com.google.appengine.api.datastore.Key;
 import com.google.appengine.api.datastore.KeyFactory;
+import com.google.appengine.tools.pipeline.impl.QueueSettings;
 
 import java.util.Properties;
 
@@ -29,21 +30,20 @@ import java.util.Properties;
 public class HandleChildExceptionTask extends ObjRefTask {
 
   private static final String FAILED_CHILD_KEY_PARAM = "failedChildKey";
-  
+
   private final Key failedChildKey;
 
-  public HandleChildExceptionTask(Key jobKey, Key failedChildKey) {
-    super(Type.HANDLE_CHILD_EXCEPTION, "handleChildFailure", jobKey);
+  public HandleChildExceptionTask(Key jobKey, Key failedChildKey, QueueSettings queueSettings) {
+    super(Type.HANDLE_CHILD_EXCEPTION, "handleChildFailure", jobKey, queueSettings);
     if (null == failedChildKey) {
       throw new NullPointerException("failedChildKey");
     }
     this.failedChildKey = failedChildKey;
   }
 
-  public HandleChildExceptionTask(Properties properties) {
-    super(Type.HANDLE_CHILD_EXCEPTION, properties);
-    String failedChild = properties.getProperty(FAILED_CHILD_KEY_PARAM);
-    this.failedChildKey = KeyFactory.stringToKey(failedChild);
+  protected HandleChildExceptionTask(Type type, String taskName, Properties properties) {
+    super(type, taskName, properties);
+    failedChildKey = KeyFactory.stringToKey(properties.getProperty(FAILED_CHILD_KEY_PARAM));
   }
 
   @Override
@@ -52,11 +52,15 @@ public class HandleChildExceptionTask extends ObjRefTask {
     properties.setProperty(FAILED_CHILD_KEY_PARAM, KeyFactory.keyToString(failedChildKey));
   }
 
+  @Override
+  public String propertiesAsString() {
+    return super.propertiesAsString() + ", failedChildKey=" + failedChildKey;
+  }
+
   /**
    * @return the failedChildKey
    */
   public Key getFailedChildKey() {
     return failedChildKey;
   }
-  
 }

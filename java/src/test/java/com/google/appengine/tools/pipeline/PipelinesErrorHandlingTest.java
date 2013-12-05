@@ -32,6 +32,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
 
   private PipelineService service = PipelineServiceFactory.newPipelineService();
 
+  @SuppressWarnings("serial")
   static class TestImmediateThrowCatchJob extends Job0<Integer> {
 
     @Override
@@ -39,9 +40,9 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
       trace("TestImmediateThrowCatchJob.run");
       return futureCall(new ImmediateThrowCatchJob(), new JobSetting.MaxAttempts(1));
     }
-
   }
 
+  @SuppressWarnings("serial")
   static class ImmediateThrowCatchJob extends Job0<Integer> {
 
     @Override
@@ -85,6 +86,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
         + "ImmediateThrowCatchJob.handleException.IllegalStateException", trace());
   }
 
+  @SuppressWarnings("serial")
   private static class AngryJob extends Job0<Integer> {
 
     @Override
@@ -94,6 +96,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
     }
   }
 
+  @SuppressWarnings("serial")
   static class TestSimpleCatchJob extends Job0<Integer> {
 
     @Override
@@ -138,6 +141,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
         + "TestSimpleCatchJob.handleException.IllegalStateException", trace());
   }
 
+  @SuppressWarnings("serial")
   static class TestCatchWithImmediateReturnJob extends Job0<Integer> {
 
     @Override
@@ -145,9 +149,9 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
       FutureValue<Integer> result = futureCall(new CatchWithImmediateReturnJob());
       return futureCall(new CheckResultJob(), result, waitFor(newDelayedValue(3)));
     }
-
   }
 
+  @SuppressWarnings("serial")
   static class CheckResultJob extends Job1<Integer, Integer> {
 
     @Override
@@ -155,9 +159,9 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
       assertEquals(EXPECTED_RESULT2, toCheck.intValue());
       return immediate(toCheck);
     }
-
   }
 
+  @SuppressWarnings("serial")
   static class CatchWithImmediateReturnJob extends Job0<Integer> {
 
     @Override
@@ -172,7 +176,6 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
       trace("TestSimpleCatchJob.handleException.IllegalStateException");
       return immediate(EXPECTED_RESULT2);
     }
-
   }
 
   /**
@@ -186,6 +189,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
         + "TestSimpleCatchJob.handleException.IllegalStateException", trace());
   }
 
+  @SuppressWarnings("serial")
   private static class AngryJobWithRethrowingFailureHandler extends Job0<Integer> {
 
     @Override
@@ -201,6 +205,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
     }
   }
 
+  @SuppressWarnings("serial")
   static class TestCatchRethrowingJob extends Job0<Integer> {
 
     @Override
@@ -215,8 +220,6 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
       trace("TestSimpleCatchJob.handleException");
       return immediate(EXPECTED_RESULT1);
     }
-
-
   }
 
   public void testCatchRethrowing() throws Exception {
@@ -227,6 +230,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
         + "TestSimpleCatchJob.handleException", trace());
   }
 
+  @SuppressWarnings("serial")
   static class TestCatchGeneratorJob extends Job0<Integer> {
 
     @Override
@@ -237,10 +241,9 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
     public Value<Integer> handleException(Throwable e) throws Throwable {
       return futureCall(new FailureHandlingJob(), immediate(e));
     }
-
-
   }
 
+  @SuppressWarnings("serial")
   static class FailureHandlingJob extends Job1<Integer, Throwable> {
 
     @Override
@@ -257,6 +260,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
     assertEquals(EXPECTED_RESULT1, result.intValue());
   }
 
+  @SuppressWarnings("serial")
   static class TestChildThrowingJob extends Job0<Integer> {
 
     @Override
@@ -268,16 +272,15 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
       assertNotNull(e);
       return immediate(EXPECTED_RESULT1);
     }
-
   }
 
+  @SuppressWarnings("serial")
   static class AngryChildJob extends Job0<Integer> {
 
     @Override
     public Value<Integer> run() {
       return futureCall(new AngryJob(), new JobSetting.MaxAttempts(1));
     }
-
   }
 
   public void testChildThrowing() throws Exception {
@@ -286,6 +289,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
     assertEquals(EXPECTED_RESULT1, result.intValue());
   }
 
+  @SuppressWarnings("serial")
   static class TestChildCancellationJob extends Job0<Integer> {
 
     @Override
@@ -299,9 +303,9 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
       assertNotNull(e);
       return immediate(EXPECTED_RESULT1);
     }
-
   }
 
+  @SuppressWarnings("serial")
   static class JobToCancel extends Job1<Integer, Integer> {
 
     @Override
@@ -317,6 +321,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
     }
   }
 
+  @SuppressWarnings("serial")
   static class ParentOfAngryChildJob extends Job0<Integer> {
 
     @Override
@@ -332,7 +337,6 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
       futureCall(new AngryJob(), new JobSetting.MaxAttempts(1));
       return firstChild;
     }
-
   }
 
   public void testChildCancellation() throws Exception {
@@ -350,6 +354,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
     assertTrue(expectedTraceChildCancelledFirst || expectedTraceParentJobHandlerFirst);
   }
 
+  @SuppressWarnings("serial")
   static class TestGrandchildCancellationJob extends Job0<Void> {
 
     @Override
@@ -364,9 +369,9 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
       assertNotNull(e);
       return immediate(EXPECTED_RESULT1);
     }
-
   }
 
+  @SuppressWarnings("serial")
   static class ParentOfJobToCancel extends Job1<Integer, String> {
 
     @Override
@@ -377,9 +382,9 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
       PromisedValue<Integer> neverReady = newPromise(Integer.class);
       return futureCall(new JobToCancel(), neverReady);
     }
-
   }
 
+  @SuppressWarnings("serial")
   private static class DelayedAngryJob extends Job0<Integer> {
 
     @Override
@@ -389,6 +394,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
     }
   }
 
+  @SuppressWarnings("serial")
   static class ParentOfGrandchildToCancelAndAngryChildJob extends Job0<Void> {
 
     @Override
@@ -402,7 +408,6 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
       futureCall(new DelayedAngryJob(), waitFor(unblockTheAngryOne), new JobSetting.MaxAttempts(1));
       return newDelayedValue(10);
     }
-
   }
 
   /**
@@ -426,6 +431,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
     assertTrue(trace(), expectedTraceChildCancelledFirst || expectedTraceParentJobHandlerFirst);
   }
 
+  @SuppressWarnings("serial")
   static class TestChildCancellationFailingJob extends Job0<Integer> {
 
     @Override
@@ -440,9 +446,9 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
       assertNotNull(e);
       return immediate(EXPECTED_RESULT1);
     }
-
   }
 
+  @SuppressWarnings("serial")
   static class JobToCancelThatFailsToCancel extends Job1<Integer, Integer> {
 
     @Override
@@ -459,6 +465,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
     }
   }
 
+  @SuppressWarnings("serial")
   static class ParentOfAngryChildJobWithJobToCancelThatFailsToCancel extends Job0<Integer> {
 
     @Override
@@ -474,7 +481,6 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
       futureCall(new AngryJob(), new JobSetting.MaxAttempts(1));
       return firstChild;
     }
-
   }
 
   public void testChildCancellationFailure() throws Exception {
@@ -498,6 +504,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
     assertTrue(trace(), expectedTraceChildCancelledFirst || expectedTraceParentJobHandlerFirst);
   }
 
+  @SuppressWarnings("serial")
   static class TestPipelineCancellationJob extends Job0<Integer> {
 
     @Override
@@ -505,11 +512,11 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
       trace("TestPipelineCancellationJob.run");
       return futureCall(new JobToCancelWithFailureHandler(), immediate(10));
     }
-
   }
 
   static int catchCount;
 
+  @SuppressWarnings("serial")
   static class JobToCancelWithFailureHandler extends Job1<Integer, Integer> {
 
     @Override
@@ -545,6 +552,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
         trace());
   }
 
+  @SuppressWarnings("serial")
   static class AngryJobParent extends Job0<Integer> {
 
     @Override
@@ -571,6 +579,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
   }
 
 
+  @SuppressWarnings("serial")
   static class JobToGetCancellationInHandleException extends Job1<Integer, String> {
 
     @Override
@@ -581,7 +590,8 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
       throw new IllegalStateException("simulated");
     }
 
-    public Value<Integer> handleException(IllegalStateException e) throws Throwable {
+    @SuppressWarnings("unused")
+    public Value<Integer> handleException(IllegalStateException e)  {
       trace("JobToGetCancellationInHandleException.handleException");
       return futureCall(new CleanupJob());
     }
@@ -590,6 +600,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
   /**
    * Invoked from handleException to test long running cleanup.
    */
+  @SuppressWarnings("serial")
   static class CleanupJob extends Job0<Integer> {
 
     @Override
@@ -602,7 +613,8 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
       // return immediate(EXPECTED_RESULT);
     }
 
-    public Value<Integer> handleException(Throwable e) throws Throwable {
+    @SuppressWarnings("unused")
+    public Value<Integer> handleException(Throwable e) {
       // should not be called as parent's handleException is not cancelable.
       // Not using assertion as control flow is checked through trace
       trace("CleanupJob.handleException");
@@ -614,6 +626,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
    * Test cancellation of a job that is currently executing handleException
    * descendant.
    */
+  @SuppressWarnings("serial")
   static class TestCancellationOfHandleExceptionJob extends Job0<Integer> {
 
     @Override
@@ -632,13 +645,15 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
       return newPromise(Integer.class);
     }
 
-    public Value<Integer> handleException(Throwable e) throws Throwable {
+    @SuppressWarnings("unused")
+    public Value<Integer> handleException(Throwable e) {
       trace("TestCancellationOfHandleExceptionJob.handleException");
       return futureCall(
           new PassThroughJob2<Integer>(), immediate(EXPECTED_RESULT1), waitFor(newDelayedValue(4)));
     }
   }
 
+  @SuppressWarnings("serial")
   static class PassThroughJob1<T> extends Job1<T, T> {
 
     @Override
@@ -646,9 +661,9 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
       trace("PassThroughJob1.run");
       return immediate(param);
     }
-
   }
 
+  @SuppressWarnings("serial")
   static class PassThroughJob2<T> extends Job1<T, T> {
 
     @Override
@@ -656,7 +671,6 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
       trace("PassThroughJob2.run");
       return immediate(param);
     }
-
   }
 
   /**
@@ -673,6 +687,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
     assertEquals(EXPECTED_RESULT1, result.intValue());
   }
 
+  @SuppressWarnings("serial")
   static class TestCancellationOfReadyToRunJob extends Job0<Integer> {
 
     @Override
@@ -685,12 +700,14 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
       return futureCall(new PassThroughJob1<Integer>(), unblockTheSecondOne);
     }
 
-    public Value<Integer> handleException(IllegalStateException e) throws Throwable {
+    @SuppressWarnings("unused")
+    public Value<Integer> handleException(IllegalStateException e) {
       trace("TestCancellationOfReadyToRunJob.handleException");
       return immediate(EXPECTED_RESULT2);
     }
   }
 
+  @SuppressWarnings("serial")
   static class UnblockAndThrowJob extends Job1<Integer, String> {
 
     @Override

@@ -15,27 +15,27 @@
 package com.google.appengine.tools.pipeline.impl.tasks;
 
 import com.google.appengine.api.datastore.Key;
+import com.google.appengine.tools.pipeline.impl.QueueSettings;
 
 import java.util.Properties;
 
 /**
  * A subclass of {@link ObjRefTask} used to request that the job
  * with the specified key should be finalized.
- * 
+ *
  * @author rudominer@google.com (Mitch Rudominer)
  */
 public class FinalizeJobTask extends ObjRefTask {
 
-  public FinalizeJobTask(Key jobKey) {
-    super(Type.FINALIZE_JOB, "finalizeJob", jobKey);
+  public FinalizeJobTask(Key jobKey, QueueSettings queueSettings) {
+    super(Type.FINALIZE_JOB, "finalizeJob", jobKey, queueSettings);
   }
 
-  public FinalizeJobTask(Properties properties) {
-    super(Type.FINALIZE_JOB, properties);
+  protected FinalizeJobTask(Type type, String taskName, Properties properties) {
+    super(type, taskName, properties);
   }
 
   public Key getJobKey() {
-    return key;
+    return getKey();
   }
-
 }

@@ -82,7 +82,7 @@ import java.util.List;
  * when any unhandled exception is thrown from its run method.
  * <p>
  * Before delivering an exception to the job’s handleException method the
- * Pipelines framework cancels all descendent jobs that originated from the
+ * Pipelines framework cancels all descendants jobs that originated from the
  * parent’s run method. A descendant job is defined as a job that is either a
  * child or the child of a child (and so on recursively) of the original job.
  * This cancellation is important for a number of reasons.
@@ -93,17 +93,17 @@ import java.util.List;
  * <li>
  * It avoids having dangling jobs which wait for a FutureValue that is never be
  * ready.</li>
- * <li>It helps cleaning up external resources as failureHandlers of descendent
+ * <li>It helps cleaning up external resources as failureHandlers of descendant
  * jobs are called (with CancellationException) in case of cancellation request
- * from their ancestor. If the descendent job with own failureHandler is a
- * generator job that has its own descendents they are cancelled first before
+ * from their ancestor. If the descendant job with own failureHandler is a
+ * generator job that has its own descendants they are cancelled first before
  * calling the failureHandler.</li>
  * </ul>
  * In case of simultaneous failures only the first one is delivered to the
  * handleException and the other failed job will ignore the cancellation request
  * caused by the first one. A handleException method can act as a generator. So
  * failure handling can be as complex as necessary involving complex job graphs.
- * A failure of a job that is a descendent of the handleException is handled in
+ * A failure of a job that is a descendant of the handleException is handled in
  * the same manner as a failure of a job originated in the run method. All
  * failed job siblings originated in the handleException are cancelled and then
  * exception is propagated to the enclosing scope which is either ancestor’s run
@@ -123,6 +123,10 @@ import java.util.List;
  * @param <E> The return type of the job.
  */
 public abstract class Job<E> implements Serializable {
+
+  /*
+   * See the <a href="http://goto/java_cascade_user_guide">user's guide</a> for more information.
+   */
 
   private static final long serialVersionUID = 868736209042268959L;
 
@@ -171,11 +175,10 @@ public abstract class Job<E> implements Serializable {
    */
   public <T> FutureValue<T> futureCallUnchecked(JobSetting[] settings, Job<?> jobInstance,
       Object... params) {
-    JobRecord childJobRecord =
-        PipelineManager.registerNewJobRecord(updateSpec, settings, thisJobRecord, currentRunGUID,
-            jobInstance, params);
+    JobRecord childJobRecord = PipelineManager.registerNewJobRecord(
+        updateSpec, settings, thisJobRecord, currentRunGUID, jobInstance, params);
     thisJobRecord.appendChildKey(childJobRecord.getKey());
-    return new FutureValueImpl<T>(childJobRecord.getOutputSlotInflated());
+    return new FutureValueImpl<>(childJobRecord.getOutputSlotInflated());
   }
 
   /**
@@ -364,7 +367,7 @@ public abstract class Job<E> implements Serializable {
    */
   public <F> PromisedValue<F> newPromise(Class<F> klass) {
     PromisedValueImpl<F> promisedValue =
-        new PromisedValueImpl<F>(getPipelineKey(), thisJobRecord.getKey(), currentRunGUID);
+        new PromisedValueImpl<>(getPipelineKey(), thisJobRecord.getKey(), currentRunGUID);
     updateSpec.getNonTransactionalGroup().includeSlot(promisedValue.getSlot());
     return promisedValue;
   }
@@ -380,8 +383,7 @@ public abstract class Job<E> implements Serializable {
    */
   public Value<Void> newDelayedValue(long delaySeconds) {
     PromisedValueImpl<Void> promisedValue = (PromisedValueImpl<Void>) newPromise(Void.class);
-    PipelineManager.registerDelayedValue(
-        delaySeconds, promisedValue.getSlot(), thisJobRecord.getRootJobKey());
+    PipelineManager.registerDelayedValue(delaySeconds, promisedValue.getSlot(), thisJobRecord);
     return promisedValue;
   }
 
@@ -389,12 +391,12 @@ public abstract class Job<E> implements Serializable {
    * Constructs a new {@code ImmediateValue}. This method is only syntactic
    * sugar. {@code immediate(x)} is equivalent to {@code new ImmediateValue(x)}.
    *
-   * @param <F> Tye type of value wrapped by the returned {@code ImmediateValue}
+   * @param <F> The type of value wrapped by the returned {@code ImmediateValue}
    * @param value The value to be wrapped by the {@code ImmediateValue}
    * @return a new {@code ImmediateValue}
    */
   public static <F> ImmediateValue<F> immediate(F value) {
-    return new ImmediateValue<F>(value);
+    return new ImmediateValue<>(value);
   }
 
   /**
@@ -455,6 +457,24 @@ public abstract class Job<E> implements Serializable {
   }
 
   /**
+   * Constructs a new {@code JobSetting.OnModule}. This method is only
+   * syntactic sugar. {@code onModule(x)} is equivalent to
+   * {@code new JobSetting.OnModule(x)}.
+   */
+  public static JobSetting.OnModule onModule(String module) {
+    return new JobSetting.OnModule(module);
+  }
+
+  /**
+   * Constructs a new {@code JobSetting.OnQueue}. This method is only
+   * syntactic sugar. {@code onQueue(x)} is equivalent to
+   * {@code new JobSetting.OnQueue(x)}.
+   */
+  public static JobSetting.OnQueue onQueue(String queue) {
+    return new JobSetting.OnQueue(queue);
+  }
+
+  /**
    * Constructs a new {@code JobSetting.StatusConsoleUrl}. This method is only
    * syntactic sugar. {@code statusConsoleUrl(x)} is equivalent to
    * {@code new JobSetting.StatusConsoleUrl(x)}.
@@ -473,7 +493,7 @@ public abstract class Job<E> implements Serializable {
    * @return A new {@code FutureList<F>}.
    */
   public static <F> FutureList<F> futureList(List<? extends Value<F>> listOfValues) {
-    return new FutureList<F>(listOfValues);
+    return new FutureList<>(listOfValues);
   }
 
   /**

@@ -16,44 +16,37 @@ package com.google.appengine.tools.pipeline.impl.tasks;
 
 import com.google.appengine.api.datastore.Key;
 import com.google.appengine.api.datastore.KeyFactory;
+import com.google.appengine.tools.pipeline.impl.QueueSettings;
 
 import java.util.Properties;
 
 /**
  * A subclass of {@link ObjRefTask} used to implement delayed value.
  * @see com.google.appengine.tools.pipeline.Job#newDelayedValue(long)
- * 
+ *
  * @author maximf@google.com (Maxim Fateev)
  */
 public class FillSlotHandleSlotFilledTask extends ObjRefTask {
-  
+
   private static final String ROOT_JOB_KEY_PARAM = "rootJobKey";
-  
-  private Key rootJobKey;
+
+  private final Key rootJobKey;
 
   /**
    * This constructor is used on the sending side. That is, it is used to
    * construct a {@code HandleSlotFilledTask}to be enqueued.
    * <p>
-   * 
+   *
    * @param slotKey The key of the Slot whose filling is to be handled
    * @param rootJobKey The key of the root job of the pipeline
    */
-  public FillSlotHandleSlotFilledTask(Key slotKey, Key rootJobKey) {
-    super(Type.FILL_SLOT_HANDLE_SLOT_FILLED, "fillSlotHandleSlotFilled", slotKey);
+  public FillSlotHandleSlotFilledTask(Key slotKey, Key rootJobKey, QueueSettings queueSettings) {
+    super(Type.FILL_SLOT_HANDLE_SLOT_FILLED, "fillSlotHandleSlotFilled", slotKey, queueSettings);
     this.rootJobKey = rootJobKey;
   }
 
-  /**
-   * This constructor is used on the receiving side. That is, it is used to
-   * construct a {@code FillSlotHandleSlotFilledTask} from an HttpRequest sent from the
-   * App Engine task queue.
-   * 
-   * @param properties See the requirements on {@code properties} specified
-   * in the parent class constructor.
-   */
-  public FillSlotHandleSlotFilledTask(Properties properties) {
-    super(Type.FILL_SLOT_HANDLE_SLOT_FILLED, properties);
+  protected FillSlotHandleSlotFilledTask(Type type, String taskName, Properties properties) {
+    super(type, taskName, properties);
     rootJobKey = KeyFactory.stringToKey(properties.getProperty(ROOT_JOB_KEY_PARAM));
   }
 
@@ -63,12 +56,16 @@ public class FillSlotHandleSlotFilledTask extends ObjRefTask {
     properties.setProperty(ROOT_JOB_KEY_PARAM, KeyFactory.keyToString(rootJobKey));
   }
 
+  @Override
+  public String propertiesAsString() {
+    return super.propertiesAsString() + ", rootJobKey=" + rootJobKey;
+  }
+
   public Key getSlotKey() {
-    return key;
+    return getKey();
   }
 
   public Key getRootJobKey() {
     return rootJobKey;
   }
-
 }

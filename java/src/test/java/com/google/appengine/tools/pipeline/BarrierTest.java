@@ -14,6 +14,8 @@
 
 package com.google.appengine.tools.pipeline;
 
+import static com.google.appengine.tools.pipeline.impl.util.GUIDGenerator.USE_SIMPLE_GUIDS_FOR_DEBUGGING;
+
 import com.google.appengine.api.datastore.Key;
 import com.google.appengine.api.datastore.KeyFactory;
 import com.google.appengine.repackaged.com.google.common.collect.ImmutableList;
@@ -41,8 +43,7 @@ public class BarrierTest extends TestCase {
   public void setUp() throws Exception {
     super.setUp();
     helper.setUp();
-    System
-        .setProperty("com.google.appengine.api.pipeline.use-simple-guids-for-debugging", "true");
+    System.setProperty(USE_SIMPLE_GUIDS_FOR_DEBUGGING, "true");
   }
 
   @Override
@@ -91,7 +92,7 @@ public class BarrierTest extends TestCase {
     for (Object value : slotValues) {
       if (value instanceof ListMarker) {
         List<?> valueList = ((ListMarker) value).valueList;
-        List<Slot> slotList = new ArrayList<Slot>(valueList.size());
+        List<Slot> slotList = new ArrayList<>(valueList.size());
         Slot dummyListSlot = createDummySlot();
         dummyListSlot.fill(null);
         for (Object v : valueList) {

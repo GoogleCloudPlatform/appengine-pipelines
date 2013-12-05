@@ -46,7 +46,7 @@ public class ExceptionRecord extends PipelineModelObject {
     try {
       exception = (Throwable) SerializationUtils.deserialize(serializedException);
     } catch (IOException e) {
-      throw new RuntimeException(e);
+      throw new RuntimeException("Failed to deserialize exception for " + getKey(), e);
     }
   }
 
@@ -55,7 +55,7 @@ public class ExceptionRecord extends PipelineModelObject {
   }
 
   @Override
-  public String getDatastoreKind() {
+  protected String getDatastoreKind() {
     return DATA_STORE_KIND;
   }
 
@@ -67,7 +67,7 @@ public class ExceptionRecord extends PipelineModelObject {
       entity.setUnindexedProperty(EXCEPTION_PROPERTY, new Blob(serializedException));
       return entity;
     } catch (IOException e) {
-      throw new RuntimeException(e);
+      throw new RuntimeException("Failed to serialize exception for " + getKey(), e);
     }
   }
 }

@@ -18,9 +18,9 @@ import java.util.Arrays;
 import java.util.Random;
 
 /**
- *
+ * Misc tests including passing large values.
+
  * @author rudominer@google.com (Mitch Rudominer)
- *
  */
 public class MiscPipelineTest extends PipelineTest {
 

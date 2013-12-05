@@ -17,14 +17,14 @@ package com.google.appengine.tools.pipeline.impl.backend;
 import com.google.appengine.api.datastore.Key;
 import com.google.appengine.tools.pipeline.impl.model.Barrier;
 import com.google.appengine.tools.pipeline.impl.model.ExceptionRecord;
-import com.google.appengine.tools.pipeline.impl.model.PipelineModelObject;
 import com.google.appengine.tools.pipeline.impl.model.JobInstanceRecord;
 import com.google.appengine.tools.pipeline.impl.model.JobRecord;
+import com.google.appengine.tools.pipeline.impl.model.PipelineModelObject;
 import com.google.appengine.tools.pipeline.impl.model.Slot;
-import com.google.appengine.tools.pipeline.impl.tasks.FanoutTask;
 import com.google.appengine.tools.pipeline.impl.tasks.Task;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -38,40 +38,39 @@ import java.util.Set;
  * An {@code UpdateSpec} is organized into the following sub-groups:
  * <ol>
  * <li>A {@link #getNonTransactionalGroup() non-transactional group}
- * <li>A set of {@link #getTransaction(String) named transactional groups}
+ * <li>A set of {@link #getOrCreateTransaction(String) named transactional groups}
  * <li>A {@link #getFinalTransaction() final transactional group}.
  * <ol>
- * 
- * When an {@code UpdateSpec} is {@link PipelineBackEnd#save(UpdateSpec) saved},
+ *
+ * When an {@code UpdateSpec} is {@link PipelineBackEnd#save saved},
  * the groups will be saved in the following order using the following
  * transactions:
  * <ol>
  * <li>Each element of the {@link #getNonTransactionalGroup() non-transactional
  * group} will be saved non-transactionally. Then,
- * <li>for each of the {@link #getTransaction(String) named transactional
+ * <li>for each of the {@link #getOrCreateTransaction(String) named transactional
  * groups}, all of the objects in the group will be saved in a single
  * transaction. The named transactional groups will be saved in random order.
  * Finally,
  * <li>each element of the {@link #getFinalTransaction() final transactional
  * group} will be saved in a transaction.
  * <ol>
- * 
+ *
  * The {@link #getFinalTransaction() final transactional group} is a
  * {@link TransactionWithTasks} and so may contain {@link Task tasks}. The tasks
  * will be enqueued in the final transaction. If there are too many tasks to
- * enqueue in a single transaction then instead a single {@link FanoutTask} will
- * be enqueued.
- * 
+ * enqueue in a single transaction then instead a single
+ * {@link com.google.appengine.tools.pipeline.impl.tasks.FanoutTask} will be
+ * enqueued.
+ *
  * @author rudominer@google.com (Mitch Rudominer)
- * 
  */
 public class UpdateSpec {
 
   private Group nonTransactionalGroup = new Group();
-  private Map<String, Transaction> transactions = new HashMap<String, Transaction>(10);
+  private Map<String, Transaction> transactions = new HashMap<>(10);
   private TransactionWithTasks finalTransaction = new TransactionWithTasks();
   private Key rootJobKey;
-
 
   public UpdateSpec(Key rootJobKey) {
     this.rootJobKey = rootJobKey;
@@ -85,7 +84,7 @@ public class UpdateSpec {
     return rootJobKey;
   }
 
-  public Transaction getTransaction(String transactionName) {
+  public Transaction getOrCreateTransaction(String transactionName) {
     Transaction transaction = transactions.get(transactionName);
     if (null == transaction) {
       transaction = new Transaction();
@@ -117,21 +116,19 @@ public class UpdateSpec {
    * </ol>
    * The objects are stored in maps keyed by their {@link Key}, so there is no
    * danger of inadvertently adding the same object twice.
-   * 
+   *
    * @author rudominer@google.com (Mitch Rudominer)
    */
-  public class Group {
+  public static class Group {
     private static final int INITIAL_SIZE = 20;
 
-    private Map<Key, JobRecord> jobMap = new HashMap<Key, JobRecord>(INITIAL_SIZE);
-    private Map<Key, Barrier> barrierMap = new HashMap<Key, Barrier>(INITIAL_SIZE);
-    private Map<Key, Slot> slotMap = new HashMap<Key, Slot>(INITIAL_SIZE);
-    private Map<Key, JobInstanceRecord> jobInstanceMap = new HashMap<Key, JobInstanceRecord>(
-        INITIAL_SIZE);
-    private Map<Key, ExceptionRecord> failureMap = new HashMap<Key, ExceptionRecord>(INITIAL_SIZE);
+    private Map<Key, JobRecord> jobMap = new HashMap<>(INITIAL_SIZE);
+    private Map<Key, Barrier> barrierMap = new HashMap<>(INITIAL_SIZE);
+    private Map<Key, Slot> slotMap = new HashMap<>(INITIAL_SIZE);
+    private Map<Key, JobInstanceRecord> jobInstanceMap = new HashMap<>(INITIAL_SIZE);
+    private Map<Key, ExceptionRecord> failureMap = new HashMap<>(INITIAL_SIZE);
 
-    private <E extends PipelineModelObject> void put(Map<Key, E> map, E object) {
-      Key key = object.getKey();
+    private static <E extends PipelineModelObject> void put(Map<Key, E> map, E object) {
       map.put(object.getKey(), object);
     }
 
@@ -182,20 +179,19 @@ public class UpdateSpec {
     public void includeException(ExceptionRecord failureRecord) {
       put(failureMap, failureRecord);
     }
-    
+
     public Collection<ExceptionRecord> getFailureRecords() {
       return failureMap.values();
     }
-
   }
 
   /**
    * An extension of {@link Group} with the added implication that all objects
    * added to the group must be saved in a single data store transaction.
-   * 
+   *
    * @author rudominer@google.com (Mitch Rudominer)
    */
-  public class Transaction extends Group {
+  public static class Transaction extends Group {
   }
 
   /**
@@ -203,24 +199,25 @@ public class UpdateSpec {
    * {@link Task Tasks}. Each task included in the group will
    * be enqueued to the task queue as part of the same transaction
    * in which the objects are saved. If there are too many tasks
-   * to include in a single transaction then a 
-   * {@link FanoutTask} will be used.
-   * 
+   * to include in a single transaction then a
+   * {@link com.google.appengine.tools.pipeline.impl.tasks.FanoutTask} will be
+   * used.
+   *
    * @author rudominer@google.com (Mitch Rudominer)
    */
   public class TransactionWithTasks extends Transaction {
     private static final int INITIAL_SIZE = 20;
-    private Set<Task> taskSet = new HashSet<Task>(INITIAL_SIZE);
+    private final Set<Task> taskSet = new HashSet<>(INITIAL_SIZE);
 
     public void registerTask(Task task) {
       taskSet.add(task);
     }
 
+    /**
+     * @return Unmodifiable collection of Tasks.
+     */
     public Collection<Task> getTasks() {
-      return taskSet;
+      return Collections.unmodifiableCollection(taskSet);
     }
-
   }
-
-
 }

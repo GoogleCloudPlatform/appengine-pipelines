@@ -1,11 +1,11 @@
 // Copyright 2011 Google Inc.
-// 
+//
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
 // the License at
-// 
+//
 // http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
 // WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -17,14 +17,12 @@ package com.google.appengine.tools.pipeline;
 import com.google.appengine.tools.pipeline.demo.LetterCountExample;
 import com.google.appengine.tools.pipeline.demo.LetterCountExample.LetterCounter;
 
+import java.util.Map.Entry;
 import java.util.SortedMap;
 import java.util.TreeMap;
-import java.util.Map.Entry;
 
 /**
- * 
  * @author rudominer@google.com (Mitch Rudominer)
- * 
  */
 public class LetterCounterTest extends PipelineTest {
 
@@ -87,8 +85,8 @@ public class LetterCounterTest extends PipelineTest {
     doLetterCounterTest("The woods are lovely dark and deep. "
         + "But I have promises to keep. And miles to go before I sleep.");
   }
-  
-  
+
+
   public void testLetterCounterHuge() throws Exception {
     doLetterCounterTest(SSB);
   }
@@ -100,7 +98,7 @@ public class LetterCounterTest extends PipelineTest {
     SortedMap<Character, Integer> counts =
         (SortedMap<Character, Integer>) waitForJobToComplete(pipelineId);
     SortedMap<Character, Integer> expectedCounts = LetterCountExample.countLetters(text);
-    SortedMap<Character, Integer> expectedCountsLettersOnly = new TreeMap<Character, Integer>();
+    SortedMap<Character, Integer> expectedCountsLettersOnly = new TreeMap<>();
     for (Entry<Character, Integer> entry : expectedCounts.entrySet()) {
       if (Character.isLetter(entry.getKey())) {
         expectedCountsLettersOnly.put(entry.getKey(), entry.getValue());

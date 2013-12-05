@@ -16,8 +16,6 @@ package com.google.appengine.tools.pipeline.impl.model;
 
 import com.google.appengine.api.datastore.Blob;
 import com.google.appengine.api.datastore.Entity;
-import com.google.appengine.api.datastore.Key;
-import com.google.appengine.api.datastore.KeyFactory;
 
 /**
  * A data model to represent shard of a large value.
@@ -34,15 +32,11 @@ public class ShardedValue extends PipelineModelObject {
   private final long shardId;
   private final byte[] value;
 
-  public ShardedValue(PipelineModelObject parent, String property, long shardId, byte[] value) {
-    super(parent.getRootJobKey(), null, createKey(parent, property, shardId),
-        parent.getGeneratorJobKey(), parent.getGraphGuid());
+  public ShardedValue(PipelineModelObject parent, long shardId, byte[] value) {
+    super(parent.getRootJobKey(), parent.getKey(), null, parent.getGeneratorJobKey(),
+        parent.getGraphGuid());
     this.shardId = shardId;
     this.value = value;
-  }
-
-  private static Key createKey(PipelineModelObject parent, String property, long shardId) {
-    return KeyFactory.createKey(parent.getKey(), DATA_STORE_KIND, property + "." + shardId);
   }
 
   public ShardedValue(Entity entity) {
@@ -54,7 +48,7 @@ public class ShardedValue extends PipelineModelObject {
   @Override
   public Entity toEntity() {
     Entity entity = toProtoEntity();
-    entity.setProperty(SHARD_ID_PROPERTY, shardId);
+    entity.setUnindexedProperty(SHARD_ID_PROPERTY, shardId);
     entity.setUnindexedProperty(VALUE_PROPERTY, new Blob(value));
     return entity;
   }
@@ -74,7 +68,7 @@ public class ShardedValue extends PipelineModelObject {
 
   @Override
   public String toString() {
-    return "ShardedValue[" + key.getName() + ", shardId=" + shardId + ", value="
+    return "ShardedValue[" + getKey().getName() + ", shardId=" + shardId + ", value="
         + getValueForDisplay() + "]";
   }
 

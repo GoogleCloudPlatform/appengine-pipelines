@@ -16,6 +16,7 @@ package com.google.appengine.tools.pipeline.impl.tasks;
 
 import com.google.appengine.api.datastore.Key;
 import com.google.appengine.api.datastore.KeyFactory;
+import com.google.appengine.tools.pipeline.impl.QueueSettings;
 
 import java.util.Properties;
 
@@ -23,7 +24,7 @@ import java.util.Properties;
  * A subclass of {@code Task} for tasks which need to reference a particular
  * Pipeline model object. The task contains the data store key of the reference
  * object in its {@link #KEY_PARAM} property.
- * 
+ *
  * @author rudominer@google.com (Mitch Rudominer)
  */
 public abstract class ObjRefTask extends Task {
@@ -33,13 +34,12 @@ public abstract class ObjRefTask extends Task {
   /**
    * The {@code Key} of the object to which this {@code ObjRefTask} refers.
    */
-  protected Key key;
-
+  private final Key key;
 
   /**
    * This constructor is used on the sending side. That is, it is used to
    * construct a task to be enqueued.
-   * 
+   *
    * @param type The type of task being constructed
    * @param namePrefix If this is {@code null} it means the task will not have a
    *        name. Otherwise this will be a prefix of the task name.
@@ -47,19 +47,23 @@ public abstract class ObjRefTask extends Task {
    *        will refer. It will be used as part of the task name if
    *        {@code namePrefix} is not {@code null}.
    */
-  protected ObjRefTask(Type type, String namePrefix, Key key) {
-    super(type, (null == namePrefix ? null : namePrefix + KeyFactory.keyToString(key)));
+  protected ObjRefTask(Type type, String namePrefix, Key key, QueueSettings queueSettings) {
+    super(type, createTaskName(namePrefix, key), queueSettings.clone());
+    this.key = key;
+  }
+
+  private static String createTaskName(String namePrefix, Key key) {
     if (null == key) {
       throw new IllegalArgumentException("key is null.");
     }
-    this.key = key;
+    return namePrefix == null ? null : namePrefix + KeyFactory.keyToString(key);
   }
 
   /**
    * This constructor is used on the receiving side. That is, it is used to
    * construct an {@code ObjRefTask} from an HttpRequest sent from the App
    * Engine task queue.
-   * 
+   *
    * @param type The type of task being constructed
    * @param properties In addition to the properties specified in the parent
    *        constructor, {@code properties} must also contain a property named "key"
@@ -67,8 +71,9 @@ public abstract class ObjRefTask extends Task {
    *        the {@link #key} of the object to which this {@code ObjRefTask}
    *        refers.
    */
-  protected ObjRefTask(Type type, Properties properties) {
-    this(type, null, KeyFactory.stringToKey(properties.getProperty(KEY_PARAM)));
+  protected ObjRefTask(Type type, String taskName, Properties properties) {
+    super(type, taskName, properties);
+    key = KeyFactory.stringToKey(properties.getProperty(KEY_PARAM));
   }
 
   public Key getKey() {
@@ -82,16 +87,7 @@ public abstract class ObjRefTask extends Task {
   }
 
   @Override
-  public String toString() {
-    String nameString = "";
-    if (null != taskName) {
-      nameString = ", name=" + taskName;
-    }
-    String delayString = "";
-    if (null != delaySeconds) {
-      delayString = ", delaySeconds=" + delaySeconds;
-    }
-    return type.toString() + "_TASK[key=" + key + nameString  
-        + delayString + "]";
+  public String propertiesAsString() {
+    return "key=" + key;
   }
 }

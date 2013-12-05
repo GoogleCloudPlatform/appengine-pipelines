@@ -16,7 +16,7 @@ package com.google.appengine.tools.pipeline.impl.backend;
 
 import com.google.appengine.api.datastore.Key;
 import com.google.appengine.tools.pipeline.NoSuchObjectException;
-import com.google.appengine.tools.pipeline.impl.model.Barrier;
+import com.google.appengine.tools.pipeline.impl.QueueSettings;
 import com.google.appengine.tools.pipeline.impl.model.ExceptionRecord;
 import com.google.appengine.tools.pipeline.impl.model.JobRecord;
 import com.google.appengine.tools.pipeline.impl.model.PipelineModelObject;
@@ -41,7 +41,7 @@ public interface PipelineBackEnd {
    * on the specification given in {@code UpdateSpec}. See the remarks at the
    * top of {@link UpdateSpec} for details.
    */
-  public void save(UpdateSpec updateSpec);
+  public void save(UpdateSpec updateSpec, QueueSettings queueSettings);
 
   /**
    * Saves an {@code UpdateSpec} to the data store, but transactionally checks
@@ -55,8 +55,8 @@ public interface PipelineBackEnd {
    * see if it is one of the {@code expectedStates}. If not then the final
    * transaction will be aborted, but this method will not throw an exception.
    */
-  public void saveWithJobStateCheck(UpdateSpec updateSpec, Key jobKey,
-      JobRecord.State... expectedStates);
+  public void saveWithJobStateCheck(UpdateSpec updateSpec, QueueSettings queueSettings,
+      Key jobKey, JobRecord.State... expectedStates);
 
   /**
    * Get the JobRecord with the given Key from the data store, and optionally
@@ -84,8 +84,10 @@ public interface PipelineBackEnd {
    *        will also be fetched from the data store and used to partially
    *        populate the graph of objects attached to the returned Slot. In
    *        particular: {@link Slot#getWaitingOnMeInflated()} will not return
-   *        {@code null} and also that for each of the {@link Barrier Barriers}
-   *        returned from that method {@link Barrier#getWaitingOnInflated()}
+   *        {@code null} and also that for each of the
+   *        {@link com.google.appengine.tools.pipeline.impl.model.Barrier Barriers}
+   *        returned from that method
+   *        {@link com.google.appengine.tools.pipeline.impl.model.Barrier#getWaitingOnInflated()}
    *        will not return {@code null}.
    * @return A {@code Slot}, possibly with a partially-inflated associated graph
    *         of objects.
@@ -162,7 +164,6 @@ public interface PipelineBackEnd {
    * @param async If this parameter is {@code true} then instead of performing
    *        the delete operation synchronously, this method will enqueue a task
    *        to perform the operation.
-   * @throws NoSuchObjectException If there is no Job with the given key.
    * @throws IllegalStateException If {@code force = false} and the specified
    *         pipeline is not in the
    *         {@link com.google.appengine.tools.pipeline.impl.model.JobRecord.State#FINALIZED}
@@ -171,12 +172,12 @@ public interface PipelineBackEnd {
    *         state.
    */
   public void deletePipeline(Key rootJobKey, boolean force, boolean async)
-      throws NoSuchObjectException, IllegalStateException;
+      throws IllegalStateException;
 
   /**
    * Immediately enqueues the given task in the app engine task queue. Note that
-   * there is another way to enqueue a task, namely to put the task into the
-   * {@link UpdateSpec.TransactionWithTasks#getTasks() collection} associated
+   * there is another way to enqueue a task, namely to register the task with
+   * {@link UpdateSpec.TransactionWithTasks#registerTask} that is associated
    * with the {@link UpdateSpec#getFinalTransaction() final transaction} of an
    * {@link UpdateSpec}. This method is simpler if one only wants to enqueue a
    * single task in isolation.

@@ -18,46 +18,47 @@ import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Test error handling through handleException.
- * 
+ *
  * @author maximf@google.com (Maxim Fateev)
  */
 public class DelayedValueTest extends PipelineTest {
 
   private static final int EXPECTED_RESULT = 5;
+  private static final long DELAY_SECONDS = 10;
 
   private PipelineService service = PipelineServiceFactory.newPipelineService();
 
-  private static AtomicLong duration = new AtomicLong();
-  
+  private static AtomicLong duration1 = new AtomicLong();
+  private static AtomicLong duration2 = new AtomicLong();
+
+  @SuppressWarnings("serial")
   static class DelayedJob extends Job0<Integer> {
 
     @Override
     public Value<Integer> run() throws Exception {
       trace("DelayedJob.run");
-      duration.set(System.currentTimeMillis() - duration.get());
+      duration2.set(System.currentTimeMillis());
       return immediate(EXPECTED_RESULT);
     }
-    
   }
-  private static final long DELAY_SECONDS = 3;
 
+  @SuppressWarnings("serial")
   static class TestDelayedValueJob extends Job0<Integer> {
 
     @Override
     public Value<Integer> run() {
       trace("TestDelayedValueJob.run");
-      duration.set(System.currentTimeMillis());
+      duration1.set(System.currentTimeMillis());
       Value<Void> delayedValue = newDelayedValue(DELAY_SECONDS);
       return futureCall(new DelayedJob(), waitFor(delayedValue));
     }
-    
   }
-  
+
   public void testDelayedValue() throws Exception {
     String pipelineId = service.startNewPipeline(new TestDelayedValueJob());
     Integer five = (Integer) waitForJobToComplete(pipelineId);
     assertEquals(EXPECTED_RESULT, five.intValue());
     assertEquals("TestDelayedValueJob.run DelayedJob.run", trace());
-    assertTrue(duration.get() >= DELAY_SECONDS * 1000);
+    assertTrue(duration2.get() - duration1.get() >= DELAY_SECONDS * 1000);
   }
 }
