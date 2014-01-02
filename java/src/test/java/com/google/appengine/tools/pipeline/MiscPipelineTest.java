@@ -14,6 +14,7 @@
 
 package com.google.appengine.tools.pipeline;
 
+import com.google.appengine.tools.pipeline.JobInfo.State;
 import com.google.appengine.tools.pipeline.JobSetting.StatusConsoleUrl;
 import com.google.appengine.tools.pipeline.impl.PipelineManager;
 
@@ -22,10 +23,18 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Misc tests including passing large values.
-
+ * Misc tests including:
+ *  Passing large values.
+ *  Delay used in a slow job
+ *  JobSetting inheritance
+ *  PromisedValue (and filling it more than once)
+ *  Cancel pipeline
+ *
  * @author rudominer@google.com (Mitch Rudominer)
  */
 public class MiscPipelineTest extends PipelineTest {
@@ -42,11 +51,236 @@ public class MiscPipelineTest extends PipelineTest {
     }
   }
 
+  public void testReturnValue() throws Exception {
+    // Testing that return value from parent is always after all children complete
+    // which is not the case right now. This this *SHOULD* change after we fix
+    // it, as fixing it should cause a dead-lock.
+    // see b/12249138
+    PipelineService service = PipelineServiceFactory.newPipelineService();
+    String pipelineId = service.startNewPipeline(new ReturnValueParentJob());
+    String value = waitForJobToComplete(pipelineId);
+    assertEquals("bla", value);
+    ReturnValueParentJob.latch1.countDown();
+    waitUntilTaskQueueIsEmpty();
+    ReturnValueParentJob.latch2.await();
+  }
+
+  @SuppressWarnings("serial")
+  private static class ReturnValueParentJob extends Job0<String> {
+
+    static CountDownLatch latch1 = new CountDownLatch(1);
+    static CountDownLatch latch2 = new CountDownLatch(1);
+
+    @Override
+    public Value<String> run() throws Exception {
+      futureCall(new ReturnedValueChildJob());
+      return immediate("bla");
+    }
+  }
+
+  @SuppressWarnings("serial")
+  private static class ReturnedValueChildJob extends Job0<Void> {
+    @Override
+    public Value<Void> run() throws Exception {
+      ReturnValueParentJob.latch1.await();
+      ReturnValueParentJob.latch2.countDown();
+      return null;
+    }
+  }
+
+  public void testSubmittingPromisedValueMoreThanOnce() throws Exception {
+    PipelineService service = PipelineServiceFactory.newPipelineService();
+    String pipelineId = service.startNewPipeline(new SubmitPromisedParentJob());
+    String value = waitForJobToComplete(pipelineId);
+    assertEquals("2", value);
+  }
+
+  @SuppressWarnings("serial")
+  private static class SubmitPromisedParentJob extends Job0<String> {
+
+    @Override
+    public Value<String> run() throws Exception {
+      PromisedValue<String> promise = newPromise();
+      FutureValue<Void> child1 = futureCall(
+          new FillPromiseJob(), immediate("1"), immediate(promise.getHandle()));
+      FutureValue<Void> child2 = futureCall(
+          new FillPromiseJob(), immediate("2"), immediate(promise.getHandle()), waitFor(child1));
+      FutureValue<String> child3 = futureCall(new ReadPromiseJob(), promise, waitFor(child2));
+      // If we return promise directly then the value would be "1" rather than "2", see b/12216307
+      //return promise;
+      return child3;
+    }
+  }
+
+  @SuppressWarnings("serial")
+  private static class ReadPromiseJob extends Job1<String, String> {
+    @Override
+    public Value<String> run(String value) {
+      return immediate(value);
+    }
+  }
+
+  @SuppressWarnings("serial")
+  private static class FillPromiseJob extends Job2<Void, String, String> {
+
+    @Override
+    public Value<Void> run(String value, String handle) throws Exception {
+      PipelineServiceFactory.newPipelineService().submitPromisedValue(handle, value);
+      return null;
+    }
+  }
+
+  public void testCancelPipeline() throws Exception {
+    PipelineService service = PipelineServiceFactory.newPipelineService();
+    String pipelineId = service.startNewPipeline(new HandleExceptionParentJob(),
+        new JobSetting.BackoffSeconds(1), new JobSetting.BackoffFactor(1),
+        new JobSetting.MaxAttempts(2));
+    JobInfo jobInfo = service.getJobInfo(pipelineId);
+    assertEquals(State.RUNNING, jobInfo.getJobState());
+    HandleExceptionChild2Job.childLatch1.await();
+    service.cancelPipeline(pipelineId);
+    HandleExceptionChild2Job.childLatch2.countDown();
+    waitUntilTaskQueueIsEmpty();
+    jobInfo = service.getJobInfo(pipelineId);
+    assertEquals(State.CANCELED_BY_REQUEST, jobInfo.getJobState());
+    assertNull(jobInfo.getOutput());
+    assertTrue(HandleExceptionParentJob.child0.get());
+    assertTrue(HandleExceptionParentJob.child1.get());
+    assertTrue(HandleExceptionParentJob.child2.get());
+    assertFalse(HandleExceptionParentJob.child3.get());
+    assertFalse(HandleExceptionParentJob.child4.get());
+    // Unexpected callbacks (should be fixed after b/12250957)
+
+    assertTrue(HandleExceptionParentJob.child3Cancel.get()); // job not started
+    assertTrue(HandleExceptionParentJob.child4Cancel.get()); // job not started
+
+    // expected callbacks
+    assertFalse(HandleExceptionParentJob.child0Cancel.get()); // job already finalized
+    assertTrue(HandleExceptionParentJob.parentCancel.get());
+    assertTrue(HandleExceptionParentJob.child1Cancel.get());
+    assertTrue(HandleExceptionParentJob.child2Cancel.get()); // after job run, but not finalized
+  }
+
+  @SuppressWarnings("serial")
+  private static class HandleExceptionParentJob extends Job0<String> {
+
+    private static AtomicBoolean parentCancel = new AtomicBoolean();
+    private static AtomicBoolean child0 = new AtomicBoolean();
+    private static AtomicBoolean child0Cancel = new AtomicBoolean();
+    private static AtomicBoolean child1 = new AtomicBoolean();
+    private static AtomicBoolean child1Cancel = new AtomicBoolean();
+    private static AtomicBoolean child2 = new AtomicBoolean();
+    private static AtomicBoolean child2Cancel = new AtomicBoolean();
+    private static AtomicBoolean child3 = new AtomicBoolean();
+    private static AtomicBoolean child3Cancel = new AtomicBoolean();
+    private static AtomicBoolean child4 = new AtomicBoolean();
+    private static AtomicBoolean child4Cancel = new AtomicBoolean();
+
+    @Override
+    public Value<String> run() {
+      FutureValue<String> child0 = futureCall(new HandleExceptionChild0Job());
+      FutureValue<String> child1 = futureCall(new HandleExceptionChild1Job(), waitFor(child0));
+      FutureValue<String> child2 = futureCall(new HandleExceptionChild3Job(), waitFor(child1));
+      return futureCall(new HandleExceptionChild4Job(), child1, child2);
+    }
+
+    @SuppressWarnings("unused")
+    public Value<String> handleException(CancellationException ex) throws Exception {
+      HandleExceptionParentJob.parentCancel.set(true);
+      return immediate("should not be used");
+    }
+  }
+
+  @SuppressWarnings("serial")
+  private static class HandleExceptionChild0Job extends Job0<String> {
+    @Override
+    public Value<String> run() {
+      HandleExceptionParentJob.child0.set(true);
+      return immediate("1");
+    }
+
+    @SuppressWarnings("unused")
+    public Value<String> handleException(CancellationException ex) {
+      HandleExceptionParentJob.child0Cancel.set(true);
+      return null;
+    }
+  }
+
+  @SuppressWarnings("serial")
+  private static class HandleExceptionChild1Job extends Job0<String> {
+
+    @Override
+    public Value<String> run() {
+      HandleExceptionParentJob.child1.set(true);
+      return futureCall(new HandleExceptionChild2Job());
+    }
+
+    @SuppressWarnings("unused")
+    public Value<String> handleException(CancellationException ex) {
+      HandleExceptionParentJob.child1Cancel.set(true);
+      return null;
+    }
+  }
+
+  @SuppressWarnings("serial")
+  private static class HandleExceptionChild2Job extends Job0<String> {
+
+    private static CountDownLatch childLatch1 = new CountDownLatch(1);
+    private static CountDownLatch childLatch2 = new CountDownLatch(1);
+
+    @Override
+    public Value<String> run() throws InterruptedException {
+      HandleExceptionParentJob.child2.set(true);
+      childLatch1.countDown();
+      childLatch2.await();
+      Thread.sleep(1000);
+      return immediate("1");
+    }
+
+    @SuppressWarnings("unused")
+    public Value<String> handleException(CancellationException ex) {
+      HandleExceptionParentJob.child2Cancel.set(true);
+      return null;
+    }
+  }
+
+  @SuppressWarnings("serial")
+  private static class HandleExceptionChild3Job extends Job0<String> {
+
+    @Override
+    public Value<String> run() {
+      HandleExceptionParentJob.child3.set(true);
+      return immediate("2");
+    }
+
+    @SuppressWarnings("unused")
+    public Value<String> handleException(CancellationException ex) {
+      HandleExceptionParentJob.child3Cancel.set(true);
+      return null;
+    }
+  }
+
+  @SuppressWarnings("serial")
+  private static class HandleExceptionChild4Job extends Job2<String, String, String> {
+
+    @Override
+    public Value<String> run(String str1, String str2) {
+      HandleExceptionParentJob.child4.set(true);
+      return immediate(str1 + str2);
+    }
+
+    @SuppressWarnings("unused")
+    public Value<String> handleException(CancellationException ex) {
+      HandleExceptionParentJob.child4Cancel.set(true);
+      return immediate("not going to be used");
+    }
+  }
+
   public void testImmediateChild() throws Exception {
     // This is also testing inheritance of statusConsoleUrl.
     PipelineService service = PipelineServiceFactory.newPipelineService();
     String pipelineId = service.startNewPipeline(new Returns5FromChildJob(), largeValue);
-    Integer five = (Integer) waitForJobToComplete(pipelineId);
+    Integer five = waitForJobToComplete(pipelineId);
     assertEquals(5, five.intValue());
   }
 

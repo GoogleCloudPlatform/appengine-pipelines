@@ -41,11 +41,10 @@ public abstract class ObjRefTask extends Task {
    * construct a task to be enqueued.
    *
    * @param type The type of task being constructed
-   * @param namePrefix If this is {@code null} it means the task will not have a
-   *        name. Otherwise this will be a prefix of the task name.
+   * @param namePrefix for the task name.
    * @param key The {@code Key} of the object to which this {@code ObjRefTask}
    *        will refer. It will be used as part of the task name if
-   *        {@code namePrefix} is not {@code null}.
+   *        combined with {@code namePrefix}.
    */
   protected ObjRefTask(Type type, String namePrefix, Key key, QueueSettings queueSettings) {
     super(type, createTaskName(namePrefix, key), queueSettings.clone());
@@ -56,7 +55,10 @@ public abstract class ObjRefTask extends Task {
     if (null == key) {
       throw new IllegalArgumentException("key is null.");
     }
-    return namePrefix == null ? null : namePrefix + KeyFactory.keyToString(key);
+    if (namePrefix == null) {
+      throw new IllegalArgumentException("namePrix is null.");
+    }
+    return namePrefix + KeyFactory.keyToString(key);
   }
 
   /**

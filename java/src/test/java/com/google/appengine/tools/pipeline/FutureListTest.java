@@ -28,14 +28,14 @@ public class FutureListTest extends PipelineTest {
   public void testFutureList() throws Exception {
     PipelineService service = PipelineServiceFactory.newPipelineService();
     String pipelineId = service.startNewPipeline(new SumsListJob1());
-    Integer sum = (Integer) waitForJobToComplete(pipelineId);
+    Integer sum = waitForJobToComplete(pipelineId);
     assertEquals(21, sum.intValue());
   }
 
   public void testReturnFutureList() throws Exception {
     PipelineService service = PipelineServiceFactory.newPipelineService();
     String pipelineId = service.startNewPipeline(new SumsListJob2());
-    Integer sum = (Integer) waitForJobToComplete(pipelineId);
+    Integer sum = waitForJobToComplete(pipelineId);
     assertEquals(21, sum.intValue());
   }
 
@@ -44,7 +44,7 @@ public class FutureListTest extends PipelineTest {
   public void testEmptyFutureList() throws Exception {
     PipelineService service = PipelineServiceFactory.newPipelineService();
     String pipelineId = service.startNewPipeline(new SumsEmptyListJob());
-    Integer sum = (Integer) waitForJobToComplete(pipelineId);
+    Integer sum = waitForJobToComplete(pipelineId);
     assertEquals(0, sum.intValue());
   }
 
