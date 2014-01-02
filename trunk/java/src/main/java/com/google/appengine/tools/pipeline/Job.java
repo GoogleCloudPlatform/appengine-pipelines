@@ -36,6 +36,8 @@ import java.util.List;
  * only reason a user-written job class should directly subclass this class is
  * if the {@code run} method of the job needs to take more arguments than the
  * greatest {@code n} such that the framework offers a {@code Jobn} class.
+ * In any case, the provided run method should be reentred as it may be called
+ * more than once.
  * <p>
  * This class contains several protected methods that may be invoked from with
  * the {@code run()} method.
@@ -188,7 +190,7 @@ public abstract class Job<E> implements Serializable {
    *
    * @param <T> The return type of the child job being specified
    * @param jobInstance A user-written job object
-   * @param settings Optional {@code JobSettings}
+   * @param settings Optional one or more {@code JobSetting}
    * @return a {@code FutureValue} representing an empty value slot that will be
    *         filled by the output of {@code jobInstance} when it finalizes. This
    *         may be passed in to further invocations of {@code futureCall()} in
@@ -207,7 +209,7 @@ public abstract class Job<E> implements Serializable {
    * @param <T1> The type of the first input to the child job
    * @param jobInstance A user-written job object
    * @param v1 the first input to the child job
-   * @param settings Optional {@code JobSettings}
+   * @param settings Optional one or more {@code JobSetting}
    * @return a {@code FutureValue} representing an empty value slot that will be
    *         filled by the output of {@code jobInstance} when it finalizes. This
    *         may be passed in to further invocations of {@code futureCall()} in
@@ -229,7 +231,7 @@ public abstract class Job<E> implements Serializable {
    * @param jobInstance A user-written job object
    * @param v1 the first input to the child job
    * @param v2 the second input to the child job
-   * @param settings Optional {@code JobSettings}
+   * @param settings Optional one or more {@code JobSetting}
    * @return a {@code FutureValue} representing an empty value slot that will be
    *         filled by the output of {@code jobInstance} when it finalizes. This
    *         may be passed in to further invocations of {@code futureCall()} in
@@ -253,7 +255,7 @@ public abstract class Job<E> implements Serializable {
    * @param v1 the first input to the child job
    * @param v2 the second input to the child job
    * @param v3 the third input to the child job
-   * @param settings Optional {@code JobSettings}
+   * @param settings Optional one or more {@code JobSetting}
    * @return a {@code FutureValue} representing an empty value slot that will be
    *         filled by the output of {@code jobInstance} when it finalizes. This
    *         may be passed in to further invocations of {@code futureCall()} in
@@ -279,7 +281,7 @@ public abstract class Job<E> implements Serializable {
    * @param v2 the second input to the child job
    * @param v3 the third input to the child job
    * @param v4 the fourth input to the child job
-   * @param settings Optional {@code JobSettings}
+   * @param settings Optional one or more {@code JobSetting}
    * @return a {@code FutureValue} representing an empty value slot that will be
    *         filled by the output of {@code jobInstance} when it finalizes. This
    *         may be passed in to further invocations of {@code futureCall()} in
@@ -308,7 +310,7 @@ public abstract class Job<E> implements Serializable {
    * @param v3 the third input to the child job
    * @param v4 the fourth input to the child job
    * @param v5 the fifth input to the child job
-   * @param settings Optional {@code JobSettings}
+   * @param settings Optional one or more {@code JobSetting}
    * @return a {@code FutureValue} representing an empty value slot that will be
    *         filled by the output of {@code jobInstance} when it finalizes. This
    *         may be passed in to further invocations of {@code futureCall()} in
@@ -339,7 +341,7 @@ public abstract class Job<E> implements Serializable {
    * @param v4 the fourth input to the child job
    * @param v5 the fifth input to the child job
    * @param v6 the sixth input to the child job
-   * @param settings Optional {@code JobSettings}
+   * @param settings Optional one or more {@code JobSetting}
    * @return a {@code FutureValue} representing an empty value slot that will be
    *         filled by the output of {@code jobInstance} when it finalizes. This
    *         may be passed in to further invocations of {@code futureCall()} in

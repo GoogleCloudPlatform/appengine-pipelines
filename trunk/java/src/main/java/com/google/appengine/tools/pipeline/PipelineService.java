@@ -16,7 +16,7 @@ package com.google.appengine.tools.pipeline;
 
 /**
  * A service used to start and stop Pipeline jobs and query their status.
- * 
+ *
  * @author rudominer@google.com (Mitch Rudominer)
  */
 public interface PipelineService {
@@ -24,10 +24,9 @@ public interface PipelineService {
   /**
    * Start a new Pipeline by specifying the root job and its arguments This
    * version of the method is for root jobs that take zero arguments.
-   * 
+   *
    * @param jobInstance A job instance to use as the root job of the Pipeline
-   * @param settings Optional {@code JobSettings}. These apply only to the root
-   *        job
+   * @param settings Optional one or more {@code JobSetting}
    * @return The pipeline handle. This String uniquely identifies the newly
    *         started Pipeline. It also uniquely identifies the root job of the
    *         Pipeline. The String may be used as an argument to
@@ -39,12 +38,11 @@ public interface PipelineService {
   /**
    * Start a new Pipeline by specifying the root job and its arguments This
    * version of the method is for root jobs that take one argument.
-   * 
+   *
    * @param <T1> The type of the first argument to the root job
    * @param jobInstance A job instance to use as the root job of the Pipeline
    * @param arg1 The first argument to the root job
-   * @param settings Optional {@code JobSettings}. These apply only to the root
-   *        job
+   * @param settings Optional one or more {@code JobSetting}
    * @return The pipeline handle. This String uniquely identifies the newly
    *         started Pipeline. It also uniquely identifies the root job of the
    *         Pipeline. The String may be used as an argument to
@@ -56,14 +54,13 @@ public interface PipelineService {
   /**
    * Start a new Pipeline by specifying the root job and its arguments This
    * version of the method is for root jobs that take two arguments.
-   * 
+   *
    * @param <T1> The type of the first argument to the root job
    * @param <T2> The type of the second argument to the root job
    * @param jobInstance A job instance to use as the root job of the Pipeline
    * @param arg1 The first argument to the root job
    * @param arg2 The second argument to the root job
-   * @param settings Optional {@code JobSettings}. These apply only to the root
-   *        job
+   * @param settings Optional one or more {@code JobSetting}
    * @return The pipeline handle. This String uniquely identifies the newly
    *         started Pipeline. It also uniquely identifies the root job of the
    *         Pipeline. The String may be used as an argument to
@@ -76,7 +73,7 @@ public interface PipelineService {
   /**
    * Start a new Pipeline by specifying the root job and its arguments This
    * version of the method is for root jobs that take three arguments.
-   * 
+   *
    * @param <T1> The type of the first argument to the root job
    * @param <T2> The type of the second argument to the root job
    * @param <T3> The type of the third argument to the root job
@@ -84,8 +81,7 @@ public interface PipelineService {
    * @param arg1 The first argument to the root job
    * @param arg2 The second argument to the root job
    * @param arg3 The third argument to the root job
-   * @param settings Optional {@code JobSettings}. These apply only to the root
-   *        job
+   * @param settings Optional one or more {@code JobSetting}
    * @return The pipeline handle. This String uniquely identifies the newly
    *         started Pipeline. It also uniquely identifies the root job of the
    *         Pipeline. The String may be used as an argument to
@@ -98,7 +94,7 @@ public interface PipelineService {
   /**
    * Start a new Pipeline by specifying the root job and its arguments This
    * version of the method is for root jobs that take four arguments.
-   * 
+   *
    * @param <T1> The type of the first argument to the root job
    * @param <T2> The type of the second argument to the root job
    * @param <T3> The type of the third argument to the root job
@@ -108,8 +104,7 @@ public interface PipelineService {
    * @param arg2 The second argument to the root job
    * @param arg3 The third argument to the root job
    * @param arg4 The fourth argument to the root job
-   * @param settings Optional {@code JobSettings}. These apply only to the root
-   *        job
+   * @param settings Optional one or more {@code JobSetting}
    * @return The pipeline handle. This String uniquely identifies the newly
    *         started Pipeline. It also uniquely identifies the root job of the
    *         Pipeline. The String may be used as an argument to
@@ -122,7 +117,7 @@ public interface PipelineService {
   /**
    * Start a new Pipeline by specifying the root job and its arguments This
    * version of the method is for root jobs that take five arguments.
-   * 
+   *
    * @param <T1> The type of the first argument to the root job
    * @param <T2> The type of the second argument to the root job
    * @param <T3> The type of the third argument to the root job
@@ -134,8 +129,7 @@ public interface PipelineService {
    * @param arg3 The third argument to the root job
    * @param arg4 The fourth argument to the root job
    * @param arg5 The fifth argument to the root job
-   * @param settings Optional {@code JobSettings}. These apply only to the root
-   *        job
+   * @param settings Optional one or more {@code JobSetting}
    * @return The pipeline handle. This String uniquely identifies the newly
    *         started Pipeline. It also uniquely identifies the root job of the
    *         Pipeline. The String may be used as an argument to
@@ -148,7 +142,7 @@ public interface PipelineService {
   /**
    * Start a new Pipeline by specifying the root job and its arguments This
    * version of the method is for root jobs that take six arguments.
-   * 
+   *
    * @param <T1> The type of the first argument to the root job
    * @param <T2> The type of the second argument to the root job
    * @param <T3> The type of the third argument to the root job
@@ -162,8 +156,7 @@ public interface PipelineService {
    * @param arg4 The fourth argument to the root job
    * @param arg5 The fifth argument to the root job
    * @param arg6 The sixth argument to the root job
-   * @param settings Optional {@code JobSettings}. These apply only to the root
-   *        job
+   * @param settings Optional one or more {@code JobSetting}
    * @return The pipeline handle. This String uniquely identifies the newly
    *         started Pipeline. It also uniquely identifies the root job of the
    *         Pipeline. The String may be used as an argument to
@@ -177,15 +170,14 @@ public interface PipelineService {
    * Start a new Pipeline by specifying the root job and its arguments This
    * version of the method is for root jobs that take more arguments than are
    * allowed in any of the type-safe versions of {@code startNewPipeline()}.
-   * 
+   *
    * @param jobInstance A job instance to use as the root job of the Pipeline
    * @param arguments An array of Objects to be used as the arguments of the
    *        root job. The type and number of the arguments must match the
    *        arguments of the {@code run()} method of the job. If possible, it is
    *        preferable to use one of the type-safe versions of
    *        {@code startNewPipeline()} instead of using this method.
-   * @param settings Optional {@code JobSettings}. These apply only to the root
-   *        job
+   * @param settings Optional one or more {@code JobSetting}
    * @return The pipeline handle. This String uniquely identifies the newly
    *         started Pipeline. It also uniquely identifies the root job of the
    *         Pipeline. The String may be used as an argument to
@@ -221,7 +213,7 @@ public interface PipelineService {
 
   /**
    * Delete all the records associated with a pipeline from the Datastore.
-   * 
+   *
    * @param pipelineHandle The handle of the pipeline to be deleted. The
    *        specified pipeline must exist and it must not be currently running.
    * @throws NoSuchObjectException If the framework cannot find a Pipeline with
@@ -233,7 +225,7 @@ public interface PipelineService {
 
   /**
    * Delete all the records associated with a pipeline from the datastore.
-   * 
+   *
    * @param pipelineHandle The handle of the pipeline to be deleted
    * @param force If this parameter is not {@code true} then this method will
    *        throw an {@link IllegalStateException} if the specified pipeline is
@@ -261,7 +253,7 @@ public interface PipelineService {
    * it is also possible to query for the {@code JobInfo} of a non-root job by
    * passing in the String returned from
    * {@link FutureValue#getSourceJobHandle()}.
-   * 
+   *
    * @param jobHandle The unique identifier of a job
    * @return A {@link JobInfo} representing the specified job
    * @throws NoSuchObjectException If the framework cannot find a job with the
@@ -274,7 +266,7 @@ public interface PipelineService {
    * This method is used to give the framework a value that is provided
    * asynchronously by some external agent and that some job is currently
    * waiting on. We call such a value a {@link PromisedValue}.
-   * 
+   *
    * @param promiseHandle The unique identifier for the {@link PromisedValue}
    *        obtained during the execution of some job via the method
    *        {@link PromisedValue#getHandle()}.
