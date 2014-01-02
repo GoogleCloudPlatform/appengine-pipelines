@@ -16,6 +16,8 @@ package com.google.appengine.tools.pipeline;
 
 import static com.google.appengine.tools.pipeline.impl.util.GUIDGenerator.USE_SIMPLE_GUIDS_FOR_DEBUGGING;
 
+import com.google.appengine.api.taskqueue.dev.LocalTaskQueue;
+import com.google.appengine.api.taskqueue.dev.QueueStateInfo;
 import com.google.appengine.tools.development.testing.LocalDatastoreServiceTestConfig;
 import com.google.appengine.tools.development.testing.LocalServiceTestHelper;
 import com.google.appengine.tools.development.testing.LocalTaskQueueTestConfig;
@@ -23,16 +25,19 @@ import com.google.apphosting.api.ApiProxy;
 
 import junit.framework.TestCase;
 
+import java.util.Map;
+
 /**
  * @author rudominer@google.com (Mitch Rudominer)
  *
  */
 public class PipelineTest extends TestCase {
 
-  protected transient LocalServiceTestHelper helper;
-  protected transient ApiProxy.Environment apiProxyEnvironment;
+  protected LocalServiceTestHelper helper;
+  protected ApiProxy.Environment apiProxyEnvironment;
 
   private static StringBuffer traceBuffer;
+  private LocalTaskQueue taskQueue;
 
   public PipelineTest() {
     LocalTaskQueueTestConfig taskQueueConfig = new LocalTaskQueueTestConfig();
@@ -74,6 +79,7 @@ public class PipelineTest extends TestCase {
     helper.setUp();
     apiProxyEnvironment = ApiProxy.getCurrentEnvironment();
     System.setProperty(USE_SIMPLE_GUIDS_FOR_DEBUGGING, "true");
+    taskQueue = LocalTaskQueueTestConfig.getLocalTaskQueue();
   }
 
   @Override
@@ -82,25 +88,53 @@ public class PipelineTest extends TestCase {
     super.tearDown();
   }
 
-  protected Object waitForJobToComplete(String pipelineId) throws Exception {
+  protected void waitUntilTaskQueueIsEmpty() throws InterruptedException {
+    boolean hasMoreTasks = true;
+    while (hasMoreTasks) {
+      Map<String, QueueStateInfo> taskInfoMap = taskQueue.getQueueStateInfo();
+      hasMoreTasks = false;
+      for (QueueStateInfo taskQueueInfo : taskInfoMap.values()) {
+        if (taskQueueInfo.getCountTasks() > 0) {
+          hasMoreTasks = true;
+          break;
+        }
+      }
+      if (hasMoreTasks) {
+        Thread.sleep(100);
+      }
+    }
+  }
+
+
+  protected JobInfo waitUntilJobComplete(String pipelineId) throws Exception {
     PipelineService service = PipelineServiceFactory.newPipelineService();
     while (true) {
       Thread.sleep(2000);
       JobInfo jobInfo = service.getJobInfo(pipelineId);
       switch (jobInfo.getJobState()) {
-        case COMPLETED_SUCCESSFULLY:
-          return jobInfo.getOutput();
         case RUNNING:
+        case WAITING_TO_RETRY:
           break;
-        case STOPPED_BY_ERROR:
-          throw new RuntimeException("Job stopped " + jobInfo.getError());
-        case STOPPED_BY_REQUEST:
-          throw new RuntimeException("Job stopped by request.");
-        case CANCELED_BY_REQUEST:
-          throw new RuntimeException("Job was canceled by request.");
         default:
-          break;
+          return jobInfo;
       }
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  protected <T> T waitForJobToComplete(String pipelineId) throws Exception {
+    JobInfo jobInfo = waitUntilJobComplete(pipelineId);
+    switch (jobInfo.getJobState()) {
+      case COMPLETED_SUCCESSFULLY:
+        return (T) jobInfo.getOutput();
+      case STOPPED_BY_ERROR:
+        throw new RuntimeException("Job stopped " + jobInfo.getError());
+      case STOPPED_BY_REQUEST:
+        throw new RuntimeException("Job stopped by request.");
+      case CANCELED_BY_REQUEST:
+        throw new RuntimeException("Job was canceled by request.");
+      default:
+        throw new RuntimeException("Unexpected job state: " + jobInfo.getJobState());
     }
   }
 }

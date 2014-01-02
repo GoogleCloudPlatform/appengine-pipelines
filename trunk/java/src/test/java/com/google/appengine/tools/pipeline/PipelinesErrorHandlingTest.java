@@ -80,7 +80,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
 
   public void testImmediateThrowCatchJob() throws Exception {
     String pipelineId = service.startNewPipeline(new TestImmediateThrowCatchJob());
-    Integer result = (Integer) waitForJobToComplete(pipelineId);
+    Integer result = waitForJobToComplete(pipelineId);
     assertEquals(EXPECTED_RESULT1, result.intValue());
     assertEquals("TestImmediateThrowCatchJob.run ImmediateThrowCatchJob.run "
         + "ImmediateThrowCatchJob.handleException.IllegalStateException", trace());
@@ -135,7 +135,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
 
   public void testSimpleCatch() throws Exception {
     String pipelineId = service.startNewPipeline(new TestSimpleCatchJob());
-    Integer result = (Integer) waitForJobToComplete(pipelineId);
+    Integer result = waitForJobToComplete(pipelineId);
     assertEquals(EXPECTED_RESULT1, result.intValue());
     assertEquals("TestSimpleCatchJob.run AngryJob.run AngryJob.run "
         + "TestSimpleCatchJob.handleException.IllegalStateException", trace());
@@ -224,7 +224,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
 
   public void testCatchRethrowing() throws Exception {
     String pipelineId = service.startNewPipeline(new TestCatchRethrowingJob());
-    Integer result = (Integer) waitForJobToComplete(pipelineId);
+    Integer result = waitForJobToComplete(pipelineId);
     assertEquals(EXPECTED_RESULT1, result.intValue());
     assertEquals("TestSimpleCatchJob.run AngryJob.run AngryJob.run AngryJob.handleException "
         + "TestSimpleCatchJob.handleException", trace());
@@ -256,7 +256,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
 
   public void testCatchGenerator() throws Exception {
     String pipelineId = service.startNewPipeline(new TestCatchGeneratorJob());
-    Integer result = (Integer) waitForJobToComplete(pipelineId);
+    Integer result = waitForJobToComplete(pipelineId);
     assertEquals(EXPECTED_RESULT1, result.intValue());
   }
 
@@ -285,7 +285,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
 
   public void testChildThrowing() throws Exception {
     String pipelineId = service.startNewPipeline(new TestChildThrowingJob());
-    Integer result = (Integer) waitForJobToComplete(pipelineId);
+    Integer result = waitForJobToComplete(pipelineId);
     assertEquals(EXPECTED_RESULT1, result.intValue());
   }
 
@@ -341,7 +341,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
 
   public void testChildCancellation() throws Exception {
     String pipelineId = service.startNewPipeline(new TestChildCancellationJob());
-    Integer result = (Integer) waitForJobToComplete(pipelineId);
+    Integer result = waitForJobToComplete(pipelineId);
     assertEquals(EXPECTED_RESULT1, result.intValue());
     // TODO(user): After implementing handleFinally which requires child
     // reference counting the order of operations will be exactly defined.
@@ -415,7 +415,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
    */
   public void testGrandchildCancellation() throws Exception {
     String pipelineId = service.startNewPipeline(new TestGrandchildCancellationJob());
-    Integer result = (Integer) waitForJobToComplete(pipelineId);
+    Integer result = waitForJobToComplete(pipelineId);
     assertEquals(EXPECTED_RESULT1, result.intValue());
 
     boolean expectedTraceChildCancelledFirst = ("TestGrandchildCancellationJob.run "
@@ -485,7 +485,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
 
   public void testChildCancellationFailure() throws Exception {
     String pipelineId = service.startNewPipeline(new TestChildCancellationFailingJob());
-    Integer result = (Integer) waitForJobToComplete(pipelineId);
+    Integer result = waitForJobToComplete(pipelineId);
     assertEquals(EXPECTED_RESULT1, result.intValue());
     // TODO(user): After implementing handleFinally which requires child
     // reference counting the order of operations will be exactly defined.
@@ -678,7 +678,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
    */
   public void testCancellationOfHandleExceptionJob() throws Exception {
     String pipelineId = service.startNewPipeline(new TestCancellationOfHandleExceptionJob());
-    Integer result = (Integer) waitForJobToComplete(pipelineId);
+    Integer result = waitForJobToComplete(pipelineId);
     assertEquals("TestCancellationOfHandleExceptionJob.run "
         + "JobToGetCancellationInHandleException.run "
         + "JobToGetCancellationInHandleException.handleException CleanupJob.run AngryJob.run "
@@ -723,7 +723,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
    */
   public void testCancellationOfReadyToRunJob() throws Exception {
     String pipelineId = service.startNewPipeline(new TestCancellationOfReadyToRunJob());
-    Integer result = (Integer) waitForJobToComplete(pipelineId);
+    Integer result = waitForJobToComplete(pipelineId);
     boolean cancellationFirst = ("TestCancellationOfReadyToRunJob.run "
         + "UnblockAndThrowJob.run TestCancellationOfReadyToRunJob.handleException").equals(trace());
     boolean cancelledRunFirst =

@@ -212,6 +212,8 @@ public class AppEngineBackEnd implements PipelineBackEnd {
       });
     }
 
+    // TODO(user): Replace this with plug-able hooks that could be used by tests,
+    // if needed could be restricted to package-scoped tests.
     // If a unit test requests us to do so, fail here.
     throwHereForTesting("AppEngineBackeEnd.saveWithJobStateCheck.beforeFinalTransaction");
 

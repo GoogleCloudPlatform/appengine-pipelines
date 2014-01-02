@@ -45,7 +45,7 @@ public class GCDTest extends PipelineTest {
   private void doGcdTest(int x, int y, int expectedGcd) throws Exception {
     PipelineService service = PipelineServiceFactory.newPipelineService();
     String pipelineId = service.startNewPipeline(new GCDJob(), x, y);
-    int calculatedGcd = (Integer) waitForJobToComplete(pipelineId);
+    int calculatedGcd = waitForJobToComplete(pipelineId);
     logger.info("The GCD of " + x + " and " + y + " is " + calculatedGcd);
     assertEquals(expectedGcd, calculatedGcd);
     // PipelineObjects pipelineObjects =

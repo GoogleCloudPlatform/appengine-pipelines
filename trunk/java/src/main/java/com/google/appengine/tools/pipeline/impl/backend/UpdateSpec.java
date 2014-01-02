@@ -93,6 +93,8 @@ public class UpdateSpec {
     return transaction;
   }
 
+  // TODO(user): could be removed, current code only have 1 entity per
+  // transaction (Barrier) and for that we don't need the transaction.
   public Collection<Transaction> getTransactions() {
     return transactions.values();
   }

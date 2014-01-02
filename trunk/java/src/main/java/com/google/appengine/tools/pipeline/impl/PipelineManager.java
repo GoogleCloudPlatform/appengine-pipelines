@@ -588,9 +588,9 @@ public class PipelineManager {
    * @param callErrorHandler should handleException method be returned instead
    *        of run
    * @param params parameters to be passed to the method to invoke
-   * @return Either run or handleException method of {@code klass}. <code>null
+   * @return Either run or handleException method of {@code class}. <code>null
    *         </code> is returned if @{code callErrorHandler} is <code>true</code>
-   *         and no handleException with matching signatore is found.
+   *         and no handleException with matching signature is found.
    *
    */
   @SuppressWarnings("unchecked")
@@ -674,7 +674,8 @@ public class PipelineManager {
       logger.warning("The pipeline has been stopped: " + rootJobRecord);
       throw new AbandonTaskException();
     }
-    State jobState = jobRecord.getState();
+
+    // TODO(user): b/12301978, check if its a previous run and if so AbandonTaskException
     Barrier runBarrier = jobRecord.getRunBarrierInflated();
     if (null == runBarrier) {
       throw new RuntimeException("Internal logic error: " + jobRecord + " has not been inflated.");
@@ -692,6 +693,7 @@ public class PipelineManager {
     tempSpec.getOrCreateTransaction("releaseRunBarrier").includeBarrier(runBarrier);
     backEnd.save(tempSpec, jobRecord.getQueueSettings());
 
+    State jobState = jobRecord.getState();
     switch (jobState) {
       case WAITING_TO_RUN:
       case RETRY:
