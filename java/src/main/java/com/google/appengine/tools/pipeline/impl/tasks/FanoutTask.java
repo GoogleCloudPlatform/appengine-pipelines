@@ -14,6 +14,8 @@
 
 package com.google.appengine.tools.pipeline.impl.tasks;
 
+import static com.google.appengine.tools.pipeline.impl.util.StringUtils.UTF_8;
+
 import com.google.appengine.api.datastore.Key;
 import com.google.appengine.api.datastore.KeyFactory;
 import com.google.appengine.tools.pipeline.impl.QueueSettings;
@@ -100,7 +102,7 @@ public class FanoutTask extends Task {
       builder.append(TASK_SEPERATOR);
     }
     builder.setLength(builder.length() - TASK_SEPERATOR.length());
-    return builder.toString().getBytes();
+    return builder.toString().getBytes(UTF_8);
   }
 
   private static void encodeTask(StringBuilder builder, Task task) {
@@ -119,7 +121,7 @@ public class FanoutTask extends Task {
   }
 
   public static List<Task> decodeTasks(byte[] encodedBytes) {
-    String encodedListOfTasks = new String(encodedBytes);
+    String encodedListOfTasks = new String(encodedBytes, UTF_8);
     String[] encodedTaskArray = encodedListOfTasks.split(TASK_SEPERATOR);
     List<Task> listOfTasks = new ArrayList<>(encodedTaskArray.length);
     for (String encodedTask : encodedTaskArray) {
