@@ -526,4 +526,8 @@ public abstract class Job<E> implements Serializable {
     thisJobRecord.setStatusConsoleUrl(url);
   }
 
+  protected String getStatusConsoleUrl() {
+    return thisJobRecord.getStatusConsoleUrl();
+  }
+
 }
