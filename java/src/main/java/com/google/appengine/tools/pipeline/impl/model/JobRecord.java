@@ -344,11 +344,18 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
     // Root Jobs have their rootJobKey the same as their keys and provide null for generatorKey
     // and graphGUID. Also, callExceptionHandler is always false.
     this(key, key, null, null, jobInstance, false, settings);
-    if (queueSettings.getOnBackend() == null && queueSettings.getOnModule() == null) {
+    if (queueSettings.getOnBackend() == null) {
       ModulesService modulesService = ModulesServiceFactory.getModulesService();
       String currentModule = modulesService.getCurrentModule();
-      queueSettings.setOnModule(currentModule);
-      queueSettings.setModuleVersion(modulesService.getDefaultVersion(currentModule));
+      if (queueSettings.getOnModule() == null) {
+        queueSettings.setOnModule(currentModule);
+        queueSettings.setModuleVersion(modulesService.getCurrentVersion());
+      } else if (queueSettings.getOnModule().equals(currentModule)) {
+        queueSettings.setModuleVersion(modulesService.getCurrentVersion());
+      } else {
+        String version = modulesService.getDefaultVersion(queueSettings.getOnModule());
+        queueSettings.setModuleVersion(version);
+      }
     }
   }
 
