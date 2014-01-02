@@ -81,7 +81,7 @@ public class PipelineManager {
    * {@link HandleSlotFilledTask HandleSlotFilledTasks} are enqueued for each of
    * the filled slots.
    *
-   * @param settings JobSettings used to control details of the Pipeline
+   * @param settings JobSetting array used to control details of the Pipeline
    * @param jobInstance A user-supplied instance of {@link Job} that will serve
    *        as the root job of the Pipeline.
    * @param params Arguments to the root job's run() method
@@ -124,7 +124,7 @@ public class PipelineManager {
    *        created objects. All objects will be added to the
    *        {@link UpdateSpec#getNonTransactionalGroup() non-transaction group}
    *        of the {@code UpdateSpec}.
-   * @param settings Array of {@code JobSettings} to apply to the newly created
+   * @param settings Array of {@code JobSetting} to apply to the newly created
    *        JobRecord.
    * @param generatorJob The generator job or {@code null} if we are creating
    *        the root job.
