@@ -53,13 +53,15 @@ public class SerializationUtils {
     if (bytes.size() <= MAX_UNCOMPRESSED_BYTE_SIZE) {
       return bytes.toByteArray();
     }
-    Deflater deflater =  new Deflater(Deflater.BEST_COMPRESSION, true);
     ByteArrayOutputStream compressedBytes = new ByteArrayOutputStream(bytes.size() / 4);
     compressedBytes.write(0);
     compressedBytes.write(ZLIB_COMPRESSION);
+    Deflater deflater =  new Deflater(Deflater.BEST_COMPRESSION, true);
     try (DeflaterOutputStream out = new DeflaterOutputStream(compressedBytes, deflater)) {
       // Use internal buffer to avoid copying it.
       out.write(bytes.getInternalBuffer(), 0, bytes.size());
+    } finally {
+      deflater.end();
     }
     return compressedBytes.toByteArray();
   }
@@ -74,8 +76,16 @@ public class SerializationUtils {
       if (in.read() != ZLIB_COMPRESSION) {
         throw new IOException("Unknown compression type");
       }
-      Inflater inflater =  new Inflater(true);
-      in = new InflaterInputStream(in, inflater);
+      final Inflater inflater =  new Inflater(true);
+      in = new InflaterInputStream(in, inflater) {
+        @Override public void close() throws IOException {
+          try {
+            super.close();
+          } finally {
+            inflater.end();
+          }
+        }
+      };
     }
     try (ObjectInputStream oin = new ObjectInputStream(in)) {
       try {
