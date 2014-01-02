@@ -215,8 +215,8 @@ public abstract class Job<E> implements Serializable {
    *         may be passed in to further invocations of {@code futureCall()} in
    *         order to specify a data dependency.
    */
-  public <T, T1> FutureValue<T> futureCall(Job1<T, T1> jobInstance, Value<T1> v1,
-      JobSetting... settings) {
+  public <T, T1> FutureValue<T> futureCall(
+      Job1<T, T1> jobInstance, Value<? extends T1> v1, JobSetting... settings) {
     return futureCallUnchecked(settings, jobInstance, v1);
   }
 
@@ -237,8 +237,8 @@ public abstract class Job<E> implements Serializable {
    *         may be passed in to further invocations of {@code futureCall()} in
    *         order to specify a data dependency.
    */
-  public <T, T1, T2> FutureValue<T> futureCall(Job2<T, T1, T2> jobInstance, Value<T1> v1,
-      Value<T2> v2, JobSetting... settings) {
+  public <T, T1, T2> FutureValue<T> futureCall(Job2<T, T1, T2> jobInstance, Value<? extends T1> v1,
+      Value<? extends T2> v2, JobSetting... settings) {
     return futureCallUnchecked(settings, jobInstance, v1, v2);
   }
 
@@ -262,7 +262,8 @@ public abstract class Job<E> implements Serializable {
    *         order to specify a data dependency.
    */
   public <T, T1, T2, T3> FutureValue<T> futureCall(Job3<T, T1, T2, T3> jobInstance,
-      Value<T1> v1, Value<T2> v2, Value<T3> v3, JobSetting... settings) {
+      Value<? extends T1> v1, Value<? extends T2> v2, Value<? extends T3> v3,
+      JobSetting... settings) {
     return futureCallUnchecked(settings, jobInstance, v1, v2, v3);
   }
 
@@ -288,7 +289,8 @@ public abstract class Job<E> implements Serializable {
    *         order to specify a data dependency.
    */
   public <T, T1, T2, T3, T4> FutureValue<T> futureCall(Job4<T, T1, T2, T3, T4> jobInstance,
-      Value<T1> v1, Value<T2> v2, Value<T3> v3, Value<T4> v4, JobSetting... settings) {
+      Value<? extends T1> v1, Value<? extends T2> v2, Value<? extends T3> v3,
+      Value<? extends T4> v4, JobSetting... settings) {
     return futureCallUnchecked(settings, jobInstance, v1, v2, v3, v4);
   }
 
@@ -316,9 +318,9 @@ public abstract class Job<E> implements Serializable {
    *         may be passed in to further invocations of {@code futureCall()} in
    *         order to specify a data dependency.
    */
-  public <T, T1, T2, T3, T4, T5> FutureValue<T> futureCall(
-      Job5<T, T1, T2, T3, T4, T5> jobInstance, Value<T1> v1, Value<T2> v2, Value<T3> v3,
-      Value<T4> v4, Value<T5> v5, JobSetting... settings) {
+  public <T, T1, T2, T3, T4, T5> FutureValue<T> futureCall(Job5<T, T1, T2, T3, T4, T5> jobInstance,
+      Value<? extends T1> v1, Value<? extends T2> v2, Value<? extends T3> v3,
+      Value<? extends T4> v4, Value<? extends T5> v5, JobSetting... settings) {
     return futureCallUnchecked(settings, jobInstance, v1, v2, v3, v4, v5);
   }
 
@@ -348,8 +350,9 @@ public abstract class Job<E> implements Serializable {
    *         order to specify a data dependency.
    */
   public <T, T1, T2, T3, T4, T5, T6> FutureValue<T> futureCall(
-      Job6<T, T1, T2, T3, T4, T5, T6> jobInstance, Value<T1> v1, Value<T2> v2, Value<T3> v3,
-      Value<T4> v4, Value<T5> v5, Value<T6> v6, JobSetting... settings) {
+      Job6<T, T1, T2, T3, T4, T5, T6> jobInstance, Value<? extends T1> v1, Value<? extends T2> v2,
+      Value<? extends T3> v3, Value<? extends T4> v4, Value<? extends T5> v5,
+      Value<? extends T6> v6, JobSetting... settings) {
     return futureCallUnchecked(settings, jobInstance, v1, v2, v3, v4, v5, v6);
   }
 
@@ -366,8 +369,17 @@ public abstract class Job<E> implements Serializable {
    *         {@link PipelineService#submitPromisedValue(String, Object)}. This
    *         may be passed in to further invocations of {@code futureCall()} in
    *         order to specify a data dependency.
+   * @deprecate Use #newPromise() instead.
    */
+  @Deprecated
   public <F> PromisedValue<F> newPromise(Class<F> klass) {
+    PromisedValueImpl<F> promisedValue =
+        new PromisedValueImpl<>(getPipelineKey(), thisJobRecord.getKey(), currentRunGUID);
+    updateSpec.getNonTransactionalGroup().includeSlot(promisedValue.getSlot());
+    return promisedValue;
+  }
+
+  public <F> PromisedValue<F> newPromise() {
     PromisedValueImpl<F> promisedValue =
         new PromisedValueImpl<>(getPipelineKey(), thisJobRecord.getKey(), currentRunGUID);
     updateSpec.getNonTransactionalGroup().includeSlot(promisedValue.getSlot());
@@ -377,7 +389,7 @@ public abstract class Job<E> implements Serializable {
   /**
    * Invoke this method from within the {@code run} method of a <b>generator
    * job</b> in order to get a {@link PromisedValue} that becomes ready after
-   * a specified delay.
+   * a specified delay. The delay starts once this job's run method complete.
    *
    * @param delaySeconds Minimal delay after which the returned value becomes ready.
    * @return A {@code PromisedValue} that represents an empty value slot that
@@ -385,7 +397,8 @@ public abstract class Job<E> implements Serializable {
    */
   public Value<Void> newDelayedValue(long delaySeconds) {
     PromisedValueImpl<Void> promisedValue = (PromisedValueImpl<Void>) newPromise(Void.class);
-    PipelineManager.registerDelayedValue(delaySeconds, promisedValue.getSlot(), thisJobRecord);
+    PipelineManager.registerDelayedValue(
+        updateSpec, thisJobRecord, delaySeconds, promisedValue.getSlot());
     return promisedValue;
   }
 

@@ -133,14 +133,16 @@ public class AppEngineTaskQueue implements PipelineTaskQueue {
       // TODO(user): change to getVersionHostname when 1.8.9 is released
       taskOptions.header("Host", service.getModuleHostname(module, version));
     }
+
+    Long delayInSeconds = queueSettings.getDelayInSeconds();
+    if (null != delayInSeconds) {
+      taskOptions.countdownMillis(delayInSeconds * 1000L);
+      queueSettings.setDelayInSeconds(null);
+    }
     addProperties(taskOptions, task.toProperties());
     String taskName = task.getName();
     if (null != taskName) {
       taskOptions.taskName(taskName);
-    }
-    Long delayInSeconds = queueSettings.getDelayInSeconds();
-    if (null != delayInSeconds) {
-      taskOptions.countdownMillis(delayInSeconds * 1000L);
     }
     return taskOptions;
   }
