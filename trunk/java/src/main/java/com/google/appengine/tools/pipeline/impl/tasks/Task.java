@@ -91,6 +91,20 @@ public abstract class Task {
       String getProperty(Task task) {
         return task.getQueueSettings().getOnQueue();
       }
+    },
+    DELAY {
+      @Override
+      void setProperty(Task task, String value) {
+        if (value != null) {
+          task.getQueueSettings().setDelayInSeconds(Long.parseLong(value));
+        }
+      }
+
+      @Override
+      String getProperty(Task task) {
+        Long delay = task.getQueueSettings().getDelayInSeconds();
+        return delay == null ? null : delay.toString();
+      }
     };
 
     static final Set<TaskProperty> ALL = EnumSet.allOf(TaskProperty.class);

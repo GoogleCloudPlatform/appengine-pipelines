@@ -78,6 +78,9 @@ public class AppEngineBackEnd implements PipelineBackEnd {
   }
 
   private void putAll(Collection<? extends PipelineModelObject> objects) {
+    if (objects.isEmpty()) {
+      return;
+    }
     List<Entity> entityList = new ArrayList<>(objects.size());
     for (PipelineModelObject x : objects) {
       logger.finest("Storing: " + x);
@@ -550,7 +553,9 @@ public class AppEngineBackEnd implements PipelineBackEnd {
     for (Entity entity : queryAll(kind, rootJobKey, true, fetchOptions)) {
       keyList.add(entity.getKey());
     }
-    dataStore.delete(keyList);
+    if (!keyList.isEmpty()) {
+      dataStore.delete(keyList);
+    }
     return keyList.size();
   }
 

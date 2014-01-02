@@ -133,9 +133,11 @@ public class OrphanedJobGraphTest extends PipelineTest {
 
     if (usePromisedValue) {
       // If we are using promised-value activation then an
-      // OrphanedObjectException
-      // should have been caught at least twice.
-      assertTrue(SupplyPromisedValueRunnable.orphanedObjectExcetionCount.get() >= 2);
+      // OrphanedObjectException should have been caught at least twice.
+      int orphanedObjectExcetionCount =
+          SupplyPromisedValueRunnable.orphanedObjectExcetionCount.get();
+      assertTrue("Was expecting orphanedObjectExcetionCount to be more than one, but it was "
+          + orphanedObjectExcetionCount, orphanedObjectExcetionCount  >= 2);
     }
 
     // Now delete the whole Pipeline
@@ -178,7 +180,7 @@ public class OrphanedJobGraphTest extends PipelineTest {
       }
       Value<Integer> dummyValue;
       if (usePromise) {
-        PromisedValue<Integer> promisedValue = newPromise(Integer.class);
+        PromisedValue<Integer> promisedValue = newPromise();
         (new Thread(new SupplyPromisedValueRunnable(ApiProxy.getCurrentEnvironment(),
             promisedValue.getHandle()))).start();
         dummyValue = promisedValue;
@@ -224,6 +226,13 @@ public class OrphanedJobGraphTest extends PipelineTest {
     public void run() {
       PipelineService service = PipelineServiceFactory.newPipelineService();
       ApiProxy.setEnvironmentForCurrentThread(apiProxyEnvironment);
+      // TODO(user): Try something better than sleep to make sure
+      // this happens after the processing the caller's runTask
+      try {
+        Thread.sleep(1000);
+      } catch (InterruptedException e1) {
+        // ignore - use uninterruptables
+      }
       try {
         service.submitPromisedValue(promiseHandle, 0);
       } catch (NoSuchObjectException e) {

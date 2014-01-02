@@ -329,7 +329,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
       trace("ParentOfAngryChildJob.run");
       // firstChild should never execute as it waits on the promise that is
       // never ready
-      PromisedValue<Integer> neverReady = newPromise(Integer.class);
+      PromisedValue<Integer> neverReady = newPromise();
       FutureValue<Integer> firstChild =
           futureCall(new JobToCancel(), neverReady, new JobSetting.MaxAttempts(1));
       // This one failing should cause cancellation of the first job, which
@@ -379,7 +379,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
       trace("ParentOfJobToCancel.run");
       // Unblocks a sibling that is going to throw an exception
       PipelineManager.acceptPromisedValue(unblockTheAngryOneHandle, EXPECTED_RESULT1);
-      PromisedValue<Integer> neverReady = newPromise(Integer.class);
+      PromisedValue<Integer> neverReady = newPromise();
       return futureCall(new JobToCancel(), neverReady);
     }
   }
@@ -400,7 +400,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
     @Override
     public Value<Void> run() {
       trace("ParentOfGrandchildToCancelAndAngryChildJob.run");
-      PromisedValue<Integer> unblockTheAngryOne = newPromise(Integer.class);
+      PromisedValue<Integer> unblockTheAngryOne = newPromise();
       futureCall(new ParentOfJobToCancel(), immediate(unblockTheAngryOne.getHandle()),
           new JobSetting.MaxAttempts(1));
       // This one failing should cause cancellation of the first job, which
@@ -473,7 +473,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
       trace("ParentOfAngryChildJobWithJobToCancelThatFailsToCancel.run");
       // firstChild should never execute as it waits on the promise that is
       // never ready
-      PromisedValue<Integer> neverReady = newPromise(Integer.class);
+      PromisedValue<Integer> neverReady = newPromise();
       FutureValue<Integer> firstChild =
           futureCall(new JobToCancelThatFailsToCancel(), neverReady, new JobSetting.MaxAttempts(1));
       // This one failing should cause cancellation of the first job, which
@@ -522,7 +522,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
     @Override
     public Value<Integer> run(Integer param1) {
       trace("JobToCancelWithFailureHandler.run");
-      PromisedValue<Integer> neverReady = newPromise(Integer.class);
+      PromisedValue<Integer> neverReady = newPromise();
       return futureCall(new JobToCancelWithFailureHandler(), neverReady);
     }
 
@@ -632,7 +632,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
     @Override
     public Value<Integer> run() {
       trace("TestCancellationOfHandleExceptionJob.run");
-      PromisedValue<Integer> unblockTheAngryOne = newPromise(Integer.class);
+      PromisedValue<Integer> unblockTheAngryOne = newPromise();
       futureCall(new JobToGetCancellationInHandleException(),
           immediate(unblockTheAngryOne.getHandle()), new JobSetting.MaxAttempts(1));
       // This one failing should cause cancellation of the first job, which
@@ -642,7 +642,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
           new JobSetting.MaxAttempts(1));
       // Returning promise that is never ready as result of handleException is
       // used
-      return newPromise(Integer.class);
+      return newPromise();
     }
 
     @SuppressWarnings("unused")
@@ -693,7 +693,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
     @Override
     public Value<Integer> run() {
       trace("TestCancellationOfReadyToRunJob.run");
-      PromisedValue<Integer> unblockTheSecondOne = newPromise(Integer.class);
+      PromisedValue<Integer> unblockTheSecondOne = newPromise();
       futureCall(new UnblockAndThrowJob(), immediate(unblockTheSecondOne.getHandle()),
           new JobSetting.MaxAttempts(1));
 

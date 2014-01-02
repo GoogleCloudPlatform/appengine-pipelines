@@ -405,19 +405,29 @@ public class PipelineManager {
     // It is possible, though unlikely, that we might be asked to accept a
     // promise before the slot to hold the promise has been saved. We will try 5
     // times, sleeping 1, 2, 4, 8 seconds between attempts.
-    for (int i = 0; i < 5; i++) {
-      try {
-        slot = backEnd.querySlot(key, false);
-      } catch (NoSuchObjectException e) {
+    int attempts = 0;
+    boolean interrupted = false;
+    try {
+      while (slot == null) {
+        attempts++;
         try {
-          Thread.sleep(((long) Math.pow(2.0, i)) * 1000L);
-        } catch (InterruptedException f) {
-          // ignore
+          slot = backEnd.querySlot(key, false);
+        } catch (NoSuchObjectException e) {
+          if (attempts >= 5) {
+            throw new NoSuchObjectException("There is no promise with handle " + promiseHandle);
+          }
+          try {
+            Thread.sleep((long) Math.pow(2.0, attempts - 1) * 1000L);
+          } catch (InterruptedException f) {
+            interrupted = true;
+          }
         }
       }
-    }
-    if (null == slot) {
-      throw new NoSuchObjectException("There is no promise with handle " + promiseHandle);
+    } finally {
+      // TODO(user): replace with Uninterruptibles#sleepUninterruptibly once we use guava
+      if (interrupted) {
+        Thread.currentThread().interrupt();
+      }
     }
     Key generatorJobKey = slot.getGeneratorJobKey();
     if (null == generatorJobKey) {
@@ -1139,7 +1149,7 @@ public class PipelineManager {
     slot.fill(null);
     updateSpec.getNonTransactionalGroup().includeSlot(slot);
     backEnd.save(updateSpec, fillSlotHandleFilledTask.getQueueSettings());
-    // TODO(user): is the double-reading for slot needed?
+    // re-reading Slot (in handleSlotFilled) is needed (to capture slot fill after this one)
     handleSlotFilled(slotKey);
   }
 
@@ -1210,10 +1220,11 @@ public class PipelineManager {
   /**
    * @param slot delayed value slot
    */
-  public static void registerDelayedValue(long delaySec, Slot slot, JobRecord generatorJobRecord) {
+  public static void registerDelayedValue(
+      UpdateSpec spec, JobRecord generatorJobRecord, long delaySec, Slot slot) {
     FillSlotHandleSlotFilledTask task = new FillSlotHandleSlotFilledTask(
         slot.getKey(), generatorJobRecord.getRootJobKey(), generatorJobRecord.getQueueSettings());
     task.getQueueSettings().setDelayInSeconds(delaySec);
-    backEnd.enqueue(task);
+    spec.getFinalTransaction().registerTask(task);
   }
 }

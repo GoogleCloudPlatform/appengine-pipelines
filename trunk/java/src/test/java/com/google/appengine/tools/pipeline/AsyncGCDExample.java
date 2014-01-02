@@ -49,8 +49,8 @@ public class AsyncGCDExample {
   public static class PrintGCDJob extends Job0<Void> {
     @Override
     public Value<Void> run() {
-      PromisedValue<Integer> a = newPromise(Integer.class);
-      PromisedValue<Integer> b = newPromise(Integer.class);
+      PromisedValue<Integer> a = newPromise();
+      PromisedValue<Integer> b = newPromise();
       asyncAskUserForTwoIntegers(a.getHandle(), b.getHandle());
       FutureValue<Integer> gcd = futureCall(new GCDExample.GCDJob(), a, b);
       // Don't ask the user for his name until after he has already
@@ -94,7 +94,7 @@ public class AsyncGCDExample {
   public static class AskUserForNameJob extends Job0<String> {
     @Override
     public Value<String> run() {
-      PromisedValue<String> userName = newPromise(String.class);
+      PromisedValue<String> userName = newPromise();
       asyncAskUserForName(userName.getHandle());
       return userName;
     }
@@ -104,6 +104,11 @@ public class AsyncGCDExample {
       Thread thread = new Thread() {
         @Override
         public void run() {
+          try {
+            Thread.sleep(2000);
+          } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+          }
           String name = callback.getUserName();
           try {
             service.submitPromisedValue(handle, name);

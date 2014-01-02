@@ -72,9 +72,9 @@ public class UserGuideExamples {
     @Override
     public Value<Integer> run(String userEmail) {
       // Invoke ComplexJob on three promised values
-      PromisedValue<Integer> x = newPromise(Integer.class);
-      PromisedValue<Integer> y = newPromise(Integer.class);
-      PromisedValue<Integer> z = newPromise(Integer.class);
+      PromisedValue<Integer> x = newPromise();
+      PromisedValue<Integer> y = newPromise();
+      PromisedValue<Integer> z = newPromise();
       FutureValue<Integer> intermediate = futureCall(new ComplexJob(), x, y, z);
 
       // Kick off the process of retrieving the data from the external agent
@@ -112,7 +112,7 @@ public class UserGuideExamples {
       String prompt =
           "The intermediate result is " + intermediate + "."
                + " Please give one more int";
-      PromisedValue<Integer> oneMoreInt = newPromise(Integer.class);
+      PromisedValue<Integer> oneMoreInt = newPromise();
       ExternalAgentJob.getIntFromUser(prompt, userEmail, oneMoreInt.getHandle());
       return oneMoreInt;
     }
