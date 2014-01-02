@@ -14,6 +14,8 @@
 
 package com.google.appengine.tools.pipeline;
 
+import com.google.appengine.tools.pipeline.JobSetting.StatusConsoleUrl;
+
 import java.util.Arrays;
 import java.util.Random;
 
@@ -37,6 +39,7 @@ public class MiscPipelineTest extends PipelineTest {
   }
 
   public void testImmediateChild() throws Exception {
+    // This is also testing inheritance of statusConsoleUrl.
     PipelineService service = PipelineServiceFactory.newPipelineService();
     String pipelineId = service.startNewPipeline(new Returns5FromChildJob(), largeValue);
     Integer five = (Integer) waitForJobToComplete(pipelineId);
@@ -47,9 +50,11 @@ public class MiscPipelineTest extends PipelineTest {
   private static class Returns5FromChildJob extends Job1<Integer, long[]> {
     @Override
     public Value<Integer> run(long[] bytes) {
+      setStatusConsoleUrl("my-console-url");
       assertTrue(Arrays.equals(largeValue, bytes));
       FutureValue<Integer> lengthJob = futureCall(new LengthJob(), immediate(bytes));
-      return futureCall(new IdentityJob(bytes), immediate(5), lengthJob);
+      return futureCall(
+          new IdentityJob(bytes), immediate(5), lengthJob, new StatusConsoleUrl(null));
     }
   }
 
@@ -64,6 +69,7 @@ public class MiscPipelineTest extends PipelineTest {
 
     @Override
     public Value<Integer> run(Integer param1, Integer length) {
+      assertNull(getStatusConsoleUrl());
       assertEquals(largeValue.length, length.intValue());
       assertTrue(Arrays.equals(largeValue, bytes));
       return immediate(param1);
@@ -74,6 +80,7 @@ public class MiscPipelineTest extends PipelineTest {
   private static class LengthJob extends Job1<Integer, long[]> {
     @Override
     public Value<Integer> run(long[] bytes) {
+      assertEquals("my-console-url", getStatusConsoleUrl());
       assertTrue(Arrays.equals(largeValue, bytes));
       return immediate(bytes.length);
     }

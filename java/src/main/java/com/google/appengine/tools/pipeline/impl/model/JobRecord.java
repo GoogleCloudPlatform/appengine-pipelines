@@ -37,8 +37,10 @@ import com.google.appengine.tools.pipeline.impl.util.StringUtils;
 
 import java.lang.reflect.Method;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * The Pipeline model object corresponding to a job.
@@ -304,7 +306,15 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
     } else {
       exceptionHandlingAncestorKey = generatorJob.getExceptionHandlingAncestorKey();
     }
+    // Inherit settings from generator job
     queueSettings.merge(generatorJob.queueSettings);
+    Map<Class<? extends JobSetting>, JobSetting> settingsMap = new HashMap<>();
+    for (JobSetting setting : settings) {
+      settingsMap.put(setting.getClass(), setting);
+    }
+    if (!settingsMap.containsKey(StatusConsoleUrl.class)) {
+      statusConsoleUrl = generatorJob.statusConsoleUrl;
+    }
   }
 
   private JobRecord(Key rootJobKey, Key thisKey, Key generatorJobKey, String graphGUID,
