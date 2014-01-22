@@ -136,6 +136,8 @@
       <test name="com.google.appengine.tools.pipeline.DelayedValueTest"/>
       <test name="com.google.appengine.tools.pipeline.FanoutTaskTest"/>
       <test name="com.google.appengine.tools.pipeline.FutureListTest"/>
+      <test name="com.google.appengine.tools.pipeline.JsonClassFilterHandlerTest"/>
+      <test name="com.google.appengine.tools.pipeline.JsonListHandlerTest"/>
       <test name="com.google.appengine.tools.pipeline.MiscPipelineTest"/>
       <test name="com.google.appengine.tools.pipeline.OrphanedJobGraphTest"/>
       <test name="com.google.appengine.tools.pipeline.StaticContentHandlerTest"/>

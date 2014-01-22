@@ -186,7 +186,7 @@ public abstract class PipelineModelObject {
     Entity entity = new Entity(key);
     entity.setProperty(ROOT_JOB_KEY_PROPERTY, rootJobKey);
     if (generatorJobKey != null) {
-      entity.setUnindexedProperty(GENERATOR_JOB_PROPERTY, generatorJobKey);
+      entity.setProperty(GENERATOR_JOB_PROPERTY, generatorJobKey);
     }
     if (graphGUID != null) {
       entity.setUnindexedProperty(GRAPH_GUID_PROPERTY, graphGUID);
@@ -224,7 +224,6 @@ public abstract class PipelineModelObject {
     return list;
   }
 
-  @SuppressWarnings("unchecked")
   protected static <E> List<E> getListProperty(String propertyName, Entity entity) {
     List<E> list = (List<E>) entity.getProperty(propertyName);
     return list == null ? new LinkedList<E>() : list;

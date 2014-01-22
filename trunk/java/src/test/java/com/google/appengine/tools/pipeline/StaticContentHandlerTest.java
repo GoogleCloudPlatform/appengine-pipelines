@@ -26,7 +26,6 @@ import java.io.InputStream;
  */
 public class StaticContentHandlerTest extends TestCase {
 
-  @SuppressWarnings("resource")
   public void testGetResourceAsStream() throws Exception {
     InputStream in = StaticContentHandler.getResourceAsStream("common.js");
     assertTrue(in.read() != -1);

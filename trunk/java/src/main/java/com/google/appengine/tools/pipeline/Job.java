@@ -545,4 +545,10 @@ public abstract class Job<E> implements Serializable {
     return thisJobRecord.getStatusConsoleUrl();
   }
 
+  /**
+   * Returns the job's display name. Used for presentation purpose only.
+   */
+  public String getJobDisplayName() {
+    return getClass().getName();
+  }
 }

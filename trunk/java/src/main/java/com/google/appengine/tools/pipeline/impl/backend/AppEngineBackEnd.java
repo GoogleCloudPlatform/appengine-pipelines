@@ -14,9 +14,12 @@
 
 package com.google.appengine.tools.pipeline.impl.backend;
 
+import static com.google.appengine.tools.pipeline.impl.model.JobRecord.ROOT_JOB_DISPLAY_NAME;
+import static com.google.appengine.tools.pipeline.impl.model.PipelineModelObject.ROOT_JOB_KEY_PROPERTY;
 import static com.google.appengine.tools.pipeline.impl.util.TestUtils.throwHereForTesting;
 
 import com.google.appengine.api.datastore.Blob;
+import com.google.appengine.api.datastore.Cursor;
 import com.google.appengine.api.datastore.DatastoreService;
 import com.google.appengine.api.datastore.DatastoreServiceFactory;
 import com.google.appengine.api.datastore.Entity;
@@ -24,7 +27,12 @@ import com.google.appengine.api.datastore.EntityNotFoundException;
 import com.google.appengine.api.datastore.FetchOptions;
 import com.google.appengine.api.datastore.Key;
 import com.google.appengine.api.datastore.PreparedQuery;
+import com.google.appengine.api.datastore.PropertyProjection;
 import com.google.appengine.api.datastore.Query;
+import com.google.appengine.api.datastore.Query.Filter;
+import com.google.appengine.api.datastore.Query.FilterOperator;
+import com.google.appengine.api.datastore.Query.FilterPredicate;
+import com.google.appengine.api.datastore.QueryResultIterator;
 import com.google.appengine.api.datastore.Transaction;
 import com.google.appengine.tools.pipeline.NoSuchObjectException;
 import com.google.appengine.tools.pipeline.impl.QueueSettings;
@@ -41,6 +49,7 @@ import com.google.appengine.tools.pipeline.impl.tasks.DeletePipelineTask;
 import com.google.appengine.tools.pipeline.impl.tasks.FanoutTask;
 import com.google.appengine.tools.pipeline.impl.tasks.Task;
 import com.google.appengine.tools.pipeline.impl.util.SerializationUtils;
+import com.google.appengine.tools.pipeline.util.Pair;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -49,6 +58,7 @@ import java.util.Collection;
 import java.util.ConcurrentModificationException;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -474,8 +484,7 @@ public class AppEngineBackEnd implements PipelineBackEnd {
     if (keysOnly) {
       query.setKeysOnly();
     }
-    query.setFilter(new Query.FilterPredicate(
-        PipelineModelObject.ROOT_JOB_KEY_PROPERTY, Query.FilterOperator.EQUAL, rootJobKey));
+    query.setFilter(new FilterPredicate(ROOT_JOB_KEY_PROPERTY, FilterOperator.EQUAL, rootJobKey));
     PreparedQuery preparedQuery = dataStore.prepare(query);
     Iterable<Entity> returnValue;
     if (null != fetchOptions) {
@@ -495,6 +504,51 @@ public class AppEngineBackEnd implements PipelineBackEnd {
     for (Entity entity : queryAll(kind, rootJobKey, false, null)) {
       listOfObjects.put(entity.getKey(), instantiator.newObject(entity));
     }
+  }
+
+  @Override
+  public Pair<? extends Iterable<JobRecord>, String> queryRootPipelines(String classFilter,
+      String cursor, int limit) {
+    Query query = new Query(JobRecord.DATA_STORE_KIND);
+    Filter filter = classFilter == null || classFilter.isEmpty()
+        ? new FilterPredicate(ROOT_JOB_DISPLAY_NAME, FilterOperator.GREATER_THAN, null)
+        : new FilterPredicate(ROOT_JOB_DISPLAY_NAME, FilterOperator.EQUAL, classFilter);
+    query.setFilter(filter);
+    PreparedQuery preparedQuery = dataStore.prepare(query);
+    FetchOptions fetchOptions = FetchOptions.Builder.withDefaults();
+    if (limit > 0) {
+      fetchOptions.limit(limit + 1);
+    }
+    if (cursor != null) {
+      fetchOptions.startCursor(Cursor.fromWebSafeString(cursor));
+    }
+    QueryResultIterator<Entity> entities =
+        preparedQuery.asQueryResultIterable(fetchOptions).iterator();
+    Cursor dsCursor = null;
+    List<JobRecord> roots = new LinkedList<>();
+    while (entities.hasNext()) {
+      if (limit > 0 && roots.size() >= limit) {
+        dsCursor = entities.getCursor();
+        break;
+      }
+      JobRecord jobRecord = new JobRecord(entities.next());
+      roots.add(jobRecord);
+    }
+    return Pair.of(roots, dsCursor == null ? null : dsCursor.toWebSafeString());
+  }
+
+  @Override
+  public Set<String> getRootPipelinesDisplayName() {
+    Query query = new Query(JobRecord.DATA_STORE_KIND);
+    query.addProjection(
+        new PropertyProjection(JobRecord.ROOT_JOB_DISPLAY_NAME, String.class));
+    query.setDistinct(true);
+    PreparedQuery preparedQuery = dataStore.prepare(query);
+    Set<String> pipelines = new LinkedHashSet<>();
+    for (Entity entity : preparedQuery.asIterable()) {
+      pipelines.add((String) entity.getProperty(JobRecord.ROOT_JOB_DISPLAY_NAME));
+    }
+    return pipelines;
   }
 
   @Override

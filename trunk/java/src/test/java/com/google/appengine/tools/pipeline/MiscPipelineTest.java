@@ -301,7 +301,7 @@ public class MiscPipelineTest extends PipelineTest {
   @SuppressWarnings("serial")
   static class Temp<T extends Serializable> implements Serializable {
 
-    private T value;
+    private final T value;
 
     Temp(T value) {
       this.value = value;
