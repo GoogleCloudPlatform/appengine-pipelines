@@ -16,11 +16,14 @@ package com.google.appengine.tools.pipeline.impl.servlets;
 
 import com.google.appengine.api.datastore.Key;
 import com.google.appengine.api.datastore.KeyFactory;
+import com.google.appengine.tools.pipeline.impl.model.Barrier;
+import com.google.appengine.tools.pipeline.impl.model.JobInstanceRecord;
 import com.google.appengine.tools.pipeline.impl.model.JobRecord;
 import com.google.appengine.tools.pipeline.impl.model.PipelineObjects;
 import com.google.appengine.tools.pipeline.impl.model.Slot;
 import com.google.appengine.tools.pipeline.impl.model.SlotDescriptor;
 import com.google.appengine.tools.pipeline.impl.util.JsonUtils;
+import com.google.appengine.tools.pipeline.util.Pair;
 
 import java.util.Date;
 import java.util.HashMap;
@@ -36,27 +39,15 @@ import java.util.Map;
  */
 public class JsonGenerator {
 
-  private final PipelineObjects pipelineObjects;
-  private String jsonRepresentation;
-
-  public JsonGenerator(PipelineObjects pipelineObjects) {
-    this.pipelineObjects = pipelineObjects;
-  }
-
-  public synchronized String getJson() {
-    if (null == jsonRepresentation) {
-      buildJsonRepresentation();
-    }
-    return jsonRepresentation;
-  }
-
   private static String toString(Key key) {
     return KeyFactory.keyToString(key);
   }
 
+  private static final String PIPELINE_ID = "pipelineId";
   private static final String ROOT_PIPELINE_ID = "rootPipelineId";
   private static final String SLOTS = "slots";
   private static final String PIPELINES = "pipelines";
+  private static final String CURSOR = "cursor";
   private static final String SLOT_STATUS = "status";
   private static final String FILLED_STATUS = "filled";
   private static final String WAITING_STATUS = "waiting";
@@ -100,16 +91,26 @@ public class JsonGenerator {
   private static final String DEFAULT_OUTPUT_NAME = "default";
   private static final String JOB_STATUS_CONSOLE_URL = "statusConsoleUrl";
 
-  private void buildJsonRepresentation() {
-    Map<String, Object> mapRepresentation = toMapRepresentation();
-    jsonRepresentation = JsonUtils.mapToJson(mapRepresentation);
+  public static String pipelineRootsToJson(
+      Pair<? extends Iterable<JobRecord>, String> pipelineRoots) {
+    Map<String, Object> mapRepresentation = rootsToMapRepresentation(pipelineRoots);
+    return JsonUtils.mapToJson(mapRepresentation);
   }
 
-  private Map<String, Object> toMapRepresentation() {
+  public static String pipelineObjectsToJson(
+      PipelineObjects pipelineObjects, String rootJobId) {
+    Map<String, Object> mapRepresentation = objectsToMapRepresentation(pipelineObjects, rootJobId);
+    return JsonUtils.mapToJson(mapRepresentation);
+  }
+
+  private static Map<String, Object> objectsToMapRepresentation(
+      PipelineObjects pipelineObjects, String rootJobId) {
     Map<String, Map<String, Object>> slotMap = new HashMap<>(pipelineObjects.slots.size());
     Map<String, Map<String, Object>> jobMap = new HashMap<>(pipelineObjects.jobs.size());
     Map<String, Object> topLevel = new HashMap<>(4);
-    topLevel.put(ROOT_PIPELINE_ID, pipelineObjects.rootJob.getKey().getName());
+    if (rootJobId != null) {
+      topLevel.put(ROOT_PIPELINE_ID, rootJobId);
+    }
     topLevel.put(SLOTS, slotMap);
     topLevel.put(PIPELINES, jobMap);
     for (Slot slot : pipelineObjects.slots.values()) {
@@ -121,7 +122,23 @@ public class JsonGenerator {
     return topLevel;
   }
 
-  private Map<String, Object> buildMapRepresentation(Slot slot) {
+  private static Map<String, Object> rootsToMapRepresentation(
+      Pair<? extends Iterable<JobRecord>, String> pipelineRoots) {
+    List<Map<String, Object>> jobList = new LinkedList<>();
+    Map<String, Object> topLevel = new HashMap<>(3);
+    for (JobRecord rootRecord : pipelineRoots.getFirst()) {
+      Map<String, Object> mapRepresentation = buildMapRepresentation(rootRecord);
+      mapRepresentation.put(PIPELINE_ID, rootRecord.getKey().getName());
+      jobList.add(mapRepresentation);
+    }
+    topLevel.put(PIPELINES, jobList);
+    if (pipelineRoots.getSecond() != null) {
+      topLevel.put(CURSOR, pipelineRoots.getSecond());
+    }
+    return topLevel;
+  }
+
+  private static Map<String, Object> buildMapRepresentation(Slot slot) {
     Map<String, Object> map = new HashMap<>(5);
     String statusString = (slot.isFilled() ? FILLED_STATUS : WAITING_STATUS);
     map.put(SLOT_STATUS, statusString);
@@ -137,9 +154,18 @@ public class JsonGenerator {
     return map;
   }
 
-  private Map<String, Object> buildMapRepresentation(JobRecord jobRecord) {
+  private static Map<String, Object> buildMapRepresentation(JobRecord jobRecord) {
     Map<String, Object> map = new HashMap<>(5);
-    map.put(JOB_CLASS, jobRecord.getJobInstanceInflated().getJobClass());
+    String jobClass = jobRecord.getRootJobDisplayName();
+    if (jobClass == null) {
+      JobInstanceRecord jobInstanceInflated = jobRecord.getJobInstanceInflated();
+      if (null != jobInstanceInflated) {
+        jobClass = jobInstanceInflated.getJobDisplayName();
+      } else {
+        jobClass = "";
+      }
+    }
+    map.put(JOB_CLASS, jobClass);
     String statusString = null;
     switch (jobRecord.getState()) {
       case WAITING_TO_RUN:
@@ -175,8 +201,11 @@ public class JsonGenerator {
     map.put(JOB_CHILDREN, buildArrayRepresentation(jobRecord.getChildKeys()));
     List<Map<String, Object>> argumentListRepresentation = new LinkedList<>();
     List<String> waitingOnRepresentation = new LinkedList<>();
-    populateJobArgumentRepresentation(argumentListRepresentation, waitingOnRepresentation,
-        jobRecord.getRunBarrierInflated().getWaitingOnInflated());
+    Barrier runBarrierInflated = jobRecord.getRunBarrierInflated();
+    if (runBarrierInflated != null) {
+      populateJobArgumentRepresentation(argumentListRepresentation, waitingOnRepresentation,
+          runBarrierInflated.getWaitingOnInflated());
+    }
     map.put(JOB_ARGS, argumentListRepresentation);
     map.put(JOB_AFTER_SLOT_KEYS, waitingOnRepresentation);
     Map<String, String> allOutputs = new HashMap<>();
@@ -200,7 +229,7 @@ public class JsonGenerator {
     return map;
   }
 
-  private void populateJobArgumentRepresentation(
+  private static void populateJobArgumentRepresentation(
       List<Map<String, Object>> argumentListRepresentation, List<String> waitingOnRepresentation,
       List<SlotDescriptor> slotDescriptors) {
     for (SlotDescriptor slotDescriptor : slotDescriptors) {
@@ -214,7 +243,7 @@ public class JsonGenerator {
     }
   }
 
-  private Map<String, Object> buildArgumentRepresentation(Slot slot) {
+  private static Map<String, Object> buildArgumentRepresentation(Slot slot) {
     Map<String, Object> map = new HashMap<>(3);
     if (slot.isFilled()) {
       map.put("type", "value");
@@ -227,7 +256,7 @@ public class JsonGenerator {
     return map;
   }
 
-  private String[] buildArrayRepresentation(List<Key> listOfKeys) {
+  private static String[] buildArrayRepresentation(List<Key> listOfKeys) {
     String[] arrayOfIds = new String[listOfKeys.size()];
     int i = 0;
     for (Key key : listOfKeys) {

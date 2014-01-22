@@ -16,7 +16,7 @@
     <dependency org="com.google.appengine" name="appengine-api-stubs" rev="${sdk_version}"
                 conf="${test}->default"/>
     <dependency org="junit" name="junit" rev="4.10" conf="${test}->default"/>
-
+    <dependency org="org.mockito" name="mockito-all" rev="1.8.4" conf="${test}->default"/>
     <dependency org="org.json" name="json" rev="20090211" conf="${thirdparty}->default"/>
   </dependencies>
 </ivy-module>

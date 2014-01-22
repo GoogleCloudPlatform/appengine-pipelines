@@ -50,12 +50,14 @@ import com.google.appengine.tools.pipeline.impl.tasks.RunJobTask;
 import com.google.appengine.tools.pipeline.impl.tasks.Task;
 import com.google.appengine.tools.pipeline.impl.util.GUIDGenerator;
 import com.google.appengine.tools.pipeline.impl.util.StringUtils;
+import com.google.appengine.tools.pipeline.util.Pair;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -316,6 +318,15 @@ public class PipelineManager {
     return backEnd.queryFullPipeline(rootJobKey);
   }
 
+  public static Pair<? extends Iterable<JobRecord>, String> queryRootPipelines(
+      String classFilter, String cursor, int limit) {
+    return backEnd.queryRootPipelines(classFilter, cursor, limit);
+  }
+
+  public static Set<String> getRootPipelinesDisplayName() {
+    return backEnd.getRootPipelinesDisplayName();
+  }
+
   private static void checkNonEmpty(String s, String name) {
     if (null == s || s.trim().length() == 0) {
       throw new IllegalArgumentException(name + " is empty.");
@@ -469,21 +480,20 @@ public class PipelineManager {
     private final JobSetting[] settings;
     private final Object[] params;
 
-    /**
-     * @param jobInstance
-     * @param settings
-     * @param params
-     */
     public RootJobInstance(Job<?> jobInstance, JobSetting[] settings, Object[] params) {
       this.jobInstance = jobInstance;
       this.settings = settings;
       this.params = params;
     }
 
-
     @Override
     public Value<Object> run() throws Exception {
       return futureCallUnchecked(settings, jobInstance, params);
+    }
+
+    @Override
+    public String getJobDisplayName() {
+      return jobInstance.getClass().getName();
     }
   }
 

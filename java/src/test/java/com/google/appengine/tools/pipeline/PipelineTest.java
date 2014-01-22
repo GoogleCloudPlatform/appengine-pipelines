@@ -121,7 +121,6 @@ public class PipelineTest extends TestCase {
     }
   }
 
-  @SuppressWarnings("unchecked")
   protected <T> T waitForJobToComplete(String pipelineId) throws Exception {
     JobInfo jobInfo = waitUntilJobComplete(pipelineId);
     switch (jobInfo.getJobState()) {

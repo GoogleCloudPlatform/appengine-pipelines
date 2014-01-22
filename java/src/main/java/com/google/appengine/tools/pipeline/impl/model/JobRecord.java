@@ -138,6 +138,7 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
   private static final String MODULE_VERSION_PROPERTY = "moduleVersion";
   private static final String CHILD_GRAPH_GUID_PROPERTY = "childGraphGuid";
   private static final String STATUS_CONSOLE_URL = "statusConsoleUrl";
+  public static final String ROOT_JOB_DISPLAY_NAME = "rootJobDisplayName";
 
   // persistent fields
   private final Key jobInstanceKey;
@@ -162,6 +163,7 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
   private long backoffFactor = JobSetting.BackoffFactor.DEFAULT;
   private QueueSettings queueSettings = new QueueSettings();
   private String statusConsoleUrl;
+  private String rootJobDisplayName;
 
   // transient fields
   private Barrier runBarrierInflated;
@@ -175,7 +177,6 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
    *
    * @param entity
    */
-  @SuppressWarnings("unchecked")
   public JobRecord(Entity entity) {
     super(entity);
     jobInstanceKey = (Key) entity.getProperty(JOB_INSTANCE_PROPERTY);
@@ -224,6 +225,7 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
     queueSettings.setModuleVersion((String) entity.getProperty(MODULE_VERSION_PROPERTY));
     queueSettings.setOnQueue((String) entity.getProperty(ON_QUEUE_PROPERTY));
     statusConsoleUrl = (String) entity.getProperty(STATUS_CONSOLE_URL);
+    rootJobDisplayName = (String) entity.getProperty(ROOT_JOB_DISPLAY_NAME);
   }
 
   /**
@@ -271,6 +273,9 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
     entity.setUnindexedProperty(MODULE_VERSION_PROPERTY, queueSettings.getModuleVersion());
     entity.setUnindexedProperty(ON_QUEUE_PROPERTY, queueSettings.getOnQueue());
     entity.setUnindexedProperty(STATUS_CONSOLE_URL, statusConsoleUrl);
+    if (rootJobDisplayName != null) {
+      entity.setProperty(ROOT_JOB_DISPLAY_NAME, rootJobDisplayName);
+    }
     return entity;
   }
 
@@ -340,6 +345,7 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
     }
   }
 
+  // Constructor for Root Jobs (called by {@link #createRootJobRecord}).
   private JobRecord(Key key, Job<?> jobInstance, JobSetting[] settings) {
     // Root Jobs have their rootJobKey the same as their keys and provide null for generatorKey
     // and graphGUID. Also, callExceptionHandler is always false.
@@ -357,6 +363,7 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
         queueSettings.setModuleVersion(version);
       }
     }
+    rootJobDisplayName = jobInstance.getJobDisplayName();
   }
 
   /**
@@ -671,11 +678,15 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
     return exceptionKey;
   }
 
+  public String getRootJobDisplayName() {
+    return rootJobDisplayName;
+  }
+
   private String getJobInstanceString() {
     if (null == jobInstanceRecordInflated) {
       return "jobInstanceKey=" + jobInstanceKey;
     }
-    String jobClass = jobInstanceRecordInflated.getJobClass();
+    String jobClass = jobInstanceRecordInflated.getClassName();
     return jobClass + (callExceptionHandler ? ".handleException" : ".run");
   }
 
@@ -684,6 +695,7 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
     return "JobRecord [" + getKey().getName() + ", " + state + ", " + getJobInstanceString()
         + ", callExceptionJHandler=" + callExceptionHandler + ", runBarrier="
         + runBarrierKey.getName() + ", finalizeBarrier=" + finalizeBarrierKey.getName()
-        + ", outputSlot=" + outputSlotKey.getName() + "]";
+        + ", outputSlot=" + outputSlotKey.getName() + ", rootJobDisplayName="
+        + rootJobDisplayName + "]";
   }
 }

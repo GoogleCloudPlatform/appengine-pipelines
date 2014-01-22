@@ -17,6 +17,8 @@ package com.google.appengine.tools.pipeline.impl.servlets;
 import com.google.appengine.api.datastore.Key;
 import com.google.appengine.tools.pipeline.util.Pair;
 
+import java.io.IOException;
+
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -24,7 +26,7 @@ import javax.servlet.http.HttpServletResponse;
 
 /**
  * Servlet that handles all requests for the Pipeline framework.
- * Dispatches all requests to {@link TaskHandler}, {@link JsonHandler} or
+ * Dispatches all requests to {@link TaskHandler}, {@link JsonTreeHandler} or
  * {@link StaticContentHandler} as appropriate
  *
  * @author rudominer@google.com (Mitch Rudominer)
@@ -44,10 +46,12 @@ public class PipelineServlet extends HttpServlet {
   private static enum RequestType {
 
     HANDLE_TASK(TaskHandler.PATH_COMPONENT),
-    GET_JSON(JsonHandler.PATH_COMPONENT),
+    GET_JSON(JsonTreeHandler.PATH_COMPONENT),
+    GET_JSON_LIST(JsonListHandler.PATH_COMPONENT),
+    GET_JSON_CLASS_FILTER(JsonClassFilterHandler.PATH_COMPONENT),
     HANDLE_STATIC("");
 
-    private String pathComponent;
+    private final String pathComponent;
 
     private RequestType(String pathComponent) {
       this.pathComponent = pathComponent;
@@ -72,12 +76,14 @@ public class PipelineServlet extends HttpServlet {
   }
 
   @Override
-  public void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException {
+  public void doPost(HttpServletRequest req, HttpServletResponse resp)
+      throws ServletException, IOException {
     doGet(req, resp);
   }
 
   @Override
-  public void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException {
+  public void doGet(HttpServletRequest req, HttpServletResponse resp)
+      throws ServletException, IOException {
     Pair<String, RequestType> pair = parseRequestType(req);
     RequestType requestType = pair.getSecond();
     String path = pair.getFirst();
@@ -86,7 +92,13 @@ public class PipelineServlet extends HttpServlet {
         TaskHandler.doPost(req);
         break;
       case GET_JSON:
-        JsonHandler.doGet(req, resp);
+        JsonTreeHandler.doGet(req, resp);
+        break;
+      case GET_JSON_LIST:
+        JsonListHandler.doGet(req, resp);
+        break;
+      case GET_JSON_CLASS_FILTER:
+        JsonClassFilterHandler.doGet(req, resp);
         break;
       case HANDLE_STATIC:
         StaticContentHandler.doGet(resp, path);

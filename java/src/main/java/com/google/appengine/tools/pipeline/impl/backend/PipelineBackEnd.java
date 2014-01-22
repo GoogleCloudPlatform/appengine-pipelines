@@ -24,8 +24,10 @@ import com.google.appengine.tools.pipeline.impl.model.PipelineObjects;
 import com.google.appengine.tools.pipeline.impl.model.Slot;
 import com.google.appengine.tools.pipeline.impl.tasks.FanoutTask;
 import com.google.appengine.tools.pipeline.impl.tasks.Task;
+import com.google.appengine.tools.pipeline.util.Pair;
 
 import java.io.IOException;
+import java.util.Set;
 
 /**
  * An interface that gives access to data store and task queue operations that
@@ -35,13 +37,12 @@ import java.io.IOException;
  */
 public interface PipelineBackEnd {
 
-
   /**
    * Saves entities to the data store and enqueues tasks to the task queue based
    * on the specification given in {@code UpdateSpec}. See the remarks at the
    * top of {@link UpdateSpec} for details.
    */
-  public void save(UpdateSpec updateSpec, QueueSettings queueSettings);
+  void save(UpdateSpec updateSpec, QueueSettings queueSettings);
 
   /**
    * Saves an {@code UpdateSpec} to the data store, but transactionally checks
@@ -55,7 +56,7 @@ public interface PipelineBackEnd {
    * see if it is one of the {@code expectedStates}. If not then the final
    * transaction will be aborted, but this method will not throw an exception.
    */
-  public void saveWithJobStateCheck(UpdateSpec updateSpec, QueueSettings queueSettings,
+  void saveWithJobStateCheck(UpdateSpec updateSpec, QueueSettings queueSettings,
       Key jobKey, JobRecord.State... expectedStates);
 
   /**
@@ -70,8 +71,7 @@ public interface PipelineBackEnd {
    * @throws NoSuchObjectException If Either the JobRecord or any of the
    *         associated Slots or Barriers are not found in the data store.
    */
-  public JobRecord queryJob(Key key, JobRecord.InflationType inflationType)
-      throws NoSuchObjectException;
+  JobRecord queryJob(Key key, JobRecord.InflationType inflationType) throws NoSuchObjectException;
 
   /**
    * Get the Slot with the given Key from the data store, and optionally also
@@ -93,7 +93,7 @@ public interface PipelineBackEnd {
    *         of objects.
    * @throws NoSuchObjectException
    */
-  public Slot querySlot(Key key, boolean inflate) throws NoSuchObjectException;
+  Slot querySlot(Key key, boolean inflate) throws NoSuchObjectException;
 
   /**
    * Get the Failure with the given Key from the data store.
@@ -102,7 +102,7 @@ public interface PipelineBackEnd {
    * @return A {@code FailureRecord}
    * @throws NoSuchObjectException
    */
-  public ExceptionRecord queryFailure(Key key) throws NoSuchObjectException;
+  ExceptionRecord queryFailure(Key key) throws NoSuchObjectException;
 
   /**
    * Given an arbitrary Java Object, returns another object that encodes the
@@ -116,7 +116,7 @@ public interface PipelineBackEnd {
    * @return The serialized version of the object.
    * @throws IOException if any problem occurs
    */
-  public Object serlializeValue(PipelineModelObject model, Object value) throws IOException;
+  Object serlializeValue(PipelineModelObject model, Object value) throws IOException;
 
   /**
    * Reverses the operation performed by
@@ -127,7 +127,7 @@ public interface PipelineBackEnd {
    * @return The deserialized version of the object.
    * @throws IOException if any problem occurs
    */
-  public Object deserializeValue(PipelineModelObject model, Object serliazedVersion)
+  Object deserializeValue(PipelineModelObject model, Object serliazedVersion)
       throws IOException;
 
   /**
@@ -142,13 +142,13 @@ public interface PipelineBackEnd {
    *         specified by the {@link FanoutTask#getRecordKey() key} contained in
    *         {@code fanoutTask} does not exist in the data store.
    */
-  public void handleFanoutTask(FanoutTask fanoutTask) throws NoSuchObjectException;
+  void handleFanoutTask(FanoutTask fanoutTask) throws NoSuchObjectException;
 
   /**
    * Queries the data store for all Pipeline objects associated with the given
    * root Job Key
    */
-  public PipelineObjects queryFullPipeline(Key rootJobKey);
+  PipelineObjects queryFullPipeline(Key rootJobKey);
 
   /**
    * Delete all datastore entities corresponding to the given pipeline.
@@ -171,7 +171,7 @@ public interface PipelineBackEnd {
    *         {@link com.google.appengine.tools.pipeline.impl.model.JobRecord.State#STOPPED}
    *         state.
    */
-  public void deletePipeline(Key rootJobKey, boolean force, boolean async)
+  void deletePipeline(Key rootJobKey, boolean force, boolean async)
       throws IllegalStateException;
 
   /**
@@ -182,6 +182,21 @@ public interface PipelineBackEnd {
    * {@link UpdateSpec}. This method is simpler if one only wants to enqueue a
    * single task in isolation.
    */
-  public void enqueue(Task task);
+  void enqueue(Task task);
 
+  /**
+   * Queries the data store for all root Pipeline.
+   *
+   * @param classFilter An optional filter by class display name.
+   * @param cursor An optional cursor (used for paging).
+   * @param limit Results limit (zero or negative will be treated as no limit).
+   * @return a Pair of job records and a next cursor (or null, if no more results).
+   */
+  Pair<? extends Iterable<JobRecord>, String> queryRootPipelines(
+      String classFilter, String cursor, int limit);
+
+  /**
+   * Returns the set of all root pipelines display name.
+   */
+  Set<String> getRootPipelinesDisplayName();
 }

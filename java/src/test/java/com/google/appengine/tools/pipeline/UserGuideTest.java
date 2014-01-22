@@ -71,7 +71,6 @@ public class UserGuideTest extends TestCase {
     assertEquals(((x - y) * (x - z)) - 2, output);
   }
 
-  @SuppressWarnings("unchecked")
   private <E> E waitForJobToComplete(String pipelineId) throws Exception {
     PipelineService service = PipelineServiceFactory.newPipelineService();
     while (true) {

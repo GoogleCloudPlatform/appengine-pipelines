@@ -31,12 +31,14 @@ public class JobInstanceRecord extends PipelineModelObject {
   public static final String DATA_STORE_KIND = "pipeline-jobInstanceRecord";
   private static final String JOB_KEY_PROPERTY = "jobKey";
   private static final String JOB_CLASS_NAME_PROPERTY = "jobClassName";
+  public static final String JOB_DISPLAY_NAME_PROPERTY = "jobDisplayName";
   private static final String INSTANCE_BYTES_PROPERTY = "bytes"; // legacy (blob)
   private static final String INSTANCE_VALUE_PROPERTY = "value";
 
   // persistent
   private final Key jobKey;
-  private final String jobClass;
+  private final String jobClassName;
+  private final String jobDisplayName;
   private final Object value;
 
   // transient
@@ -45,7 +47,8 @@ public class JobInstanceRecord extends PipelineModelObject {
   public JobInstanceRecord(JobRecord job, Job<?> jobInstance) {
     super(job.getRootJobKey(), job.getGeneratorJobKey(), job.getGraphGuid());
     jobKey = job.getKey();
-    jobClass = jobInstance.getClass().getName();
+    jobClassName = jobInstance.getClass().getName();
+    jobDisplayName = jobInstance.getJobDisplayName();
     try {
       value = PipelineManager.getBackEnd().serlializeValue(this, jobInstance);
     } catch (IOException e) {
@@ -57,7 +60,12 @@ public class JobInstanceRecord extends PipelineModelObject {
   public JobInstanceRecord(Entity entity) {
     super(entity);
     jobKey = (Key) entity.getProperty(JOB_KEY_PROPERTY);
-    jobClass = (String) entity.getProperty(JOB_CLASS_NAME_PROPERTY);
+    jobClassName = (String) entity.getProperty(JOB_CLASS_NAME_PROPERTY);
+    if (entity.hasProperty(JOB_DISPLAY_NAME_PROPERTY)) {
+      jobDisplayName = (String) entity.getProperty(JOB_DISPLAY_NAME_PROPERTY);
+    } else {
+      jobDisplayName = jobClassName;
+    }
     if (entity.hasProperty(INSTANCE_BYTES_PROPERTY)) {
       value = entity.getProperty(INSTANCE_BYTES_PROPERTY);
     } else {
@@ -69,8 +77,9 @@ public class JobInstanceRecord extends PipelineModelObject {
   public Entity toEntity() {
     Entity entity = toProtoEntity();
     entity.setProperty(JOB_KEY_PROPERTY, jobKey);
-    entity.setUnindexedProperty(JOB_CLASS_NAME_PROPERTY, jobClass);
+    entity.setProperty(JOB_CLASS_NAME_PROPERTY, jobClassName);
     entity.setUnindexedProperty(INSTANCE_VALUE_PROPERTY, value);
+    entity.setUnindexedProperty(JOB_DISPLAY_NAME_PROPERTY, jobDisplayName);
     return entity;
   }
 
@@ -83,8 +92,15 @@ public class JobInstanceRecord extends PipelineModelObject {
     return jobKey;
   }
 
-  public String getJobClass() {
-    return jobClass;
+  /**
+   * Returns the job class name for display purpose only.
+   */
+  public String getJobDisplayName() {
+    return jobDisplayName;
+  }
+
+  public String getClassName() {
+    return jobClassName;
   }
 
   public synchronized Job<?> getJobInstanceDeserialized() {

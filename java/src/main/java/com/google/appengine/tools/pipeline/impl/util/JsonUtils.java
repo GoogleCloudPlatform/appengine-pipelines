@@ -64,7 +64,7 @@ public class JsonUtils {
   /**
    * Convert a JSON representation into an object
    */
-  private static Object fromJson(String json) {
+  public static Object fromJson(String json) {
     try {
       JSONObject jsonObject = new JSONObject(json);
       if (jsonObject.has("JSON")) {
