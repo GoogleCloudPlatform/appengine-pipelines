@@ -343,13 +343,6 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
     for (JobSetting setting : settings) {
       applySetting(setting);
     }
-  }
-
-  // Constructor for Root Jobs (called by {@link #createRootJobRecord}).
-  private JobRecord(Key key, Job<?> jobInstance, JobSetting[] settings) {
-    // Root Jobs have their rootJobKey the same as their keys and provide null for generatorKey
-    // and graphGUID. Also, callExceptionHandler is always false.
-    this(key, key, null, null, jobInstance, false, settings);
     if (queueSettings.getOnBackend() == null) {
       ModulesService modulesService = ModulesServiceFactory.getModulesService();
       String currentModule = modulesService.getCurrentModule();
@@ -363,6 +356,13 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
         queueSettings.setModuleVersion(version);
       }
     }
+  }
+
+  // Constructor for Root Jobs (called by {@link #createRootJobRecord}).
+  private JobRecord(Key key, Job<?> jobInstance, JobSetting[] settings) {
+    // Root Jobs have their rootJobKey the same as their keys and provide null for generatorKey
+    // and graphGUID. Also, callExceptionHandler is always false.
+    this(key, key, null, null, jobInstance, false, settings);
     rootJobDisplayName = jobInstance.getJobDisplayName();
   }
 
