@@ -221,8 +221,17 @@ public class JsonGenerator {
     map.put(JOB_BACKOFF_SECONDS, jobRecord.getBackoffSeconds());
     map.put(JOB_BACKOFF_FACTOR, jobRecord.getBackoffFactor());
     map.put(JOB_KWARGS, new HashMap<String, String>());
-    map.put(JOB_LAST_RETRY_MESSAGE, "");
-    map.put(JOB_ABORT_MESSAGE, "");
+    Throwable error = jobRecord.getException();
+    if (error != null) {
+      switch (jobRecord.getState()) {
+        case STOPPED:
+        case CANCELED:
+          map.put(JOB_ABORT_MESSAGE, error.getMessage());
+          break;
+        default:
+          map.put(JOB_LAST_RETRY_MESSAGE, error.getMessage());
+      }
+    }
     if (jobRecord.getStatusConsoleUrl() != null) {
       map.put(JOB_STATUS_CONSOLE_URL, jobRecord.getStatusConsoleUrl());
     }

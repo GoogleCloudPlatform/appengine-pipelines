@@ -51,6 +51,24 @@ public class MiscPipelineTest extends PipelineTest {
     }
   }
 
+  @SuppressWarnings("serial")
+  private static class FailedJob extends Job0<String> {
+
+    @Override
+    public Value<String> run() throws Exception {
+      throw new RuntimeException("koko");
+    }
+  }
+
+  public void testJobFailure() throws Exception {
+    PipelineService service = PipelineServiceFactory.newPipelineService();
+    String pipelineId = service.startNewPipeline(new FailedJob());
+    JobInfo jobInfo = waitUntilJobComplete(pipelineId);
+    assertEquals(JobInfo.State.STOPPED_BY_ERROR, jobInfo.getJobState());
+    assertEquals("koko", jobInfo.getException().getMessage());
+    assertNull(jobInfo.getOutput());
+  }
+
   public void testReturnValue() throws Exception {
     // Testing that return value from parent is always after all children complete
     // which is not the case right now. This this *SHOULD* change after we fix
