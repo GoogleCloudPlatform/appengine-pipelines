@@ -50,7 +50,7 @@ public class JobInstanceRecord extends PipelineModelObject {
     jobClassName = jobInstance.getClass().getName();
     jobDisplayName = jobInstance.getJobDisplayName();
     try {
-      value = PipelineManager.getBackEnd().serlializeValue(this, jobInstance);
+      value = PipelineManager.getBackEnd().serializeValue(this, jobInstance);
     } catch (IOException e) {
       throw new RuntimeException("Exception while attempting to serialize the jobInstance "
           + jobInstance, e);
