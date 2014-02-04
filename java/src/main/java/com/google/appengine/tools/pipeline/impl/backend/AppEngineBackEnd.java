@@ -409,7 +409,7 @@ public class AppEngineBackEnd implements PipelineBackEnd {
   }
 
   @Override
-  public Object serlializeValue(PipelineModelObject model, Object value) throws IOException {
+  public Object serializeValue(PipelineModelObject model, Object value) throws IOException {
     byte[] bytes = SerializationUtils.serialize(value);
     if (bytes.length < MAX_BLOB_BYTE_SIZE) {
       return new Blob(bytes);

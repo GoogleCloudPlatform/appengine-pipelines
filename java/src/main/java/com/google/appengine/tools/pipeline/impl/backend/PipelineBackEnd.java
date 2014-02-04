@@ -116,18 +116,18 @@ public interface PipelineBackEnd {
    * @return The serialized version of the object.
    * @throws IOException if any problem occurs
    */
-  Object serlializeValue(PipelineModelObject model, Object value) throws IOException;
+  Object serializeValue(PipelineModelObject model, Object value) throws IOException;
 
   /**
    * Reverses the operation performed by
-   * {@link #serlializeValue(PipelineModelObject, Object)}.
+   * {@link #serializeValue(PipelineModelObject, Object)}.
    *
    * @param model The model that is associated with the serialized version.
-   * @param serliazedVersion The serialized version of an object.
+   * @param serializedVersion The serialized version of an object.
    * @return The deserialized version of the object.
    * @throws IOException if any problem occurs
    */
-  Object deserializeValue(PipelineModelObject model, Object serliazedVersion)
+  Object deserializeValue(PipelineModelObject model, Object serializedVersion)
       throws IOException;
 
   /**

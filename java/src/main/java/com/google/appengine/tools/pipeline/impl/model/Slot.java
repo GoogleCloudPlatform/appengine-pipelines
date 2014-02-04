@@ -79,7 +79,7 @@ public class Slot extends PipelineModelObject {
     }
     try {
       entity.setUnindexedProperty(VALUE_PROPERTY,
-          PipelineManager.getBackEnd().serlializeValue(this, value));
+          PipelineManager.getBackEnd().serializeValue(this, value));
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
