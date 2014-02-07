@@ -225,6 +225,7 @@ public abstract class PipelineModelObject {
   }
 
   protected static <E> List<E> getListProperty(String propertyName, Entity entity) {
+    @SuppressWarnings("unchecked")
     List<E> list = (List<E>) entity.getProperty(propertyName);
     return list == null ? new LinkedList<E>() : list;
   }

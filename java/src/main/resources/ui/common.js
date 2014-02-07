@@ -86,13 +86,13 @@ function getElapsedTimeString(startTimestampMs, updatedTimestampMs) {
 
 // Clears the status butter.
 function clearButter() {
-  $("#butter").css('display', 'none');
+  $('#butter').css('display', 'none');
 }
 
 
 // Sets the status butter, optionally indicating if it's an error message.
-function setButter(message, error, traceback) {
-  var butter = $("#butter");
+function setButter(message, error, traceback, asHtml) {
+  var butter = $('#butter');
   // Prevent flicker on butter update by hiding it first.
   butter.css('display', 'none');
   if (error) {
@@ -101,7 +101,11 @@ function setButter(message, error, traceback) {
     butter.removeClass('error').addClass('info');
   }
   butter.children().remove();
-  butter.append($('<div>').text(message));
+  if (asHtml) {
+    butter.append($('<div>').html(message));
+  } else {
+    butter.append($('<div>').text(message));
+  }
 
   function centerButter() {
     butter.css('left', ($(window).width() - $(butter).outerWidth()) / 2);
