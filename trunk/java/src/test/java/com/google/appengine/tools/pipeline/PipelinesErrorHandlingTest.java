@@ -415,6 +415,7 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
    */
   public void testGrandchildCancellation() throws Exception {
     String pipelineId = service.startNewPipeline(new TestGrandchildCancellationJob());
+    waitUntilTaskQueueIsEmpty();
     Integer result = waitForJobToComplete(pipelineId);
     assertEquals(EXPECTED_RESULT1, result.intValue());
 
@@ -713,7 +714,10 @@ public class PipelinesErrorHandlingTest extends PipelineTest {
     @Override
     public Value<Integer> run(String unblockHandle) throws Exception {
       trace("UnblockAndThrowJob.run");
-      PipelineManager.acceptPromisedValue(unblockHandle, EXPECTED_RESULT1);
+      // TODO(user): uncomment once b/12249138 is fixed, which will be a good test to verify
+      // that a job should never return a value before all its children completed and first
+      // exception if happens will override possible already filled value.
+      // PipelineManager.acceptPromisedValue(unblockHandle, EXPECTED_RESULT1);
       throw new IllegalStateException("simulated");
     }
   }

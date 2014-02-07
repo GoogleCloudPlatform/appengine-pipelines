@@ -97,20 +97,16 @@ public class JsonGenerator {
     return JsonUtils.mapToJson(mapRepresentation);
   }
 
-  public static String pipelineObjectsToJson(
-      PipelineObjects pipelineObjects, String rootJobId) {
-    Map<String, Object> mapRepresentation = objectsToMapRepresentation(pipelineObjects, rootJobId);
+  public static String pipelineObjectsToJson(PipelineObjects pipelineObjects) {
+    Map<String, Object> mapRepresentation = objectsToMapRepresentation(pipelineObjects);
     return JsonUtils.mapToJson(mapRepresentation);
   }
 
-  private static Map<String, Object> objectsToMapRepresentation(
-      PipelineObjects pipelineObjects, String rootJobId) {
+  private static Map<String, Object> objectsToMapRepresentation(PipelineObjects pipelineObjects) {
     Map<String, Map<String, Object>> slotMap = new HashMap<>(pipelineObjects.slots.size());
     Map<String, Map<String, Object>> jobMap = new HashMap<>(pipelineObjects.jobs.size());
     Map<String, Object> topLevel = new HashMap<>(4);
-    if (rootJobId != null) {
-      topLevel.put(ROOT_PIPELINE_ID, rootJobId);
-    }
+    topLevel.put(ROOT_PIPELINE_ID, pipelineObjects.rootJob.getKey().getName());
     topLevel.put(SLOTS, slotMap);
     topLevel.put(PIPELINES, jobMap);
     for (Slot slot : pipelineObjects.slots.values()) {

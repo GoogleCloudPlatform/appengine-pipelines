@@ -14,7 +14,9 @@
 
 package com.google.appengine.tools.pipeline.impl.servlets;
 
+import com.google.appengine.tools.pipeline.NoSuchObjectException;
 import com.google.appengine.tools.pipeline.impl.PipelineManager;
+import com.google.appengine.tools.pipeline.impl.model.JobRecord;
 import com.google.appengine.tools.pipeline.impl.model.PipelineObjects;
 
 import java.io.IOException;
@@ -39,14 +41,20 @@ public class JsonTreeHandler {
       throw new ServletException(ROOT_PIPELINE_ID + " parameter not found.");
     }
     try {
-      PipelineObjects pipelineObjects;
+      JobRecord jobInfo;
       try {
-        pipelineObjects = PipelineManager.queryFullPipeline(rootJobHandle);
-      } catch (IllegalArgumentException ex) {
+        jobInfo = PipelineManager.getJob(rootJobHandle);
+      } catch (NoSuchObjectException nsoe) {
         resp.sendError(HttpServletResponse.SC_NOT_FOUND);
         return;
       }
-      String asJson = JsonGenerator.pipelineObjectsToJson(pipelineObjects, rootJobHandle);
+      String rootJobKey = jobInfo.getRootJobKey().getName();
+      if (!rootJobKey.equals(rootJobHandle)) {
+        resp.sendError(449, rootJobKey);
+        return;
+      }
+      PipelineObjects pipelineObjects = PipelineManager.queryFullPipeline(rootJobKey);
+      String asJson = JsonGenerator.pipelineObjectsToJson(pipelineObjects);
       resp.getWriter().write(asJson);
     } catch (IOException e) {
       throw new ServletException(e);
