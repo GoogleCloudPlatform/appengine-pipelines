@@ -233,7 +233,7 @@ public abstract class Task {
 
   @Override
   public String toString() {
-    String value = getType() + "_TASK[name=" + getName() + "queueSettings=" + getQueueSettings();
+    String value = getType() + "_TASK[name=" + getName() + ", queueSettings=" + getQueueSettings();
     String extraProperties = propertiesAsString();
     if (extraProperties != null && !extraProperties.isEmpty()) {
       value += ", " + extraProperties;
