@@ -302,7 +302,7 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
   public JobRecord(JobRecord generatorJob, String graphGUIDParam, Job<?> jobInstance,
       boolean callExceptionHandler, JobSetting[] settings) {
     this(generatorJob.getRootJobKey(), null, generatorJob.getKey(), graphGUIDParam, jobInstance,
-        callExceptionHandler, settings);
+        callExceptionHandler, settings, generatorJob.getQueueSettings());
     // If generator job has exception handler then it should be called in case
     // of this job throwing to create an exception handling child job.
     // If callExceptionHandler is true then this job is an exception handling
@@ -314,7 +314,6 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
       exceptionHandlingAncestorKey = generatorJob.getExceptionHandlingAncestorKey();
     }
     // Inherit settings from generator job
-    queueSettings.merge(generatorJob.queueSettings);
     Map<Class<? extends JobSetting>, JobSetting> settingsMap = new HashMap<>();
     for (JobSetting setting : settings) {
       settingsMap.put(setting.getClass(), setting);
@@ -325,7 +324,8 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
   }
 
   private JobRecord(Key rootJobKey, Key thisKey, Key generatorJobKey, String graphGUID,
-      Job<?> jobInstance, boolean callExceptionHandler, JobSetting[] settings) {
+      Job<?> jobInstance, boolean callExceptionHandler, JobSetting[] settings,
+      QueueSettings parentQueueSettings) {
     super(rootJobKey, null, thisKey, generatorJobKey, graphGUID);
     jobInstanceRecordInflated = new JobInstanceRecord(this, jobInstance);
     jobInstanceKey = jobInstanceRecordInflated.getKey();
@@ -344,6 +344,9 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
     state = State.WAITING_TO_RUN;
     for (JobSetting setting : settings) {
       applySetting(setting);
+    }
+    if (parentQueueSettings != null) {
+      queueSettings.merge(parentQueueSettings);
     }
     if (queueSettings.getOnBackend() == null) {
       String module = queueSettings.getOnModule();
@@ -373,7 +376,7 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
   private JobRecord(Key key, Job<?> jobInstance, JobSetting[] settings) {
     // Root Jobs have their rootJobKey the same as their keys and provide null for generatorKey
     // and graphGUID. Also, callExceptionHandler is always false.
-    this(key, key, null, null, jobInstance, false, settings);
+    this(key, key, null, null, jobInstance, false, settings, null);
     rootJobDisplayName = jobInstance.getJobDisplayName();
   }
 
