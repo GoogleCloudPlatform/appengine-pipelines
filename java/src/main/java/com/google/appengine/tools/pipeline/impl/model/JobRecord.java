@@ -14,6 +14,8 @@
 
 package com.google.appengine.tools.pipeline.impl.model;
 
+import com.google.appengine.api.backends.BackendService;
+import com.google.appengine.api.backends.BackendServiceFactory;
 import com.google.appengine.api.datastore.Entity;
 import com.google.appengine.api.datastore.Key;
 import com.google.appengine.api.datastore.Text;
@@ -161,7 +163,7 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
   private long maxAttempts = JobSetting.MaxAttempts.DEFAULT;
   private long backoffSeconds = JobSetting.BackoffSeconds.DEFAULT;
   private long backoffFactor = JobSetting.BackoffFactor.DEFAULT;
-  private QueueSettings queueSettings = new QueueSettings();
+  private final QueueSettings queueSettings = new QueueSettings();
   private String statusConsoleUrl;
   private String rootJobDisplayName;
 
@@ -344,16 +346,25 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
       applySetting(setting);
     }
     if (queueSettings.getOnBackend() == null) {
-      ModulesService modulesService = ModulesServiceFactory.getModulesService();
-      String currentModule = modulesService.getCurrentModule();
-      if (queueSettings.getOnModule() == null) {
-        queueSettings.setOnModule(currentModule);
-        queueSettings.setModuleVersion(modulesService.getCurrentVersion());
-      } else if (queueSettings.getOnModule().equals(currentModule)) {
-        queueSettings.setModuleVersion(modulesService.getCurrentVersion());
+      String module = queueSettings.getOnModule();
+      if (module == null) {
+        BackendService backendSerivce = BackendServiceFactory.getBackendService();
+        String currentBackend = backendSerivce.getCurrentBackend();
+        // If currentBackend contains ':' it is actually a B type module (see b/12893879)
+        if (currentBackend != null && currentBackend.indexOf(':') == -1) {
+          queueSettings.setOnBackend(currentBackend);
+        } else {
+          ModulesService modulesService = ModulesServiceFactory.getModulesService();
+          queueSettings.setOnModule(modulesService.getCurrentModule());
+          queueSettings.setModuleVersion(modulesService.getCurrentVersion());
+        }
       } else {
-        String version = modulesService.getDefaultVersion(queueSettings.getOnModule());
-        queueSettings.setModuleVersion(version);
+        ModulesService modulesService = ModulesServiceFactory.getModulesService();
+        if (module.equals(modulesService.getCurrentModule())) {
+          queueSettings.setModuleVersion(modulesService.getCurrentVersion());
+        } else {
+          queueSettings.setModuleVersion(modulesService.getDefaultVersion(module));
+        }
       }
     }
   }

@@ -57,6 +57,11 @@ public interface JobSetting extends Serializable {
     public int getValue() {
       return value;
     }
+
+    @Override
+    public String toString() {
+      return getClass() + "[" + value + "]";
+    }
   }
 
   /**
@@ -73,6 +78,11 @@ public interface JobSetting extends Serializable {
 
     public String getValue() {
       return value;
+    }
+
+    @Override
+    public String toString() {
+      return getClass() + "[" + value + "]";
     }
   }
 

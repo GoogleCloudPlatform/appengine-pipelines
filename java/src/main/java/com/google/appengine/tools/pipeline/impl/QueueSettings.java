@@ -17,10 +17,10 @@ public final class QueueSettings implements Cloneable {
    * Merge will override any {@code null} setting with a matching setting from {@code other}.
    */
   public QueueSettings merge(QueueSettings other) {
-    if (onBackend == null) {
+    if (onBackend == null && onModule == null) {
       onBackend = other.getOnBackend();
     }
-    if (onModule == null) {
+    if (onModule == null && onBackend == null) {
       onModule = other.getOnModule();
       moduleVersion = other.getModuleVersion();
     }
