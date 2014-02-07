@@ -38,9 +38,15 @@ public class JsonTreeHandler {
     if (null == rootJobHandle) {
       throw new ServletException(ROOT_PIPELINE_ID + " parameter not found.");
     }
-    PipelineObjects pipelineObjects = PipelineManager.queryFullPipeline(rootJobHandle);
-    String asJson = JsonGenerator.pipelineObjectsToJson(pipelineObjects, rootJobHandle);
     try {
+      PipelineObjects pipelineObjects;
+      try {
+        pipelineObjects = PipelineManager.queryFullPipeline(rootJobHandle);
+      } catch (IllegalArgumentException ex) {
+        resp.sendError(HttpServletResponse.SC_NOT_FOUND);
+        return;
+      }
+      String asJson = JsonGenerator.pipelineObjectsToJson(pipelineObjects, rootJobHandle);
       resp.getWriter().write(asJson);
     } catch (IOException e) {
       throw new ServletException(e);

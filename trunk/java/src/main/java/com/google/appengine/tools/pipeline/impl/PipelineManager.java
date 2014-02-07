@@ -313,6 +313,11 @@ public class PipelineManager {
     updateSpec.getFinalTransaction().registerTask(task);
   }
 
+  /**
+   * Returns all the associated PipelineModelObject for a root pipeline.
+   *
+   * @throws IllegalArgumentException if root pipeline was not found.
+   */
   public static PipelineObjects queryFullPipeline(String rootJobHandle) {
     Key rootJobKey = KeyFactory.createKey(JobRecord.DATA_STORE_KIND, rootJobHandle);
     return backEnd.queryFullPipeline(rootJobKey);
