@@ -50,6 +50,7 @@ public class JsonTreeHandler {
       }
       String rootJobKey = jobInfo.getRootJobKey().getName();
       if (!rootJobKey.equals(rootJobHandle)) {
+        resp.addHeader(ROOT_PIPELINE_ID, rootJobKey);
         resp.sendError(449, rootJobKey);
         return;
       }
