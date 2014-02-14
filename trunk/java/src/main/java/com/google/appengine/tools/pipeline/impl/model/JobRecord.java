@@ -263,7 +263,7 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
     if (childGraphGuid != null) {
       entity.setUnindexedProperty(CHILD_GRAPH_GUID_PROPERTY, new Text(childGraphGuid));
     }
-    entity.setUnindexedProperty(START_TIME_PROPERTY, startTime);
+    entity.setProperty(START_TIME_PROPERTY, startTime);
     entity.setUnindexedProperty(END_TIME_PROPERTY, endTime);
     entity.setProperty(CHILD_KEYS_PROPERTY, childKeys);
     entity.setUnindexedProperty(ATTEMPT_NUM_PROPERTY, attemptNumber);
