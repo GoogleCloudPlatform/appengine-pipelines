@@ -53,7 +53,12 @@ public class AppEngineTaskQueue implements PipelineTaskQueue {
   public void enqueue(Task task) {
     logger.finest("Enqueueing: " + task);
     TaskOptions taskOptions = toTaskOptions(task);
-    getQueue(task.getQueueSettings().getOnQueue()).add(taskOptions);
+    Queue queue = getQueue(task.getQueueSettings().getOnQueue());
+    try {
+      queue.add(taskOptions);
+    } catch (TaskAlreadyExistsException ingore) {
+      // ignore
+    }
   }
 
   private static Queue getQueue(String queueName) {
