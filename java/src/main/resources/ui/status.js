@@ -198,7 +198,8 @@ function constructStageNode(pipelineId, infoMap, sidebar) {
   } else if (infoMap.status == 'finalizing') {
     statusTimeLabel = 'Complete';
     statusTimeMs = infoMap.endTimeMs;
-  } else if (infoMap.status == 'aborted') {
+  } else if (infoMap.status == 'aborted' ||
+             infoMap.status == 'canceled') {
     statusTimeLabel = 'Aborted';
     statusTimeMs = infoMap.endTimeMs;
   } else if (infoMap.status == 'waiting') {
@@ -850,6 +851,11 @@ function initStatus() {
 function initStatusDone() {
   jQuery.timeago.settings.allowFuture = true;
 
+  // Update the root pipeline ID to match what the server returns. This handles
+  // the case where the ID specified is for a child node. We always want to
+  // show status up to the root.
+  ROOT_PIPELINE_ID = STATUS_MAP.rootPipelineId;
+
   // Generate the sidebar.
   generateSidebar(STATUS_MAP, null, $('#sidebar'));
 
@@ -868,7 +874,9 @@ function initStatusDone() {
     $('#auto-refresh').attr('checked', '');
   } else {
     var rootStatus = STATUS_MAP.pipelines[STATUS_MAP.rootPipelineId].status;
-    if (rootStatus != 'done' && rootStatus != 'aborted') {
+    if (!(rootStatus == 'done' ||
+          rootStatus == 'aborted' ||
+          rootStatus == 'canceled')) {
       // Only do auto-refresh behavior if we're not in a terminal state.
       window.setTimeout(function() {
         var loc = window.location;
