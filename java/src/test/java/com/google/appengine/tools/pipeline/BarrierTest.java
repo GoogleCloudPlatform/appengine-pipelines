@@ -18,12 +18,12 @@ import static com.google.appengine.tools.pipeline.impl.util.GUIDGenerator.USE_SI
 
 import com.google.appengine.api.datastore.Key;
 import com.google.appengine.api.datastore.KeyFactory;
-import com.google.appengine.repackaged.com.google.common.collect.ImmutableList;
-import com.google.appengine.repackaged.com.google.common.collect.Lists;
 import com.google.appengine.tools.development.testing.LocalDatastoreServiceTestConfig;
 import com.google.appengine.tools.development.testing.LocalServiceTestHelper;
 import com.google.appengine.tools.pipeline.impl.model.Barrier;
 import com.google.appengine.tools.pipeline.impl.model.Slot;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
 
 import junit.framework.TestCase;
 

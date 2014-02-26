@@ -19,7 +19,6 @@ import static com.google.appengine.tools.pipeline.impl.util.GUIDGenerator.USE_SI
 import com.google.appengine.api.datastore.Entity;
 import com.google.appengine.api.datastore.Key;
 import com.google.appengine.api.datastore.KeyFactory;
-import com.google.appengine.repackaged.com.google.common.collect.Lists;
 import com.google.appengine.tools.development.testing.LocalDatastoreServiceTestConfig;
 import com.google.appengine.tools.development.testing.LocalServiceTestHelper;
 import com.google.appengine.tools.pipeline.impl.QueueSettings;
@@ -31,6 +30,7 @@ import com.google.appengine.tools.pipeline.impl.tasks.FinalizeJobTask;
 import com.google.appengine.tools.pipeline.impl.tasks.HandleSlotFilledTask;
 import com.google.appengine.tools.pipeline.impl.tasks.RunJobTask;
 import com.google.appengine.tools.pipeline.impl.tasks.Task;
+import com.google.common.collect.ImmutableList;
 
 import junit.framework.TestCase;
 
@@ -44,7 +44,7 @@ public class FanoutTaskTest extends TestCase {
   private LocalServiceTestHelper helper =
       new LocalServiceTestHelper(new LocalDatastoreServiceTestConfig());
 
-  private List<Task> listOfTasks;
+  private List<? extends Task> listOfTasks;
   byte[] encodedBytes;
   private QueueSettings queueSettings1 = new QueueSettings();
   private QueueSettings queueSettings2 = new QueueSettings().setOnQueue("queue1");
@@ -62,7 +62,7 @@ public class FanoutTaskTest extends TestCase {
     FinalizeJobTask finalizeJobTask = new FinalizeJobTask(key, queueSettings1);
     key = KeyFactory.createKey(Slot.DATA_STORE_KIND, "slot1");
     HandleSlotFilledTask hsfTask = new HandleSlotFilledTask(key, queueSettings2);
-    listOfTasks = Lists.<Task> newLinkedList(runJobTask, runJobTask2, finalizeJobTask, hsfTask);
+    listOfTasks = ImmutableList.of(runJobTask, runJobTask2, finalizeJobTask, hsfTask);
     encodedBytes = FanoutTask.encodeTasks(listOfTasks);
   }
 

@@ -100,6 +100,14 @@
       <scope>test</scope>
     </dependency>
     <dependency>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
+      <!-- version number of release candidates come before the ##.0 in maven,
+           use .99 to get latest release within the specified major version -->
+      <version>[15.0,15.99]</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
       <version>4.10</version>
