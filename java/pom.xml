@@ -6,6 +6,9 @@
   <name>App Engine Pipeline Framework</name>
   <description>Google App Engine API for connecting together complex workflows</description>
   <url>http://code.google.com/p/appengine-pipeline/</url>
+  <organization>
+    <name>Google</name>
+  </organization>
   <version>0.3-SNAPSHOT</version>
   <packaging>jar</packaging>
   <licenses>
@@ -15,7 +18,7 @@
     </license>
   </licenses>
   <properties>
-    <appengine.target.version>[1.8.9,1.10)</appengine.target.version>
+    <appengine.target.version>[1.9.0,1.10)</appengine.target.version>
   </properties>
   <build>
     <plugins>
@@ -25,6 +28,18 @@
         <configuration>
           <source>1.7</source>
           <target>1.7</target>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <configuration>
+          <archive>
+            <manifest>
+              <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+              <addDefaultSpecificationEntries>true</addDefaultSpecificationEntries>
+            </manifest>
+          </archive>
         </configuration>
       </plugin>
       <plugin>
@@ -73,11 +88,6 @@
       <groupId>com.google.appengine</groupId>
       <artifactId>appengine-api-1.0-sdk</artifactId>
       <version>${appengine.target.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>com.google.appengine</groupId>
-      <artifactId>appengine-api-labs</artifactId>
-      <version>1.8.9</version>
     </dependency>
     <dependency>
       <groupId>javax.servlet</groupId>
