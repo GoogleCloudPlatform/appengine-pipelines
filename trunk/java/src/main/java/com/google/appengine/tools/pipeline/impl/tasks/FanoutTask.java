@@ -92,7 +92,7 @@ public class FanoutTask extends Task {
     return recordKey;
   }
 
-  public static byte[] encodeTasks(Collection<Task> taskList) {
+  public static byte[] encodeTasks(Collection<? extends Task> taskList) {
     if (taskList.isEmpty()) {
       return new byte[0];
     }
