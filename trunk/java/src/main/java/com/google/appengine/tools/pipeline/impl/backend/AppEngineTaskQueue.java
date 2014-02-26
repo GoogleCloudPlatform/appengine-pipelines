@@ -15,8 +15,8 @@
 package com.google.appengine.tools.pipeline.impl.backend;
 
 import com.google.appengine.api.backends.BackendServiceFactory;
-import com.google.appengine.api.labs.modules.ModulesService;
-import com.google.appengine.api.labs.modules.ModulesServiceFactory;
+import com.google.appengine.api.modules.ModulesService;
+import com.google.appengine.api.modules.ModulesServiceFactory;
 import com.google.appengine.api.taskqueue.Queue;
 import com.google.appengine.api.taskqueue.QueueConstants;
 import com.google.appengine.api.taskqueue.QueueFactory;
@@ -135,8 +135,7 @@ public class AppEngineTaskQueue implements PipelineTaskQueue {
         module = service.getCurrentModule();
         version = service.getCurrentVersion();
       }
-      // TODO(user): change to getVersionHostname when 1.8.9 is released
-      taskOptions.header("Host", service.getModuleHostname(module, version));
+      taskOptions.header("Host", service.getVersionHostname(module, version));
     }
 
     Long delayInSeconds = queueSettings.getDelayInSeconds();
