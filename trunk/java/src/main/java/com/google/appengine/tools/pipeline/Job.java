@@ -545,6 +545,18 @@ public abstract class Job<E> implements Serializable {
     return thisJobRecord.getStatusConsoleUrl();
   }
 
+  protected String getOnQueue() {
+    return thisJobRecord.getQueueSettings().getOnQueue();
+  }
+
+  protected String getOnBackend() {
+    return thisJobRecord.getQueueSettings().getOnBackend();
+  }
+
+  protected String getOnModule() {
+    return thisJobRecord.getQueueSettings().getOnModule();
+  }
+
   /**
    * Returns the job's display name. Used for presentation purpose only.
    */

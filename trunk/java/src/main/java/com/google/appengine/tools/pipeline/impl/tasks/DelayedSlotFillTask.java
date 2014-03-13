@@ -17,6 +17,7 @@ package com.google.appengine.tools.pipeline.impl.tasks;
 import com.google.appengine.api.datastore.Key;
 import com.google.appengine.api.datastore.KeyFactory;
 import com.google.appengine.tools.pipeline.impl.QueueSettings;
+import com.google.appengine.tools.pipeline.impl.model.Slot;
 
 import java.util.Properties;
 
@@ -26,7 +27,7 @@ import java.util.Properties;
  *
  * @author maximf@google.com (Maxim Fateev)
  */
-public class FillSlotHandleSlotFilledTask extends ObjRefTask {
+public class DelayedSlotFillTask extends ObjRefTask {
 
   private static final String ROOT_JOB_KEY_PARAM = "rootJobKey";
 
@@ -37,15 +38,18 @@ public class FillSlotHandleSlotFilledTask extends ObjRefTask {
    * construct a {@code HandleSlotFilledTask}to be enqueued.
    * <p>
    *
-   * @param slotKey The key of the Slot whose filling is to be handled
+   * @param slot The Slot whose filling is to be handled
+   * @param delay The delay in seconds before task gets executed
    * @param rootJobKey The key of the root job of the pipeline
+   * @param queueSettings The queue settings
    */
-  public FillSlotHandleSlotFilledTask(Key slotKey, Key rootJobKey, QueueSettings queueSettings) {
-    super(Type.FILL_SLOT_HANDLE_SLOT_FILLED, "fillSlotHandleSlotFilled", slotKey, queueSettings);
+  public DelayedSlotFillTask(Slot slot, long delay, Key rootJobKey, QueueSettings queueSettings) {
+    super(Type.DELAYED_SLOT_FILL, "delayedSlotFillTask", slot.getKey(), queueSettings);
+    getQueueSettings().setDelayInSeconds(delay);
     this.rootJobKey = rootJobKey;
   }
 
-  protected FillSlotHandleSlotFilledTask(Type type, String taskName, Properties properties) {
+  protected DelayedSlotFillTask(Type type, String taskName, Properties properties) {
     super(type, taskName, properties);
     rootJobKey = KeyFactory.stringToKey(properties.getProperty(ROOT_JOB_KEY_PARAM));
   }

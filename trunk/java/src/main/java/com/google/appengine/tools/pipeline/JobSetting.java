@@ -175,8 +175,8 @@ public interface JobSetting extends Serializable {
     private static final long serialVersionUID = -5010485721032395432L;
     public static final String DEFAULT = null;
 
-    public OnQueue(String backend) {
-      super(backend);
+    public OnQueue(String queue) {
+      super(queue);
     }
   }
 

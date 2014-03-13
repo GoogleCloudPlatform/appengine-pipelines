@@ -40,9 +40,9 @@ import com.google.appengine.tools.pipeline.impl.model.Slot;
 import com.google.appengine.tools.pipeline.impl.model.SlotDescriptor;
 import com.google.appengine.tools.pipeline.impl.servlets.PipelineServlet;
 import com.google.appengine.tools.pipeline.impl.tasks.CancelJobTask;
+import com.google.appengine.tools.pipeline.impl.tasks.DelayedSlotFillTask;
 import com.google.appengine.tools.pipeline.impl.tasks.DeletePipelineTask;
 import com.google.appengine.tools.pipeline.impl.tasks.FanoutTask;
-import com.google.appengine.tools.pipeline.impl.tasks.FillSlotHandleSlotFilledTask;
 import com.google.appengine.tools.pipeline.impl.tasks.FinalizeJobTask;
 import com.google.appengine.tools.pipeline.impl.tasks.HandleChildExceptionTask;
 import com.google.appengine.tools.pipeline.impl.tasks.HandleSlotFilledTask;
@@ -520,24 +520,19 @@ public class PipelineManager {
     try {
       switch (task.getType()) {
         case RUN_JOB:
-          RunJobTask runJobTask = (RunJobTask) task;
-          runJob(runJobTask.getJobKey());
+          runJob((RunJobTask) task);
           break;
         case HANDLE_SLOT_FILLED:
-          HandleSlotFilledTask hsfTask = (HandleSlotFilledTask) task;
-          handleSlotFilled(hsfTask.getSlotKey());
+          handleSlotFilled((HandleSlotFilledTask) task);
           break;
         case FINALIZE_JOB:
-          FinalizeJobTask finalizeJobTask = (FinalizeJobTask) task;
-          finalizeJob(finalizeJobTask.getJobKey());
+          finalizeJob((FinalizeJobTask) task);
           break;
         case FAN_OUT:
-          FanoutTask fanoutTask = (FanoutTask) task;
-          handleFanoutTaskOrAbandonTask(fanoutTask);
+          handleFanoutTaskOrAbandonTask((FanoutTask) task);
           break;
         case CANCEL_JOB:
-          CancelJobTask cancelJobTask = (CancelJobTask) task;
-          cancelJob(cancelJobTask.getJobKey());
+          cancelJob((CancelJobTask) task);
           break;
         case DELETE_PIPELINE:
           DeletePipelineTask deletePipelineTask = (DeletePipelineTask) task;
@@ -549,14 +544,10 @@ public class PipelineManager {
           }
           break;
         case HANDLE_CHILD_EXCEPTION:
-          HandleChildExceptionTask handleChildExceptionTask = (HandleChildExceptionTask) task;
-          handleChildException(
-              handleChildExceptionTask.getKey(), handleChildExceptionTask.getFailedChildKey());
+          handleChildException((HandleChildExceptionTask) task);
           break;
-        case FILL_SLOT_HANDLE_SLOT_FILLED:
-          FillSlotHandleSlotFilledTask fillSlotHandleSlotFilledTask =
-              (FillSlotHandleSlotFilledTask) task;
-          handleFillSlotHandleFilled(fillSlotHandleSlotFilledTask);
+        case DELAYED_SLOT_FILL:
+          handleDelayedSlotFill((DelayedSlotFillTask) task);
           break;
         default:
           throw new IllegalArgumentException("Unrecognized task type: " + task.getType());
@@ -672,12 +663,11 @@ public class PipelineManager {
    * a {@link HandleSlotFilledTask} for any slots that are filled immediately.
    *
    * @see "http://goto/java-pipeline-model"
-   *
-   * @param jobKey
    */
-  private static void runJob(Key jobKey) {
-    JobRecord jobRecord = null;
-    jobRecord = queryJobOrAbandonTask(jobKey, JobRecord.InflationType.FOR_RUN);
+  private static void runJob(RunJobTask task) {
+    Key jobKey = task.getJobKey();
+    JobRecord jobRecord = queryJobOrAbandonTask(jobKey, JobRecord.InflationType.FOR_RUN);
+    jobRecord.getQueueSettings().merge(task.getQueueSettings());
     Key rootJobKey = jobRecord.getRootJobKey();
     logger.info("Running pipeline job " + jobKey.getName() + "; UI at "
         + PipelineServlet.makeViewerUrl(rootJobKey, jobKey));
@@ -814,9 +804,10 @@ public class PipelineManager {
         updateSpec, jobRecord.getQueueSettings(), jobKey, State.WAITING_TO_RUN, State.RETRY);
   }
 
-  private static void cancelJob(Key jobKey) {
-    JobRecord jobRecord = null;
-    jobRecord = queryJobOrAbandonTask(jobKey, JobRecord.InflationType.FOR_RUN);
+  private static void cancelJob(CancelJobTask cancelJobTask) {
+    Key jobKey = cancelJobTask.getJobKey();
+    JobRecord jobRecord = queryJobOrAbandonTask(jobKey, JobRecord.InflationType.FOR_RUN);
+    jobRecord.getQueueSettings().merge(cancelJobTask.getQueueSettings());
     Key rootJobKey = jobRecord.getRootJobKey();
     logger.info("Cancelling pipeline job " + jobKey.getName());
     JobRecord rootJobRecord = jobRecord;
@@ -955,8 +946,11 @@ public class PipelineManager {
     }
   }
 
-  private static void handleChildException(Key jobKey, Key failedChildKey) {
+  private static void handleChildException(HandleChildExceptionTask handleChildExceptionTask) {
+    Key jobKey = handleChildExceptionTask.getKey();
+    Key failedChildKey = handleChildExceptionTask.getFailedChildKey();
     JobRecord jobRecord = queryJobOrAbandonTask(jobKey, JobRecord.InflationType.FOR_RUN);
+    jobRecord.getQueueSettings().merge(handleChildExceptionTask.getQueueSettings());
     Key rootJobKey = jobRecord.getRootJobKey();
     logger.info("Running pipeline job " + jobKey.getName() + "; UI at "
         + PipelineServlet.makeViewerUrl(rootJobKey, jobKey));
@@ -990,14 +984,13 @@ public class PipelineManager {
    * output slot.
    *
    * @see "http://goto/java-pipeline-model"
-   *
-   * @param jobKey
    */
-  private static void finalizeJob(Key jobKey) {
+  private static void finalizeJob(FinalizeJobTask finalizeJobTask) {
+    Key jobKey = finalizeJobTask.getJobKey();
     // Get the JobRecord, its finalize Barrier, all the slots in the
     // finalize Barrier, and the job's output Slot.
     JobRecord jobRecord = queryJobOrAbandonTask(jobKey, JobRecord.InflationType.FOR_FINALIZE);
-
+    jobRecord.getQueueSettings().merge(finalizeJobTask.getQueueSettings());
     switch (jobRecord.getState()) {
       case WAITING_TO_FINALIZE:
         // OK, proceed
@@ -1101,12 +1094,10 @@ public class PipelineManager {
    * barrier is waiting on are now filled then the barrier should be released.
    * Release the barrier by enqueueing an appropriate task (either
    * {@link RunJobTask} or {@link FinalizeJobTask}.
-   *
-   * @param slotKey The key of the slot that has been filled.
    */
-  private static void handleSlotFilled(Key slotKey) {
-    Slot slot = null;
-    slot = querySlotOrAbandonTask(slotKey, true);
+  private static void handleSlotFilled(HandleSlotFilledTask hsfTask) {
+    Key slotKey = hsfTask.getSlotKey();
+    Slot slot = querySlotOrAbandonTask(slotKey, true);
     List<Barrier> waitingList = slot.getWaitingOnMeInflated();
     if (null == waitingList) {
       throw new RuntimeException("Internal logic error: " + slot + " is not inflated");
@@ -1133,6 +1124,7 @@ public class PipelineManager {
         if (shouldBeReleased) {
           Key jobKey = barrier.getJobKey();
           JobRecord jobRecord = queryJobOrAbandonTask(jobKey, JobRecord.InflationType.NONE);
+          jobRecord.getQueueSettings().merge(hsfTask.getQueueSettings());
           Task task;
           switch (barrier.getType()) {
             case RUN:
@@ -1157,17 +1149,16 @@ public class PipelineManager {
   /**
    * Fills the slot with null value and calls handleSlotFilled
    */
-  private static void handleFillSlotHandleFilled(
-      FillSlotHandleSlotFilledTask fillSlotHandleFilledTask) {
-    Key slotKey = fillSlotHandleFilledTask.getSlotKey();
+  private static void handleDelayedSlotFill(DelayedSlotFillTask task) {
+    Key slotKey = task.getSlotKey();
     Slot slot = querySlotOrAbandonTask(slotKey, true);
-    Key rootJobKey = fillSlotHandleFilledTask.getRootJobKey();
+    Key rootJobKey = task.getRootJobKey();
     UpdateSpec updateSpec = new UpdateSpec(rootJobKey);
     slot.fill(null);
     updateSpec.getNonTransactionalGroup().includeSlot(slot);
-    backEnd.save(updateSpec, fillSlotHandleFilledTask.getQueueSettings());
+    backEnd.save(updateSpec, task.getQueueSettings());
     // re-reading Slot (in handleSlotFilled) is needed (to capture slot fill after this one)
-    handleSlotFilled(slotKey);
+    handleSlotFilled(new HandleSlotFilledTask(slotKey, task.getQueueSettings()));
   }
 
   /**
@@ -1239,9 +1230,9 @@ public class PipelineManager {
    */
   public static void registerDelayedValue(
       UpdateSpec spec, JobRecord generatorJobRecord, long delaySec, Slot slot) {
-    FillSlotHandleSlotFilledTask task = new FillSlotHandleSlotFilledTask(
-        slot.getKey(), generatorJobRecord.getRootJobKey(), generatorJobRecord.getQueueSettings());
-    task.getQueueSettings().setDelayInSeconds(delaySec);
+    Key rootKey = generatorJobRecord.getRootJobKey();
+    QueueSettings queueSettings = generatorJobRecord.getQueueSettings();
+    DelayedSlotFillTask task = new DelayedSlotFillTask(slot, delaySec, rootKey , queueSettings);
     spec.getFinalTransaction().registerTask(task);
   }
 }

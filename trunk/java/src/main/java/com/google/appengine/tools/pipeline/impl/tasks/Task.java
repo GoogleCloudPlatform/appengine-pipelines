@@ -139,7 +139,7 @@ public abstract class Task {
     FINALIZE_JOB(FinalizeJobTask.class),
     FAN_OUT(FanoutTask.class),
     DELETE_PIPELINE(DeletePipelineTask.class),
-    FILL_SLOT_HANDLE_SLOT_FILLED(FillSlotHandleSlotFilledTask.class);
+    DELAYED_SLOT_FILL(DelayedSlotFillTask.class);
 
     private final Constructor<? extends Task> taskConstructor;
 
