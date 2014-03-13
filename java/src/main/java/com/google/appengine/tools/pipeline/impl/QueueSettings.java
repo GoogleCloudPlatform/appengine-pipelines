@@ -15,6 +15,7 @@ public final class QueueSettings implements Cloneable {
 
   /**
    * Merge will override any {@code null} setting with a matching setting from {@code other}.
+   * Note, delay value is not being merged.
    */
   public QueueSettings merge(QueueSettings other) {
     if (onBackend == null && onModule == null) {

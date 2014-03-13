@@ -26,6 +26,7 @@ import com.google.appengine.api.taskqueue.TaskOptions;
 import com.google.appengine.tools.pipeline.impl.QueueSettings;
 import com.google.appengine.tools.pipeline.impl.servlets.TaskHandler;
 import com.google.appengine.tools.pipeline.impl.tasks.Task;
+import com.google.apphosting.api.ApiProxy;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -62,6 +63,10 @@ public class AppEngineTaskQueue implements PipelineTaskQueue {
   }
 
   private static Queue getQueue(String queueName) {
+    if (queueName == null) {
+      Map<String, Object> attributes = ApiProxy.getCurrentEnvironment().getAttributes();
+      queueName = (String) attributes.get(TaskHandler.TASK_QUEUE_NAME_HEADER);
+    }
     return queueName == null ? QueueFactory.getDefaultQueue() : QueueFactory.getQueue(queueName);
   }
 

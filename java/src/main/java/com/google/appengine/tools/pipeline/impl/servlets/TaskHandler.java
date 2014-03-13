@@ -17,8 +17,10 @@ package com.google.appengine.tools.pipeline.impl.servlets;
 import com.google.appengine.tools.pipeline.impl.PipelineManager;
 import com.google.appengine.tools.pipeline.impl.tasks.Task;
 import com.google.appengine.tools.pipeline.impl.util.StringUtils;
+import com.google.apphosting.api.ApiProxy;
 
 import java.util.Enumeration;
+import java.util.Map;
 import java.util.Properties;
 import java.util.logging.Logger;
 
@@ -67,9 +69,15 @@ public class TaskHandler {
     }
     String taskName = request.getHeader(TASK_NAME_REQUEST_HEADER);
     Task task = Task.fromProperties(taskName, properties);
+    task.getQueueSettings().setDelayInSeconds(null);
     String queueName = request.getHeader(TASK_QUEUE_NAME_HEADER);
-    if (queueName != null && task.getQueueSettings().getOnQueue() == null) {
-      task.getQueueSettings().setOnQueue(queueName);
+    if (queueName != null && !queueName.isEmpty()) {
+      String onQueue = task.getQueueSettings().getOnQueue();
+       if (onQueue == null || onQueue.isEmpty()) {
+         task.getQueueSettings().setOnQueue(queueName);
+       }
+       Map<String, Object> attributes = ApiProxy.getCurrentEnvironment().getAttributes();
+       attributes.put(TASK_QUEUE_NAME_HEADER, queueName);
     }
     return task;
   }
