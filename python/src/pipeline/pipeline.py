@@ -1201,6 +1201,11 @@ class InOrder(object):
 
   def __enter__(self):
     """When entering a 'with' block."""
+    # Reentrancy checking gives false errors in test mode since everything is
+    # on the same thread, and all pipelines are executed in order in test mode
+    # anyway, so disable InOrder for tests.
+    if _TEST_MODE:
+        return
     InOrder._thread_init()
     if InOrder._local._activated:
       raise UnexpectedPipelineError('Already in an InOrder "with" block.')
@@ -1209,6 +1214,8 @@ class InOrder(object):
 
   def __exit__(self, type, value, trace):
     """When exiting a 'with' block."""
+    if _TEST_MODE:
+        return
     InOrder._local._activated = False
     InOrder._local._in_order_futures.clear()
     return False
