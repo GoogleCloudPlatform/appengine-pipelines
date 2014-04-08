@@ -19,6 +19,7 @@ import static com.google.appengine.tools.pipeline.impl.util.GUIDGenerator.USE_SI
 import com.google.appengine.api.taskqueue.dev.LocalTaskQueue;
 import com.google.appengine.api.taskqueue.dev.QueueStateInfo;
 import com.google.appengine.tools.development.testing.LocalDatastoreServiceTestConfig;
+import com.google.appengine.tools.development.testing.LocalModulesServiceTestConfig;
 import com.google.appengine.tools.development.testing.LocalServiceTestHelper;
 import com.google.appengine.tools.development.testing.LocalTaskQueueTestConfig;
 import com.google.apphosting.api.ApiProxy;
@@ -121,6 +122,7 @@ public class PipelineTest extends TestCase {
     }
   }
 
+  @SuppressWarnings("unchecked")
   protected <T> T waitForJobToComplete(String pipelineId) throws Exception {
     JobInfo jobInfo = waitUntilJobComplete(pipelineId);
     switch (jobInfo.getJobState()) {
