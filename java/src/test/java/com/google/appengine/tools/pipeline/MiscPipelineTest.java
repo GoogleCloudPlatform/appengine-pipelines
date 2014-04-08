@@ -34,8 +34,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *  JobSetting inheritance
  *  PromisedValue (and filling it more than once)
  *  Cancel pipeline
- *  WaitFor passed to a new pipeline
- *  FutureValue passed to a new pipeline
  *
  * @author rudominer@google.com (Mitch Rudominer)
  */
@@ -51,66 +49,6 @@ public class MiscPipelineTest extends PipelineTest {
     for (int i = 0; i < largeValue.length; i++) {
       largeValue[i] = random.nextLong();
     }
-  }
-
-
-  @SuppressWarnings("serial")
-  private static class CallerJob extends Job0<String> {
-
-    static AtomicBoolean flag = new AtomicBoolean();
-
-    @Override
-    public Value<String> run() throws Exception {
-      FutureValue<Void> child1 = futureCall(new ChildJob());
-      FutureValue<String> child2 = futureCall(new StrJob<>(), immediate(Long.valueOf(123)));
-      PipelineService service = PipelineServiceFactory.newPipelineService();
-      String str1 = service.startNewPipeline(new EchoJob<>(), child2);
-      String str2 = service.startNewPipeline(new CalledJob(), waitFor(child1));
-      return immediate(str1 + "," + str2);
-    }
-  }
-
-  @SuppressWarnings("serial")
-  private static class EchoJob<T> extends Job1<T, T> {
-
-    @Override
-    public Value<T> run(T t) throws Exception {
-      return immediate(t);
-    }
-  }
-
-  @SuppressWarnings("serial")
-  private static class ChildJob extends Job0<Void> {
-
-    @Override
-    public Value<Void> run() throws Exception {
-      Thread.sleep(5000);
-      CallerJob.flag.set(true);
-      return null;
-    }
-  }
-
-  @SuppressWarnings("serial")
-  private static class CalledJob extends Job0<Boolean> {
-
-    @Override
-    public Value<Boolean> run() throws Exception {
-      return immediate(CallerJob.flag.get());
-    }
-  }
-
-  public void testWaitForUsedByNewPipeline() throws Exception {
-    PipelineService service = PipelineServiceFactory.newPipelineService();
-    String pipelineId = service.startNewPipeline(new CallerJob());
-    JobInfo jobInfo = waitUntilJobComplete(pipelineId);
-    assertEquals(JobInfo.State.COMPLETED_SUCCESSFULLY, jobInfo.getJobState());
-    String[] calledPipelines = ((String) jobInfo.getOutput()).split(",");
-    jobInfo = waitUntilJobComplete(calledPipelines[0]);
-    assertEquals(JobInfo.State.COMPLETED_SUCCESSFULLY, jobInfo.getJobState());
-    assertEquals("123", jobInfo.getOutput());
-    jobInfo = waitUntilJobComplete(calledPipelines[1]);
-    assertEquals(JobInfo.State.COMPLETED_SUCCESSFULLY, jobInfo.getJobState());
-    assertTrue((Boolean) jobInfo.getOutput());
   }
 
   @SuppressWarnings("serial")
