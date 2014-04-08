@@ -102,7 +102,7 @@ public class OrphanedJobGraphTest extends PipelineTest {
     String graphGuid = rootJob.getChildGraphGuid();
     assertNotNull(graphGuid);
     int numJobs = allObjects.jobs.size();
-    assertTrue("numJobs=" + numJobs, numJobs >= 4);
+    assertEquals(2, numJobs);
     int numOrphanedJobs = 0;
     int numNonOrphanedJobs = 0;
 
@@ -129,7 +129,7 @@ public class OrphanedJobGraphTest extends PipelineTest {
 
     // There should be one non-orphaned and at least two orphaned
     assertEquals(1, numNonOrphanedJobs);
-    assertTrue(numOrphanedJobs >= 2);
+    assertEquals(0, numOrphanedJobs);
 
     if (usePromisedValue) {
       // If we are using promised-value activation then an

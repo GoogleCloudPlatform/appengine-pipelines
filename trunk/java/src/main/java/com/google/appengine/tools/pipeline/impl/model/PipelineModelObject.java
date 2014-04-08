@@ -229,4 +229,8 @@ public abstract class PipelineModelObject {
     List<E> list = (List<E>) entity.getProperty(propertyName);
     return list == null ? new LinkedList<E>() : list;
   }
+
+  protected static String getKeyName(Key key) {
+    return key == null ? "null" : key.getName();
+  }
 }
