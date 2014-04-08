@@ -15,6 +15,7 @@
 package com.google.appengine.tools.pipeline.impl.backend;
 
 import com.google.appengine.api.backends.BackendServiceFactory;
+import com.google.appengine.api.modules.ModulesException;
 import com.google.appengine.api.modules.ModulesService;
 import com.google.appengine.api.modules.ModulesServiceFactory;
 import com.google.appengine.api.taskqueue.Queue;
@@ -23,6 +24,9 @@ import com.google.appengine.api.taskqueue.QueueFactory;
 import com.google.appengine.api.taskqueue.TaskAlreadyExistsException;
 import com.google.appengine.api.taskqueue.TaskHandle;
 import com.google.appengine.api.taskqueue.TaskOptions;
+import com.google.appengine.tools.cloudstorage.ExceptionHandler;
+import com.google.appengine.tools.cloudstorage.RetryHelper;
+import com.google.appengine.tools.cloudstorage.RetryParams;
 import com.google.appengine.tools.pipeline.impl.QueueSettings;
 import com.google.appengine.tools.pipeline.impl.servlets.TaskHandler;
 import com.google.appengine.tools.pipeline.impl.tasks.Task;
@@ -34,6 +38,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.logging.Logger;
@@ -49,6 +54,9 @@ public class AppEngineTaskQueue implements PipelineTaskQueue {
   private static final Logger logger = Logger.getLogger(AppEngineTaskQueue.class.getName());
 
   static final int MAX_TASKS_PER_ENQUEUE = QueueConstants.maxTasksPerAdd();
+
+  private static final ExceptionHandler MODULES_EXCEPTION_HANDLER =
+      new ExceptionHandler.Builder().retryOn(ModulesException.class).build();
 
   @Override
   public void enqueue(Task task) {
@@ -127,20 +135,27 @@ public class AppEngineTaskQueue implements PipelineTaskQueue {
   }
 
   private TaskOptions toTaskOptions(Task task) {
-    QueueSettings queueSettings = task.getQueueSettings();
+    final QueueSettings queueSettings = task.getQueueSettings();
     TaskOptions taskOptions = TaskOptions.Builder.withUrl(TaskHandler.HANDLE_TASK_URL);
     if (queueSettings.getOnBackend() != null) {
       taskOptions.header("Host", BackendServiceFactory.getBackendService().getBackendAddress(
           queueSettings.getOnBackend()));
     } else {
-      ModulesService service = ModulesServiceFactory.getModulesService();
-      String module = queueSettings.getOnModule();
-      String version = queueSettings.getModuleVersion();
-      if (module == null) {
-        module = service.getCurrentModule();
-        version = service.getCurrentVersion();
-      }
-      taskOptions.header("Host", service.getVersionHostname(module, version));
+
+      String versionHostname = RetryHelper.runWithRetries(new Callable<String>() {
+        @Override
+        public String call() {
+          ModulesService service = ModulesServiceFactory.getModulesService();
+          String module = queueSettings.getOnModule();
+          String version = queueSettings.getModuleVersion();
+          if (module == null) {
+            module = service.getCurrentModule();
+            version = service.getCurrentVersion();
+          }
+          return service.getVersionHostname(module, version);
+        }
+      }, RetryParams.getDefaultInstance(), MODULES_EXCEPTION_HANDLER);
+      taskOptions.header("Host", versionHostname);
     }
 
     Long delayInSeconds = queueSettings.getDelayInSeconds();
