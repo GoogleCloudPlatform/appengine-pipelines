@@ -270,8 +270,10 @@ public class Barrier extends PipelineModelObject {
 
   @Override
   public String toString() {
-    return "Barrier[" + getKey().getName() + ", " + type + ", released=" + released + ", "
+    return "Barrier[" + getKeyName(getKey()) + ", " + type + ", released=" + released + ", "
         + jobKey.getName() + ", waitingOn="
-        + StringUtils.toStringParallel(waitingOnKeys, waitingOnGroupSizes) + "]";
+        + StringUtils.toStringParallel(waitingOnKeys, waitingOnGroupSizes) + ", job="
+        + getKeyName(getJobKey()) + ", parent="
+        + getKeyName(getGeneratorJobKey()) + ", guid=" + getGraphGuid() + "]";
   }
 }

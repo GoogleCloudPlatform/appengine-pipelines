@@ -567,7 +567,7 @@ public class AppEngineBackEnd implements PipelineBackEnd {
     putAll(slots, new Instantiator<Slot>() {
       @Override
       public Slot newObject(Entity entity) {
-        return new Slot(entity);
+        return new Slot(entity, true);
       }
     }, Slot.DATA_STORE_KIND, rootJobKey);
     putAll(jobs, new Instantiator<JobRecord>() {

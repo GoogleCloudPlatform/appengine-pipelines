@@ -47,6 +47,8 @@ public class Slot extends PipelineModelObject {
 
   // transient
   private List<Barrier> waitingOnMeInflated;
+  private Object serializedVersion;
+
 
   public Slot(Key rootJobKey, Key generatorJobKey, String graphGUID) {
     super(rootJobKey, generatorJobKey, graphGUID);
@@ -54,17 +56,28 @@ public class Slot extends PipelineModelObject {
   }
 
   public Slot(Entity entity) {
+    this(entity, false);
+  }
+
+  public Slot(Entity entity, boolean lazy) {
     super(entity);
     filled = (Boolean) entity.getProperty(FILLED_PROPERTY);
     fillTime = (Date) entity.getProperty(FILL_TIME_PROPERTY);
     sourceJobKey = (Key) entity.getProperty(SOURCE_JOB_KEY_PROPERTY);
-    Object serializedVersion = entity.getProperty(VALUE_PROPERTY);
+    waitingOnMeKeys = getListProperty(WAITING_ON_ME_PROPERTY, entity);
+    if (lazy) {
+      serializedVersion = entity.getProperty(VALUE_PROPERTY);
+    } else {
+      value = deserializeValue(entity.getProperty(VALUE_PROPERTY));
+    }
+  }
+
+  private Object deserializeValue(Object serializedValue) {
     try {
-      value = PipelineManager.getBackEnd().deserializeValue(this, serializedVersion);
+      return PipelineManager.getBackEnd().deserializeValue(this, serializedValue);
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
-    waitingOnMeKeys = getListProperty(WAITING_ON_ME_PROPERTY, entity);
   }
 
   @Override
@@ -77,13 +90,17 @@ public class Slot extends PipelineModelObject {
     if (null != sourceJobKey) {
       entity.setProperty(SOURCE_JOB_KEY_PROPERTY, sourceJobKey);
     }
-    try {
-      entity.setUnindexedProperty(VALUE_PROPERTY,
-          PipelineManager.getBackEnd().serializeValue(this, value));
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
     entity.setProperty(WAITING_ON_ME_PROPERTY, waitingOnMeKeys);
+    if (serializedVersion != null) {
+      entity.setUnindexedProperty(VALUE_PROPERTY, serializedVersion);
+    } else {
+      try {
+        entity.setUnindexedProperty(VALUE_PROPERTY,
+            PipelineManager.getBackEnd().serializeValue(this, value));
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }
     return entity;
   }
 
@@ -109,6 +126,10 @@ public class Slot extends PipelineModelObject {
   }
 
   public Object getValue() {
+    if (serializedVersion != null) {
+      value = deserializeValue(serializedVersion);
+      serializedVersion = null;
+    }
     return value;
   }
 
@@ -130,6 +151,7 @@ public class Slot extends PipelineModelObject {
   public void fill(Object value) {
     filled = true;
     this.value = value;
+    serializedVersion = null;
     fillTime = new Date();
   }
 
@@ -146,7 +168,8 @@ public class Slot extends PipelineModelObject {
 
   @Override
   public String toString() {
-    return "Slot[" + getKey().getName() + ", value=" + value + ", filled=" + filled
-        + ", waitingOnMe=" + waitingOnMeKeys + "]";
+    return "Slot[" + getKeyName(getKey()) + ", value=" + (serializedVersion != null ? "..." : value)
+        + ", filled=" + filled + ", waitingOnMe=" + waitingOnMeKeys + ", parent="
+        + getKeyName(getGeneratorJobKey()) + ", guid=" + getGraphGuid() + "]";
   }
 }

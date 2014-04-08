@@ -706,10 +706,11 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
 
   @Override
   public String toString() {
-    return "JobRecord [" + getKey().getName() + ", " + state + ", " + getJobInstanceString()
+    return "JobRecord [" + getKeyName(getKey()) + ", " + state + ", " + getJobInstanceString()
         + ", callExceptionJHandler=" + callExceptionHandler + ", runBarrier="
         + runBarrierKey.getName() + ", finalizeBarrier=" + finalizeBarrierKey.getName()
         + ", outputSlot=" + outputSlotKey.getName() + ", rootJobDisplayName="
-        + rootJobDisplayName + "]";
+        + rootJobDisplayName + ", parent=" + getKeyName(getGeneratorJobKey()) + ", guid="
+        + getGraphGuid() + ", childGuid=" + childGraphGuid + "]";
   }
 }

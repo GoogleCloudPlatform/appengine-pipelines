@@ -138,7 +138,11 @@ public class JsonGenerator {
     Map<String, Object> map = new HashMap<>(5);
     String statusString = (slot.isFilled() ? FILLED_STATUS : WAITING_STATUS);
     map.put(SLOT_STATUS, statusString);
-    map.put(SLOT_VALUE, slot.getValue());
+    try {
+      map.put(SLOT_VALUE, slot.getValue());
+    } catch (RuntimeException ex) {
+      map.put(SLOT_VALUE, ex);
+    }
     Date fillTime = slot.getFillTime();
     if (null != fillTime) {
       map.put(SLOT_FILL_TIME, fillTime.getTime());
@@ -252,7 +256,11 @@ public class JsonGenerator {
     Map<String, Object> map = new HashMap<>(3);
     if (slot.isFilled()) {
       map.put("type", "value");
-      map.put("value", slot.getValue());
+      try {
+        map.put("value", slot.getValue());
+      } catch (RuntimeException ex) {
+        map.put("value", ex);
+      }
     } else {
       map.put("type", "slot");
       map.put("slot_key", toString(slot.getKey()));
