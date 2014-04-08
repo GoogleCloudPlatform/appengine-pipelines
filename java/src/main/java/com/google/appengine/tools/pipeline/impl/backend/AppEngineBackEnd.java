@@ -129,7 +129,7 @@ public class AppEngineBackEnd implements PipelineBackEnd {
           }
         }
         if (!stateIsExpected) {
-          logger.finest("Job " + jobRecord + " is not in one of the expected states: "
+          logger.info("Job " + jobRecord + " is not in one of the expected states: "
               + Arrays.asList(expectedStates)
               + " and so transactionallySaveAll() will not continue.");
           return;
