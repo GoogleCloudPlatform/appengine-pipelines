@@ -17,11 +17,14 @@ package com.google.appengine.tools.pipeline.impl.backend;
 import static com.google.appengine.tools.pipeline.impl.model.JobRecord.ROOT_JOB_DISPLAY_NAME;
 import static com.google.appengine.tools.pipeline.impl.model.PipelineModelObject.ROOT_JOB_KEY_PROPERTY;
 import static com.google.appengine.tools.pipeline.impl.util.TestUtils.throwHereForTesting;
+import static java.util.concurrent.Executors.callable;
 
 import com.google.appengine.api.datastore.Blob;
 import com.google.appengine.api.datastore.Cursor;
+import com.google.appengine.api.datastore.DatastoreFailureException;
 import com.google.appengine.api.datastore.DatastoreService;
 import com.google.appengine.api.datastore.DatastoreServiceFactory;
+import com.google.appengine.api.datastore.DatastoreTimeoutException;
 import com.google.appengine.api.datastore.Entity;
 import com.google.appengine.api.datastore.EntityNotFoundException;
 import com.google.appengine.api.datastore.FetchOptions;
@@ -34,6 +37,10 @@ import com.google.appengine.api.datastore.Query.FilterOperator;
 import com.google.appengine.api.datastore.Query.FilterPredicate;
 import com.google.appengine.api.datastore.QueryResultIterator;
 import com.google.appengine.api.datastore.Transaction;
+import com.google.appengine.tools.cloudstorage.ExceptionHandler;
+import com.google.appengine.tools.cloudstorage.RetriesExhaustedException;
+import com.google.appengine.tools.cloudstorage.RetryHelper;
+import com.google.appengine.tools.cloudstorage.RetryParams;
 import com.google.appengine.tools.pipeline.NoSuchObjectException;
 import com.google.appengine.tools.pipeline.impl.QueueSettings;
 import com.google.appengine.tools.pipeline.impl.model.Barrier;
@@ -62,7 +69,6 @@ import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.Set;
 import java.util.logging.Logger;
 
@@ -72,12 +78,24 @@ import java.util.logging.Logger;
  */
 public class AppEngineBackEnd implements PipelineBackEnd {
 
+  private static final RetryParams RETRY_PARAMS = new RetryParams.Builder()
+      .retryDelayBackoffFactor(2)
+      .initialRetryDelayMillis(300)
+      .maxRetryDelayMillis(5000)
+      .retryMinAttempts(5)
+      .retryMaxAttempts(5)
+      .build();
+
+  private static final
+      ExceptionHandler MODULES_EXCEPTION_HANDLER = new ExceptionHandler.Builder().retryOn(
+          ConcurrentModificationException.class, DatastoreTimeoutException.class,
+          DatastoreFailureException.class).build();
+
   private static final Logger logger = Logger.getLogger(AppEngineBackEnd.class.getName());
 
   // Arbitrary value for now; may need tuning.
   private static final int MAX_ENTITIES_PER_GET = 100;
   private static final int MAX_BLOB_BYTE_SIZE = 1000000;
-  private static final Random random = new Random();
 
   private final DatastoreService dataStore;
   private final AppEngineTaskQueue taskQueue;
@@ -173,28 +191,16 @@ public class AppEngineBackEnd implements PipelineBackEnd {
     }
   }
 
-  private void tryFiveTimes(Operation operation) {
-    int attempts = 1;
-    while (true) {
-      try {
-        operation.run();
-        return;
-      } catch (ConcurrentModificationException e) {
-        String logMessage =
-            "ConcurrentModificationException during " + operation.getName() + " attempt "
-                + attempts + ".";
-        if (attempts++ < 5) {
-          logger.finest(logMessage + " Trying again.");
-          try {
-            // Sleep between 0.08 to 5.04 seconds, considering attempts
-            Thread.sleep((long) ((random.nextFloat() + 0.05) * attempts * 800.0));
-          } catch (InterruptedException f) {
-            // ignore
-          }
-        } else {
-          logger.info(logMessage);
-          throw e;
-        }
+  private void tryFiveTimes(final Operation operation) {
+    try {
+      RetryHelper.runWithRetries(callable(operation), RETRY_PARAMS, MODULES_EXCEPTION_HANDLER);
+    } catch (RetriesExhaustedException e) {
+      if (e.getCause() instanceof RuntimeException) {
+        logger.info(e.getCause().getMessage() + " during " + operation.getName()
+            + " throwing after multiple attempts ");
+        throw (RuntimeException) e.getCause();
+      } else {
+        throw e;
       }
     }
   }

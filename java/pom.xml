@@ -102,7 +102,11 @@
       <version>2.5</version>
       <scope>provided</scope>
     </dependency>
-
+    <dependency>
+      <groupId>com.google.appengine.tools</groupId>
+      <artifactId>appengine-gcs-client</artifactId>
+      <version>[0.3.8,0.4)</version>
+    </dependency>
     <!-- Test Dependencies -->
     <dependency>
       <groupId>com.google.appengine</groupId>
