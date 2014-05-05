@@ -1940,16 +1940,6 @@ class _PipelineContext(object):
       else:
         # Generator yielded no children, so treat it as a sync function.
         stage.outputs.default._set_value_test(stage._pipeline_key, None)
-
-      # Enforce the policy of requiring all undeclared output slots from
-      # child pipelines to be consumed by their parent generator.
-      for slot in all_output_slots:
-        if slot.name == 'default':
-          continue
-        if slot.filled and not slot._strict and not slot._touched:
-          raise SlotNotDeclaredError(
-              'Undeclared output "%s"; all dynamic outputs from child '
-              'pipelines must be consumed.' % slot.name)
     else:
       try:
         result = stage.run_test(*stage.args, **stage.kwargs)
