@@ -875,9 +875,9 @@ public class PipelineManager {
     updateSpec.getNonTransactionalGroup().includeException(exceptionRecord);
     Key exceptionKey = exceptionRecord.getKey();
     jobRecord.setExceptionKey(exceptionKey);
-    updateSpec.getNonTransactionalGroup().includeJob(jobRecord);
     if (jobRecord.isCallExceptionHandler() || attemptNumber >= maxAttempts) {
       jobRecord.setState(State.STOPPED);
+      updateSpec.getNonTransactionalGroup().includeJob(jobRecord);
       if (jobRecord.isExceptionHandlerSpecified()) {
         cancelChildren(jobRecord, null);
         executeExceptionHandler(updateSpec, jobRecord, caughtException, false);
@@ -899,16 +899,16 @@ public class PipelineManager {
       backEnd.save(updateSpec, jobRecord.getQueueSettings());
     } else {
       jobRecord.setState(State.RETRY);
-      updateSpec.getNonTransactionalGroup().includeJob(jobRecord);
-      updateSpec.getNonTransactionalGroup().includeJob(rootJobRecord);
-      backEnd.save(updateSpec, jobRecord.getQueueSettings());
       int backoffFactor = jobRecord.getBackoffFactor();
       int backoffSeconds = jobRecord.getBackoffSeconds();
       RunJobTask task =
           new RunJobTask(jobRecord.getKey(), attemptNumber, jobRecord.getQueueSettings());
       task.getQueueSettings().setDelayInSeconds(
           backoffSeconds * (long) Math.pow(backoffFactor, attemptNumber));
-      backEnd.enqueue(task);
+      updateSpec.getFinalTransaction().includeJob(jobRecord);
+      updateSpec.getFinalTransaction().registerTask(task);
+      backEnd.saveWithJobStateCheck(updateSpec, jobRecord.getQueueSettings(), jobRecord.getKey(),
+          State.WAITING_TO_RUN, State.RETRY);
     }
   }
 

@@ -242,11 +242,20 @@ public class Barrier extends PipelineModelObject {
   }
 
   public void addRegularArgumentSlot(Slot slot) {
+    verifyStateBeforAdd(slot);
     addSlotDescriptor(new SlotDescriptor(slot, 0));
   }
 
   public void addPhantomArgumentSlot(Slot slot) {
+    verifyStateBeforAdd(slot);
     addSlotDescriptor(new SlotDescriptor(slot, -1));
+  }
+
+  private void verifyStateBeforAdd(Slot slot) {
+    if (getType() == Type.FINALIZE && waitingOnInflated != null && !waitingOnInflated.isEmpty()) {
+      throw new IllegalStateException("Trying to add a slot, " + slot +
+          ", to an already populated finalized barrier: " + this);
+    }
   }
 
   /**
@@ -261,6 +270,7 @@ public class Barrier extends PipelineModelObject {
     if (!initialSlot.isFilled()) {
       throw new IllegalArgumentException("initialSlot must be filled");
     }
+    verifyStateBeforAdd(initialSlot);
     int groupSize = slotList.size() + 1;
     addSlotDescriptor(new SlotDescriptor(initialSlot, groupSize));
     for (Slot slot : slotList) {
