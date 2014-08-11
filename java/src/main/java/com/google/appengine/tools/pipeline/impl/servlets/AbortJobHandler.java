@@ -1,4 +1,4 @@
-// Copyright 2011 Google Inc.
+// Copyright 2014 Google Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License"); you may not
 // use this file except in compliance with the License. You may obtain a copy of
@@ -16,8 +16,6 @@ package com.google.appengine.tools.pipeline.impl.servlets;
 
 import com.google.appengine.tools.pipeline.NoSuchObjectException;
 import com.google.appengine.tools.pipeline.impl.PipelineManager;
-import com.google.appengine.tools.pipeline.impl.model.JobRecord;
-import com.google.appengine.tools.pipeline.impl.model.PipelineObjects;
 
 import java.io.IOException;
 
@@ -26,39 +24,27 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 /**
- * @author rudominer@google.com (Mitch Rudominer)
+ * @author ozarov@google.com (Arie Ozarov)
  */
-public class JsonTreeHandler {
+public class AbortJobHandler {
 
-  public static final String PATH_COMPONENT = "rpc/tree";
+  public static final String PATH_COMPONENT = "rpc/abort";
   private static final String ROOT_PIPELINE_ID = "root_pipeline_id";
 
   public static void doGet(HttpServletRequest req, HttpServletResponse resp)
-      throws ServletException {
-
+      throws IOException, ServletException {
     String rootJobHandle = req.getParameter(ROOT_PIPELINE_ID);
     if (null == rootJobHandle) {
       throw new ServletException(ROOT_PIPELINE_ID + " parameter not found.");
     }
     try {
-      JobRecord jobInfo;
-      try {
-        jobInfo = PipelineManager.getJob(rootJobHandle);
-      } catch (NoSuchObjectException nsoe) {
-        resp.sendError(HttpServletResponse.SC_NOT_FOUND);
-        return;
-      }
-      String rootJobKey = jobInfo.getRootJobKey().getName();
-      if (!rootJobKey.equals(rootJobHandle)) {
-        resp.addHeader(ROOT_PIPELINE_ID, rootJobKey);
-        resp.sendError(449, rootJobKey);
-        return;
-      }
-      PipelineObjects pipelineObjects = PipelineManager.queryFullPipeline(rootJobKey);
-      String asJson = JsonGenerator.pipelineObjectsToJson(pipelineObjects);
-      // TODO(user): Temporary until we support abort/delete in Python
-      resp.addHeader("Pipeline-Lang", "Java");
-      resp.getWriter().write(asJson);
+      PipelineManager.cancelJob(rootJobHandle);
+    } catch (NoSuchObjectException nsoe) {
+      resp.sendError(HttpServletResponse.SC_NOT_FOUND);
+      return;
+    }
+    try {
+      resp.getWriter().write("cancellation request was sent");
     } catch (IOException e) {
       throw new ServletException(e);
     }
