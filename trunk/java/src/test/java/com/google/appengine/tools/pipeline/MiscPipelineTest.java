@@ -17,6 +17,7 @@ package com.google.appengine.tools.pipeline;
 import com.google.appengine.tools.pipeline.JobInfo.State;
 import com.google.appengine.tools.pipeline.JobSetting.StatusConsoleUrl;
 import com.google.appengine.tools.pipeline.impl.PipelineManager;
+import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
 
 import java.io.Serializable;
@@ -54,6 +55,11 @@ public class MiscPipelineTest extends PipelineTest {
     }
   }
 
+  @Override
+  protected boolean isHrdSafe() {
+    return false;
+  }
+
   @SuppressWarnings("serial")
   private static class ReturnFutureListJob extends Job0<List<String>> {
 
@@ -70,6 +76,79 @@ public class MiscPipelineTest extends PipelineTest {
     String pipelineId = service.startNewPipeline(new ReturnFutureListJob());
     List<String> value = waitForJobToComplete(pipelineId);
     assertEquals(ImmutableList.of("123", "456"), value);
+  }
+
+  private static class StringToLong implements Function<String, Long>, Serializable {
+
+    private static final long serialVersionUID = -913828405842203610L;
+
+    @Override
+    public Long apply(String input) {
+      return Long.valueOf(input);
+    }
+  }
+
+  @SuppressWarnings("serial")
+  private static class TestTransformJob extends Job0<Long> {
+
+    @Override
+    public Value<Long> run() {
+      FutureValue<String> child1 = futureCall(new StrJob<>(), immediate(Long.valueOf(123)));
+      return futureCall(new Jobs.Transform<>(new StringToLong()), child1);
+    }
+  }
+
+  public void testTransform() throws Exception {
+    PipelineService service = PipelineServiceFactory.newPipelineService();
+    String pipelineId = service.startNewPipeline(new TestTransformJob());
+    Long value = waitForJobToComplete(pipelineId);
+    assertEquals(Long.valueOf(123), value);
+  }
+
+
+  @SuppressWarnings("serial")
+  private static class RootJob extends Job0<String> {
+
+    private final boolean delete;
+
+    RootJob(boolean delete) {
+      this.delete = delete;
+    }
+
+    @Override
+    public Value<String> run() throws Exception {
+      FutureValue<String> child1 = futureCall(new StrJob<>(), immediate(Long.valueOf(123)));
+      FutureValue<String> child2 = futureCall(new StrJob<>(), immediate(Long.valueOf(456)));
+      if (delete) {
+        return Jobs.waitForAllAndDelete(this, child1, child2);
+      } else {
+        return Jobs.waitForAll(this, child1, child2);
+      }
+    }
+  }
+
+  public void testWaitForAll() throws Exception {
+    PipelineService service = PipelineServiceFactory.newPipelineService();
+    String pipelineId = service.startNewPipeline(new RootJob(false));
+    JobInfo jobInfo = waitUntilJobComplete(pipelineId);
+    assertEquals(JobInfo.State.COMPLETED_SUCCESSFULLY, jobInfo.getJobState());
+    assertEquals("123", jobInfo.getOutput());
+    assertNotNull(service.getJobInfo(pipelineId));
+  }
+
+  public void testWaitForAllAndDelete() throws Exception {
+    PipelineService service = PipelineServiceFactory.newPipelineService();
+    String pipelineId = service.startNewPipeline(new RootJob(true));
+    JobInfo jobInfo = waitUntilJobComplete(pipelineId);
+    assertEquals(JobInfo.State.COMPLETED_SUCCESSFULLY, jobInfo.getJobState());
+    assertEquals("123", jobInfo.getOutput());
+    waitUntilTaskQueueIsEmpty();
+    try {
+      service.getJobInfo(pipelineId);
+      fail("Was expecting a NoSuchObjectException exception");
+    } catch (NoSuchObjectException expected) {
+      // expected;
+    }
   }
 
   @SuppressWarnings("serial")
