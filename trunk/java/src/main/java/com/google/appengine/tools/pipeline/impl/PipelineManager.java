@@ -1188,7 +1188,7 @@ public class PipelineManager {
       return backEnd.queryJob(key, inflationType);
     } catch (NoSuchObjectException e) {
       logger.log(
-          Level.SEVERE, "Cannot find some part of the job: " + key + ". Aborting the pipeline.", e);
+          Level.WARNING, "Cannot find some part of the job: " + key + ". Ignoring the task.", e);
       throw new AbandonTaskException();
     }
   }
@@ -1215,7 +1215,7 @@ public class PipelineManager {
     try {
       return backEnd.querySlot(key, inflate);
     } catch (NoSuchObjectException e) {
-      logger.log(Level.SEVERE, "Cannot find the slot: " + key + ". Aborting the pipeline.", e);
+      logger.log(Level.WARNING, "Cannot find the slot: " + key + ". Ignoring the task.", e);
       throw new AbandonTaskException();
     }
   }
