@@ -113,6 +113,34 @@ public class MiscPipelineTest extends PipelineTest {
     assertTrue((Boolean) jobInfo.getOutput());
   }
 
+
+  @SuppressWarnings("serial")
+  private abstract static class AbstractJob extends Job0<String> {
+
+    @Override
+    public Value<String> run() throws Exception {
+      return immediate(getValue());
+    }
+
+    protected abstract String getValue();
+  }
+
+  @SuppressWarnings("serial")
+  private static class ConcreteJob extends AbstractJob {
+
+    @Override
+    protected String getValue() {
+      return "Shalom";
+    }
+  }
+
+  public void testJobInheritence() throws Exception {
+    PipelineService service = PipelineServiceFactory.newPipelineService();
+    String pipelineId = service.startNewPipeline(new ConcreteJob());
+    JobInfo jobInfo = waitUntilJobComplete(pipelineId);
+    assertEquals("Shalom", jobInfo.getOutput());
+  }
+
   @SuppressWarnings("serial")
   private static class FailedJob extends Job0<String> {
 
