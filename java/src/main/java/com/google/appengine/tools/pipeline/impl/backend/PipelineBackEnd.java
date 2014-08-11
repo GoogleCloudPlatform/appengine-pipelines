@@ -54,7 +54,8 @@ public interface PipelineBackEnd {
    * {@link JobRecord} with the given {@code jobKey} will be retrieved from the
    * data store and its {@link JobRecord#getState() state} will be checked to
    * see if it is one of the {@code expectedStates}. If not then the final
-   * transaction will be aborted and the method return {@code false}.
+   * transaction will be aborted, and this method will return {@code false}.
+   * @return {@code true} iff the transaction was applied successfully.
    */
   boolean saveWithJobStateCheck(UpdateSpec updateSpec, QueueSettings queueSettings,
       Key jobKey, JobRecord.State... expectedStates);
@@ -200,3 +201,4 @@ public interface PipelineBackEnd {
    */
   Set<String> getRootPipelinesDisplayName();
 }
+
