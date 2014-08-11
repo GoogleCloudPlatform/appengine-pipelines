@@ -94,12 +94,8 @@ public class FutureListTest extends PipelineTest {
     @Override
     public Value<List<Integer>> run() {
       Returns5Job returns5Job = new Returns5Job();
-      List<Value<Integer>> valueList = new ArrayList<>(4);
-      valueList.add(futureCall(returns5Job));
-      valueList.add(immediate(7));
-      valueList.add(futureCall(returns5Job));
-      valueList.add(immediate(4));
-      return futureList(valueList);
+      return new FutureList<>(
+          futureCall(returns5Job), immediate(7), futureCall(returns5Job), immediate(4));
     }
   }
 
