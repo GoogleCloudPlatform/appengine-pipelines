@@ -671,8 +671,10 @@ public class PipelineManager {
     Key rootJobKey = jobRecord.getRootJobKey();
     logger.info("Running pipeline job " + jobKey.getName() + "; UI at "
         + PipelineServlet.makeViewerUrl(rootJobKey, jobKey));
-    JobRecord rootJobRecord = jobRecord;
-    if (!rootJobKey.equals(jobKey)) {
+    JobRecord rootJobRecord;
+    if (rootJobKey.equals(jobKey)) {
+      rootJobRecord = jobRecord;
+    } else {
       rootJobRecord = queryJobOrAbandonTask(rootJobKey, JobRecord.InflationType.NONE);
     }
     if (rootJobRecord.getState() == State.STOPPED) {
@@ -755,7 +757,12 @@ public class PipelineManager {
     jobRecord.setStartTime(new Date());
     tempSpec = new UpdateSpec(jobRecord.getRootJobKey());
     tempSpec.getNonTransactionalGroup().includeJob(jobRecord);
-    backEnd.save(tempSpec, jobRecord.getQueueSettings());
+    if (!backEnd.saveWithJobStateCheck(
+        tempSpec, jobRecord.getQueueSettings(), jobKey, State.WAITING_TO_RUN, State.RETRY)) {
+      logger.info("Ignoring runJob request for job " + jobRecord + " which is not in a"
+          + " WAITING_TO_RUN or a RETRY state");
+      return;
+    }
     //TODO(user): Use the commented code to avoid resetting stack trace of rethrown exceptions
     //    List<Throwable> throwableParams = new ArrayList<Throwable>(params.length);
     //    for (Object param : params) {
@@ -810,8 +817,10 @@ public class PipelineManager {
     jobRecord.getQueueSettings().merge(cancelJobTask.getQueueSettings());
     Key rootJobKey = jobRecord.getRootJobKey();
     logger.info("Cancelling pipeline job " + jobKey.getName());
-    JobRecord rootJobRecord = jobRecord;
-    if (!rootJobKey.equals(jobKey)) {
+    JobRecord rootJobRecord;
+    if (rootJobKey.equals(jobKey)) {
+      rootJobRecord = jobRecord;
+    } else {
       rootJobRecord = queryJobOrAbandonTask(rootJobKey, JobRecord.InflationType.NONE);
     }
     if (rootJobRecord.getState() == State.STOPPED) {
@@ -934,14 +943,13 @@ public class PipelineManager {
 
   private static void cancelChildren(JobRecord jobRecord, Key failedChildKey) {
     for (Key childKey : jobRecord.getChildKeys()) {
-      if (childKey.equals(failedChildKey)) {
-        continue;
-      }
-      CancelJobTask cancelJobTask = new CancelJobTask(childKey, jobRecord.getQueueSettings());
-      try {
-        backEnd.enqueue(cancelJobTask);
-      } catch (TaskAlreadyExistsException e) {
-        // OK. Some other thread has already enqueued this task.
+      if (!childKey.equals(failedChildKey)) {
+        CancelJobTask cancelJobTask = new CancelJobTask(childKey, jobRecord.getQueueSettings());
+        try {
+          backEnd.enqueue(cancelJobTask);
+        } catch (TaskAlreadyExistsException e) {
+          // OK. Some other thread has already enqueued this task.
+        }
       }
     }
   }
@@ -952,10 +960,12 @@ public class PipelineManager {
     JobRecord jobRecord = queryJobOrAbandonTask(jobKey, JobRecord.InflationType.FOR_RUN);
     jobRecord.getQueueSettings().merge(handleChildExceptionTask.getQueueSettings());
     Key rootJobKey = jobRecord.getRootJobKey();
-    logger.info("Running pipeline job " + jobKey.getName() + "; UI at "
+    logger.info("Running pipeline job " + jobKey.getName() + " exception handler; UI at "
         + PipelineServlet.makeViewerUrl(rootJobKey, jobKey));
-    JobRecord rootJobRecord = jobRecord;
-    if (!rootJobKey.equals(jobKey)) {
+    JobRecord rootJobRecord;
+    if (rootJobKey.equals(jobKey)) {
+      rootJobRecord = jobRecord;
+    } else {
       rootJobRecord = queryJobOrAbandonTask(rootJobKey, JobRecord.InflationType.NONE);
     }
     if (rootJobRecord.getState() == State.STOPPED) {
