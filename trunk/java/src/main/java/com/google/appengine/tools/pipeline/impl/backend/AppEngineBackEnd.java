@@ -70,6 +70,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
 
 /**
@@ -86,10 +87,10 @@ public class AppEngineBackEnd implements PipelineBackEnd {
       .retryMaxAttempts(5)
       .build();
 
-  private static final
-      ExceptionHandler MODULES_EXCEPTION_HANDLER = new ExceptionHandler.Builder().retryOn(
-          ConcurrentModificationException.class, DatastoreTimeoutException.class,
-          DatastoreFailureException.class).build();
+  private static final ExceptionHandler MODULES_EXCEPTION_HANDLER = new ExceptionHandler.Builder()
+      .retryOn(ConcurrentModificationException.class, DatastoreTimeoutException.class,
+          DatastoreFailureException.class)
+      .build();
 
   private static final Logger logger = Logger.getLogger(AppEngineBackEnd.class.getName());
 
@@ -125,7 +126,7 @@ public class AppEngineBackEnd implements PipelineBackEnd {
     putAll(group.getFailureRecords());
   }
 
-  private void transactionallySaveAll(UpdateSpec.Transaction transactionSpec,
+  private boolean transactionallySaveAll(UpdateSpec.Transaction transactionSpec,
       QueueSettings queueSettings, Key rootJobKey, Key jobKey, JobRecord.State... expectedStates) {
     Transaction transaction = dataStore.beginTransaction();
     try {
@@ -150,7 +151,7 @@ public class AppEngineBackEnd implements PipelineBackEnd {
           logger.info("Job " + jobRecord + " is not in one of the expected states: "
               + Arrays.asList(expectedStates)
               + " and so transactionallySaveAll() will not continue.");
-          return;
+          return false;
         }
       }
       saveAll(transactionSpec);
@@ -176,6 +177,7 @@ public class AppEngineBackEnd implements PipelineBackEnd {
         transaction.rollback();
       }
     }
+    return true;
   }
 
   private abstract class Operation implements Runnable {
@@ -211,8 +213,9 @@ public class AppEngineBackEnd implements PipelineBackEnd {
   }
 
   @Override
-  public void saveWithJobStateCheck(final UpdateSpec updateSpec, final QueueSettings queueSettings,
-      final Key jobKey, final JobRecord.State... expectedStates) {
+  public boolean saveWithJobStateCheck(final UpdateSpec updateSpec,
+      final QueueSettings queueSettings, final Key jobKey,
+      final JobRecord.State... expectedStates) {
     tryFiveTimes(new Operation("save") {
       @Override
       public void run() {
@@ -232,14 +235,15 @@ public class AppEngineBackEnd implements PipelineBackEnd {
     // if needed could be restricted to package-scoped tests.
     // If a unit test requests us to do so, fail here.
     throwHereForTesting("AppEngineBackeEnd.saveWithJobStateCheck.beforeFinalTransaction");
-
+    final AtomicBoolean wasSaved = new AtomicBoolean(true);
     tryFiveTimes(new Operation("save") {
       @Override
       public void run() {
-        transactionallySaveAll(updateSpec.getFinalTransaction(), queueSettings,
-            updateSpec.getRootJobKey(), jobKey, expectedStates);
+        wasSaved.set(transactionallySaveAll(updateSpec.getFinalTransaction(), queueSettings,
+            updateSpec.getRootJobKey(), jobKey, expectedStates));
       }
     });
+    return wasSaved.get();
   }
 
   @Override
