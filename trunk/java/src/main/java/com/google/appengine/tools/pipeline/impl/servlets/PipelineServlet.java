@@ -49,6 +49,8 @@ public class PipelineServlet extends HttpServlet {
     GET_JSON(JsonTreeHandler.PATH_COMPONENT),
     GET_JSON_LIST(JsonListHandler.PATH_COMPONENT),
     GET_JSON_CLASS_FILTER(JsonClassFilterHandler.PATH_COMPONENT),
+    ABORT_JOB(AbortJobHandler.PATH_COMPONENT),
+    DELETE_JOB(DeleteJobHandler.PATH_COMPONENT),
     HANDLE_STATIC("");
 
     private final String pathComponent;
@@ -99,6 +101,12 @@ public class PipelineServlet extends HttpServlet {
         break;
       case GET_JSON_CLASS_FILTER:
         JsonClassFilterHandler.doGet(req, resp);
+        break;
+      case ABORT_JOB:
+        AbortJobHandler.doGet(req, resp);
+        break;
+      case DELETE_JOB:
+        DeleteJobHandler.doGet(req, resp);
         break;
       case HANDLE_STATIC:
         StaticContentHandler.doGet(resp, path);
