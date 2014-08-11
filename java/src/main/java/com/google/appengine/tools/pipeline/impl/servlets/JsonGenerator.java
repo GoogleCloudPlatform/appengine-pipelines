@@ -24,6 +24,7 @@ import com.google.appengine.tools.pipeline.impl.model.Slot;
 import com.google.appengine.tools.pipeline.impl.model.SlotDescriptor;
 import com.google.appengine.tools.pipeline.impl.util.JsonUtils;
 import com.google.appengine.tools.pipeline.util.Pair;
+import com.google.common.base.Optional;
 
 import java.util.Date;
 import java.util.HashMap;
@@ -215,7 +216,8 @@ public class JsonGenerator {
     // one output and so we put it in "default".
     allOutputs.put(DEFAULT_OUTPUT_NAME, outputSlotId);
     map.put(JOB_OUTPUTS, allOutputs);
-    map.put(JOB_QUEUE_NAME, "");
+    map.put(JOB_QUEUE_NAME,
+        Optional.fromNullable(jobRecord.getQueueSettings().getOnQueue()).or(""));
     map.put(JOB_CURRENT_ATTEMPT, jobRecord.getAttemptNumber());
     map.put(JOB_MAX_ATTEMPTS, jobRecord.getMaxAttempts());
     map.put(JOB_BACKOFF_SECONDS, jobRecord.getBackoffSeconds());
