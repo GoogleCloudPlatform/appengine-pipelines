@@ -17,6 +17,7 @@ package com.google.appengine.tools.pipeline;
 import com.google.appengine.tools.pipeline.JobInfo.State;
 import com.google.appengine.tools.pipeline.JobSetting.StatusConsoleUrl;
 import com.google.appengine.tools.pipeline.impl.PipelineManager;
+import com.google.common.collect.ImmutableList;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -53,6 +54,23 @@ public class MiscPipelineTest extends PipelineTest {
     }
   }
 
+  @SuppressWarnings("serial")
+  private static class ReturnFutureListJob extends Job0<List<String>> {
+
+    @Override
+    public Value<List<String>> run() throws Exception {
+      FutureValue<String> child1 = futureCall(new StrJob<>(), immediate(Long.valueOf(123)));
+      FutureValue<String> child2 = futureCall(new StrJob<>(), immediate(Long.valueOf(456)));
+      return new FutureList<>(ImmutableList.of(child1, child2));
+    }
+  }
+
+  public void testReturnFutureList() throws Exception {
+    PipelineService service = PipelineServiceFactory.newPipelineService();
+    String pipelineId = service.startNewPipeline(new ReturnFutureListJob());
+    List<String> value = waitForJobToComplete(pipelineId);
+    assertEquals(ImmutableList.of("123", "456"), value);
+  }
 
   @SuppressWarnings("serial")
   private static class CallerJob extends Job0<String> {
