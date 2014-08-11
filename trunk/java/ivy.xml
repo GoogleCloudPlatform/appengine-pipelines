@@ -10,7 +10,7 @@
                 conf="${sdk}->default"/>
     <dependency org="javax.servlet" name="servlet-api" rev="2.5" conf="${sdk}->default"/>
     <dependency org="com.google.appengine.tools" name="appengine-gcs-client"
-                rev="[0.3.8,0.4)" conf="${thirdparty}->default"/>
+                rev="[0.4,0.5)" conf="${thirdparty}->default"/>
     <dependency org="com.google.appengine" name="appengine-testing" rev="${sdk_version}"
                 conf="${test}->default"/>
     <dependency org="com.google.appengine" name="appengine-api-stubs" rev="${sdk_version}"
