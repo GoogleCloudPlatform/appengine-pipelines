@@ -17,6 +17,8 @@ package com.google.appengine.tools.pipeline;
 import com.google.appengine.tools.pipeline.JobInfo.State;
 import com.google.appengine.tools.pipeline.JobSetting.StatusConsoleUrl;
 import com.google.appengine.tools.pipeline.impl.PipelineManager;
+import com.google.appengine.tools.pipeline.impl.model.JobRecord;
+import com.google.appengine.tools.pipeline.impl.model.PipelineObjects;
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
 
@@ -229,6 +231,30 @@ public class MiscPipelineTest extends PipelineTest {
     protected String getValue() {
       return "Shalom";
     }
+
+    @Override
+    public String getJobDisplayName() {
+      return "ConcreteJob: " + getValue();
+    }
+
+    @SuppressWarnings("unused")
+    public Value<String> handleException(Throwable t) {
+      return immediate("Got exception!");
+    }
+  }
+
+  public void testGetJobDisplayName() throws Exception {
+    PipelineService service = PipelineServiceFactory.newPipelineService();
+    ConcreteJob job = new ConcreteJob();
+    String pipelineId = service.startNewPipeline(job);
+    JobRecord jobRecord = PipelineManager.getJob(pipelineId);
+    assertEquals(job.getJobDisplayName(), jobRecord.getRootJobDisplayName());
+    JobInfo jobInfo = waitUntilJobComplete(pipelineId);
+    assertEquals("Shalom", jobInfo.getOutput());
+    jobRecord = PipelineManager.getJob(pipelineId);
+    assertEquals(job.getJobDisplayName(), jobRecord.getRootJobDisplayName());
+    PipelineObjects pobjects = PipelineManager.queryFullPipeline(pipelineId);
+    assertEquals(job.getJobDisplayName(), pobjects.rootJob.getRootJobDisplayName());
   }
 
   public void testJobInheritence() throws Exception {
@@ -247,7 +273,7 @@ public class MiscPipelineTest extends PipelineTest {
     }
   }
 
-  public void testJobFailure() throws Exception {
+ public void testJobFailure() throws Exception {
     PipelineService service = PipelineServiceFactory.newPipelineService();
     String pipelineId = service.startNewPipeline(new FailedJob());
     JobInfo jobInfo = waitUntilJobComplete(pipelineId);
