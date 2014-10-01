@@ -145,7 +145,7 @@ public class OrphanedJobGraphTest extends PipelineTest {
 
     // Check that all jobs have been deleted
     AppEngineBackEnd backend = new AppEngineBackEnd();
-    Iterable<Entity> jobs = backend.queryAll(JobRecord.DATA_STORE_KIND, rootJobKey, true, null);
+    Iterable<Entity> jobs = backend.queryAll(JobRecord.DATA_STORE_KIND, rootJobKey);
     numJobs = 0;
     // TODO(user): replace with Iterables.size once b/11899553 is fixed
     for (@SuppressWarnings("unused") Entity entity : jobs) {
