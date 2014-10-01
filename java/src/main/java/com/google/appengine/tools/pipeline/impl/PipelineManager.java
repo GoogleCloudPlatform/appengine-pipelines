@@ -498,7 +498,7 @@ public class PipelineManager {
 
     @Override
     public String getJobDisplayName() {
-      return jobInstance.getClass().getName();
+      return jobInstance.getJobDisplayName();
     }
   }
 
