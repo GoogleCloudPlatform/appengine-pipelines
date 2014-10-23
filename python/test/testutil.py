@@ -48,13 +48,14 @@ def setup_for_testing(require_indexes=True, define_queues=[]):
   from google.appengine.api import apiproxy_stub_map
   from google.appengine.api import memcache
   from google.appengine.api import queueinfo
-  from google.appengine.tools import dev_appserver
+  from google.appengine.datastore import datastore_stub_util
+  from google.appengine.tools import old_dev_appserver
   from google.appengine.tools import dev_appserver_index
   before_level = logging.getLogger().getEffectiveLevel()
   try:
     logging.getLogger().setLevel(100)
     root_path = os.path.realpath(os.path.dirname(__file__))
-    dev_appserver.SetupStubs(
+    old_dev_appserver.SetupStubs(
         TEST_APP_ID,
         root_path=root_path,
         login_url='',
@@ -69,6 +70,10 @@ def setup_for_testing(require_indexes=True, define_queues=[]):
     memcache.flush_all()
   finally:
     logging.getLogger().setLevel(before_level)
+
+  datastore_stub = apiproxy_stub_map.apiproxy.GetStub('datastore_v3')
+  hr_policy = datastore_stub_util.PseudoRandomHRConsistencyPolicy(probability=1)
+  datastore_stub.SetConsistencyPolicy(hr_policy)
 
   taskqueue_stub = apiproxy_stub_map.apiproxy.GetStub('taskqueue')
   taskqueue_stub.queue_yaml_parser = (

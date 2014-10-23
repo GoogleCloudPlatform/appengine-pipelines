@@ -2,6 +2,7 @@
 """Tests for util.py."""
 
 import datetime
+import logging
 import os
 import sys
 import unittest
@@ -44,3 +45,8 @@ class GetTaskTargetTest(unittest.TestCase):
     task = taskqueue.Task(url="/relative_url",
                           target=util._get_task_target())
     self.assertEqual("v7", task.target)
+
+
+if __name__ == '__main__':
+  logging.getLogger().setLevel(logging.DEBUG)
+  unittest.main()

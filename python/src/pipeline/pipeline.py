@@ -56,17 +56,15 @@ import util as mr_util
 # pylint: disable=protected-access
 
 # For convenience
+_BarrierIndex = models._BarrierIndex
+_BarrierRecord = models._BarrierRecord
 _PipelineRecord = models._PipelineRecord
 _SlotRecord = models._SlotRecord
-_BarrierRecord = models._BarrierRecord
 _StatusRecord = models._StatusRecord
 
 
 # Overall TODOs:
 # - Add a human readable name for start()
-# - Consider using sha1 of the UUID for user-supplied pipeline keys to ensure
-#   that they keys are definitely not sequential or guessable (Python's uuid1
-#   method generates roughly sequential IDs).
 
 # Potential TODOs:
 # - Add support for ANY N barriers.
@@ -165,7 +163,7 @@ class Slot(object):
       raise UnexpectedPipelineError('Slot with key "%s" missing a name.' %
                                     slot_key)
     if slot_key is None:
-      slot_key = db.Key.from_path(_SlotRecord.kind(), uuid.uuid1().hex)
+      slot_key = db.Key.from_path(_SlotRecord.kind(), uuid.uuid4().hex)
       self._exists = _TEST_MODE
     else:
       self._exists = True
@@ -386,7 +384,7 @@ class Pipeline(object):
 
   Modifiable instance properties:
     backoff_seconds: How many seconds to use as the constant factor in
-      exponential backoff; may be changed by the user
+      exponential backoff; may be changed by the user.
     backoff_factor: Base factor to use for exponential backoff. The formula
       followed is (backoff_seconds * backoff_factor^current_attempt).
     max_attempts: Maximum number of retry attempts to make before failing
@@ -412,6 +410,17 @@ class Pipeline(object):
   # Internal only.
   _class_path = None  # Set for each class
   _send_mail = mail.send_mail_to_admins  # For testing
+
+  # callback_xg_transaction: Determines whether callbacks are processed within
+  # a single entity-group transaction (False), a cross-entity-group
+  # transaction (True), or no transaction (None, default). It is generally
+  # unsafe for a callback to modify pipeline state outside of a transaction, in
+  # particular any pre-initialized state from the pipeline record, such as the
+  # outputs. If a transaction is used, the callback method must operate within
+  # the datastore's transaction time limits.
+  # TODO(user): Make non-internal once other API calls are considered for
+  # transaction support.
+  _callback_xg_transaction = None
 
   def __init__(self, *args, **kwargs):
     """Initializer.
@@ -442,7 +451,7 @@ class Pipeline(object):
       self._context = _PipelineContext('', 'default', '')
       self._root_pipeline_key = _TEST_ROOT_PIPELINE_KEY
       self._pipeline_key = db.Key.from_path(
-          _PipelineRecord.kind(), uuid.uuid1().hex)
+          _PipelineRecord.kind(), uuid.uuid4().hex)
       self.outputs = PipelineFuture(self.output_names)
       self._context.evaluate_test(self)
 
@@ -608,7 +617,7 @@ class Pipeline(object):
       PipelineSetupError if the pipeline could not start for any other reason.
     """
     if not idempotence_key:
-      idempotence_key = uuid.uuid1().hex
+      idempotence_key = uuid.uuid4().hex
     elif not isinstance(idempotence_key, unicode):
       try:
         idempotence_key.encode('utf-8')
@@ -639,7 +648,7 @@ class Pipeline(object):
       kwargs: Ignored keyword arguments usually passed to start().
     """
     if not idempotence_key:
-      idempotence_key = uuid.uuid1().hex
+      idempotence_key = uuid.uuid4().hex
     pipeline_key = db.Key.from_path(_PipelineRecord.kind(), idempotence_key)
     context = _PipelineContext('', 'default', base_path)
     future = PipelineFuture(self.output_names, force_strict=True)
@@ -769,7 +778,7 @@ class Pipeline(object):
 
       status_record.put()
     except Exception, e:
-      raise PipelineRuntimeError('Could not set status for %s#%s: %s' % 
+      raise PipelineRuntimeError('Could not set status for %s#%s: %s' %
           (self, self.pipeline_id, str(e)))
 
   def complete(self, default_output=None):
@@ -832,11 +841,14 @@ class Pipeline(object):
     kwargs['method'] = 'POST'
     return taskqueue.Task(*args, **kwargs)
 
-  def send_result_email(self):
+  def send_result_email(self, sender=None):
     """Sends an email to admins indicating this Pipeline has completed.
 
     For developer convenience. Automatically called from finalized for root
     Pipelines that do not override the default action.
+
+    Args:
+      sender: (optional) Override the sender's email address.
     """
     status = 'successful'
     if self.was_aborted:
@@ -880,7 +892,8 @@ The Pipeline API
 </body></html>
 """ % param_dict
 
-    sender = '%s@%s.appspotmail.com' % (app_id, app_id)
+    if sender is None:
+      sender = '%s@%s.appspotmail.com' % (app_id, app_id)
     try:
       self._send_mail(sender, subject, body, html=html)
     except (mail.InvalidSenderError, mail.InvalidEmailError):
@@ -1007,26 +1020,19 @@ The Pipeline API
     if cls is Pipeline:
       return
 
-    # This is a brute-force approach to solving the module reverse-lookup
-    # problem, where we want to refer to a class by its stable module name
-    # but have no built-in facility for doing so in Python.
-    found = None
-    for name, module in module_dict.items():
-      if name == '__main__':
-        continue
-      found = getattr(module, cls.__name__, None)
-      if found is cls:
-        break
-    else:
-      # If all else fails, try the main module.
-      name = '__main__'
-      module = module_dict.get(name)
-      found = getattr(module, cls.__name__, None)
-      if found is not cls:
-        raise ImportError('Could not determine path for Pipeline '
-                          'function/class "%s"' % cls.__name__)
-
-    cls._class_path = '%s.%s' % (name, cls.__name__)
+    class_path = '%s.%s' % (cls.__module__, cls.__name__)
+    # When a WSGI handler is invoked as an entry point, any Pipeline class
+    # defined in the same file as the handler will get __module__ set to
+    # __main__. Thus we need to find out its real fully qualified path.
+    if cls.__module__ == '__main__':
+      for name, module in module_dict.items():
+        if name == '__main__':
+          continue
+        found = getattr(module, cls.__name__, None)
+        if found is cls:
+          class_path = '%s.%s' % (name, cls.__name__)
+          break
+    cls._class_path = class_path
 
   def _set_values_internal(self,
                            context,
@@ -1447,17 +1453,21 @@ class _PipelineContext(object):
         slot_record.put()
         task = taskqueue.Task(
             url=self.barrier_handler_path,
-            params=dict(slot_key=slot.key),
+            params=dict(
+                slot_key=slot.key,
+                use_barrier_indexes=True),
             headers={'X-Ae-Slot-Key': slot.key,
                      'X-Ae-Filler-Pipeline-Key': filler_pipeline_key})
         task.add(queue_name=self.queue_name, transactional=True)
-      db.run_in_transaction(txn)
+      db.run_in_transaction_options(
+          db.create_transaction_options(propagation=db.ALLOWED), txn)
 
     self.session_filled_output_names.add(slot.name)
 
   def notify_barriers(self,
                       slot_key,
                       cursor,
+                      use_barrier_indexes,
                       max_to_notify=_MAX_BARRIERS_TO_NOTIFY):
     """Searches for barriers affected by a slot and triggers completed ones.
 
@@ -1465,14 +1475,36 @@ class _PipelineContext(object):
       slot_key: db.Key or stringified key of the _SlotRecord that was filled.
       cursor: Stringified Datastore cursor where the notification query
         should pick up.
+      use_barrier_indexes: When True, use _BarrierIndex records to determine
+        which _Barriers to trigger by having this _SlotRecord filled. When
+        False, use the old method that queries for _BarrierRecords by
+        the blocking_slots parameter.
       max_to_notify: Used for testing.
+
+    Raises:
+      PipelineStatusError: If any of the barriers are in a bad state.
     """
     if not isinstance(slot_key, db.Key):
       slot_key = db.Key(slot_key)
-    query = (
-        _BarrierRecord.all(cursor=cursor)
-        .filter('blocking_slots =', slot_key))
-    results = query.fetch(max_to_notify)
+    logging.debug('Notifying slot %r', slot_key)
+
+    if use_barrier_indexes:
+      # Please see models.py:_BarrierIndex to understand how _BarrierIndex
+      # entities relate to _BarrierRecord entities.
+      query = (
+          _BarrierIndex.all(cursor=cursor, keys_only=True)
+          .ancestor(slot_key))
+      barrier_index_list = query.fetch(max_to_notify)
+      barrier_key_list = [
+          _BarrierIndex.to_barrier_key(key) for key in barrier_index_list]
+      results = db.get(barrier_key_list)
+    else:
+      # TODO(user): Delete this backwards compatible codepath and
+      # make use_barrier_indexes the assumed default in all cases.
+      query = (
+          _BarrierRecord.all(cursor=cursor)
+          .filter('blocking_slots =', slot_key))
+      results = query.fetch(max_to_notify)
 
     # Fetch all blocking _SlotRecords for any potentially triggered barriers.
     blocking_slot_keys = []
@@ -1487,24 +1519,23 @@ class _PipelineContext(object):
     task_list = []
     updated_barriers = []
     for barrier in results:
-      all_ready = True
+      ready_slots = []
       for blocking_slot_key in barrier.blocking_slots:
         slot_record = blocking_slot_dict.get(blocking_slot_key)
         if slot_record is None:
-          logging.error('Barrier "%s" relies on Slot "%s" which is missing.',
-                        barrier.key(), blocking_slot_key)
-          all_ready = False
-          break
-        if slot_record.status != _SlotRecord.FILLED:
-          all_ready = False
-          break
+          raise UnexpectedPipelineError(
+              'Barrier "%r" relies on Slot "%r" which is missing.' %
+              (barrier.key(), blocking_slot_key))
+        if slot_record.status == _SlotRecord.FILLED:
+          ready_slots.append(blocking_slot_key)
 
       # When all of the blocking_slots have been filled, consider the barrier
       # ready to trigger. We'll trigger it regardless of the current
       # _BarrierRecord status, since there could be task queue failures at any
       # point in this flow; this rolls forward the state and de-dupes using
       # the task name tombstones.
-      if all_ready:
+      pending_slots = set(barrier.blocking_slots) - set(ready_slots)
+      if not pending_slots:
         if barrier.status != _BarrierRecord.FIRED:
           barrier.status = _BarrierRecord.FIRED
           barrier.trigger_time = self._gettime()
@@ -1520,12 +1551,16 @@ class _PipelineContext(object):
           # contention on the _PipelineRecord entity.
           countdown = 1
         pipeline_key = _BarrierRecord.target.get_value_for_datastore(barrier)
+        logging.debug('Firing barrier %r', barrier.key())
         task_list.append(taskqueue.Task(
             url=path,
             countdown=countdown,
             name='ae-barrier-fire-%s-%s' % (pipeline_key.name(), purpose),
             params=dict(pipeline_key=pipeline_key, purpose=purpose),
             headers={'X-Ae-Pipeline-Key': pipeline_key}))
+      else:
+        logging.debug('Not firing barrier %r, Waiting for slots: %r',
+                      barrier.key(), pending_slots)
 
     # Blindly overwrite _BarrierRecords that have an updated status. This is
     # acceptable because by this point all finalization barriers for
@@ -1545,7 +1580,10 @@ class _PipelineContext(object):
       task_list.append(taskqueue.Task(
           name='%s-ae-barrier-notify-%d' % (prefix, end),
           url=self.barrier_handler_path,
-          params=dict(slot_key=slot_key, cursor=query.cursor())))
+          params=dict(
+              slot_key=slot_key,
+              cursor=query.cursor(),
+              use_barrier_indexes=use_barrier_indexes)))
 
     if task_list:
       try:
@@ -1676,7 +1714,6 @@ class _PipelineContext(object):
     # Adjust all pipeline output keys for this Pipeline to be children of
     # the _PipelineRecord, that way we can write them all and submit in a
     # single transaction.
-    entities_to_put = []
     for name, slot in pipeline.outputs._output_dict.iteritems():
       slot.key = db.Key.from_path(
           *slot.key.to_path(), **dict(parent=pipeline._pipeline_key))
@@ -1684,6 +1721,7 @@ class _PipelineContext(object):
     _, output_slots, params_text, params_blob = _generate_args(
         pipeline, pipeline.outputs, self.queue_name, self.base_path)
 
+    @db.transactional(propagation=db.INDEPENDENT)
     def txn():
       pipeline_record = db.get(pipeline._pipeline_key)
       if pipeline_record is not None:
@@ -1710,12 +1748,11 @@ class _PipelineContext(object):
           class_path=pipeline._class_path,
           max_attempts=pipeline.max_attempts))
 
-      entities_to_put.append(_BarrierRecord(
-          parent=pipeline._pipeline_key,
-          key_name=_BarrierRecord.FINALIZE,
-          target=pipeline._pipeline_key,
-          root_pipeline=pipeline._pipeline_key,
-          blocking_slots=list(output_slots)))
+      entities_to_put.extend(_PipelineContext._create_barrier_entities(
+          pipeline._pipeline_key,
+          pipeline._pipeline_key,
+          _BarrierRecord.FINALIZE,
+          output_slots))
 
       db.put(entities_to_put)
 
@@ -1728,7 +1765,7 @@ class _PipelineContext(object):
         return task
       task.add(queue_name=self.queue_name, transactional=True)
 
-    task = db.run_in_transaction(txn)
+    task = txn()
     # Immediately mark the output slots as existing so they can be filled
     # by asynchronous pipelines or used in test mode.
     for output_slot in pipeline.outputs._output_dict.itervalues():
@@ -2179,7 +2216,7 @@ class _PipelineContext(object):
           return
 
       child_pipeline_key = db.Key.from_path(
-          _PipelineRecord.kind(), uuid.uuid1().hex)
+          _PipelineRecord.kind(), uuid.uuid4().hex)
       all_output_slots.update(output_slots)
       all_children_keys.append(child_pipeline_key)
 
@@ -2199,25 +2236,94 @@ class _PipelineContext(object):
         pipelines_to_run.add(child_pipeline_key)
         child_pipeline.start_time = self._gettime()
       else:
-        entities_to_put.append(_BarrierRecord(
-            parent=child_pipeline_key,
-            key_name=_BarrierRecord.START,
-            target=child_pipeline_key,
-            root_pipeline=root_pipeline_key,
-            blocking_slots=list(dependent_slots)))
+        entities_to_put.extend(_PipelineContext._create_barrier_entities(
+            root_pipeline_key,
+            child_pipeline_key,
+            _BarrierRecord.START,
+            dependent_slots))
 
-      entities_to_put.append(_BarrierRecord(
-          parent=child_pipeline_key,
-          key_name=_BarrierRecord.FINALIZE,
-          target=child_pipeline_key,
-          root_pipeline=root_pipeline_key,
-          blocking_slots=list(output_slots)))
+      entities_to_put.extend(_PipelineContext._create_barrier_entities(
+          root_pipeline_key,
+          child_pipeline_key,
+          _BarrierRecord.FINALIZE,
+          output_slots))
+
+    # This generator pipeline's finalization barrier must include all of the
+    # outputs of any child pipelines that it runs. This ensures the finalized
+    # calls will not happen until all child pipelines have completed.
+    #
+    # The transition_run() call below will update the FINALIZE _BarrierRecord
+    # for this generator pipeline to include all of these child outputs in
+    # its list of blocking_slots. That update is done transactionally to
+    # make sure the _BarrierRecord only lists the slots that matter.
+    #
+    # However, the notify_barriers() method doesn't find _BarrierRecords
+    # through the blocking_slots field. It finds them through _BarrierIndexes
+    # entities. Thus, before we update the FINALIZE _BarrierRecord in
+    # transition_run(), we need to write _BarrierIndexes for all child outputs.
+    barrier_entities = _PipelineContext._create_barrier_entities(
+        root_pipeline_key,
+        pipeline_key,
+        _BarrierRecord.FINALIZE,
+        all_output_slots)
+    # Ignore the first element which is the _BarrierRecord. That entity must
+    # have already been created and put in the datastore for the parent
+    # pipeline before this code generated child pipelines.
+    barrier_indexes = barrier_entities[1:]
+    entities_to_put.extend(barrier_indexes)
 
     db.put(entities_to_put)
+
     self.transition_run(pipeline_key,
                         blocking_slot_keys=all_output_slots,
                         fanned_out_pipelines=all_children_keys,
                         pipelines_to_run=pipelines_to_run)
+
+  @staticmethod
+  def _create_barrier_entities(root_pipeline_key,
+                               child_pipeline_key,
+                               purpose,
+                               blocking_slot_keys):
+    """Creates all of the entities required for a _BarrierRecord.
+
+    Args:
+      root_pipeline_key: The root pipeline this is part of.
+      child_pipeline_key: The pipeline this barrier is for.
+      purpose: _BarrierRecord.START or _BarrierRecord.FINALIZE.
+      blocking_slot_keys: Set of db.Keys corresponding to _SlotRecords that
+        this barrier should wait on before firing.
+
+    Returns:
+      List of entities, starting with the _BarrierRecord entity, followed by
+      _BarrierIndexes used for firing when _SlotRecords are filled in the same
+      order as the blocking_slot_keys list provided. All of these entities
+      should be put in the Datastore to ensure the barrier fires properly.
+    """
+    result = []
+
+    blocking_slot_keys = list(blocking_slot_keys)
+
+    barrier = _BarrierRecord(
+        parent=child_pipeline_key,
+        key_name=purpose,
+        target=child_pipeline_key,
+        root_pipeline=root_pipeline_key,
+        blocking_slots=blocking_slot_keys)
+
+    result.append(barrier)
+
+    for slot_key in blocking_slot_keys:
+      barrier_index_path = []
+      barrier_index_path.extend(slot_key.to_path())
+      barrier_index_path.extend(child_pipeline_key.to_path())
+      barrier_index_path.extend([_BarrierIndex.kind(), purpose])
+      barrier_index_key = db.Key.from_path(*barrier_index_path)
+      barrier_index = _BarrierIndex(
+          key=barrier_index_key,
+          root_pipeline=root_pipeline_key)
+      result.append(barrier_index)
+
+    return result
 
   def handle_run_exception(self, pipeline_key, pipeline_func, e):
     """Handles an exception raised by a Pipeline's user code.
@@ -2319,7 +2425,9 @@ class _PipelineContext(object):
         # NOTE: Always update a generator pipeline's finalization barrier to
         # include all of the outputs of any pipelines that it runs, to ensure
         # that finalized calls will not happen until all child pipelines have
-        # completed.
+        # completed. This must happen transactionally with the enqueue of
+        # the fan-out kickoff task above to ensure the child output slots and
+        # the barrier blocking slots are the same.
         barrier_key = db.Key.from_path(
             _BarrierRecord.kind(), _BarrierRecord.FINALIZE,
             parent=pipeline_key)
@@ -2468,7 +2576,8 @@ class _BarrierHandler(webapp.RequestHandler):
     context = _PipelineContext.from_environ(self.request.environ)
     context.notify_barriers(
         self.request.get('slot_key'),
-        self.request.get('cursor'))
+        self.request.get('cursor'),
+        use_barrier_indexes=self.request.get('use_barrier_indexes') == 'True')
 
 
 class _PipelineHandler(webapp.RequestHandler):
@@ -2573,6 +2682,10 @@ class _CleanupHandler(webapp.RequestHandler):
         _StatusRecord.all(keys_only=True)
         .filter('root_pipeline =', root_pipeline_key))
     db.delete(status_keys)
+    barrier_index_keys = (
+        _BarrierIndex.all(keys_only=True)
+        .filter('root_pipeline =', root_pipeline_key))
+    db.delete(barrier_index_keys)
 
 
 class _CallbackHandler(webapp.RequestHandler):
@@ -2628,18 +2741,29 @@ class _CallbackHandler(webapp.RequestHandler):
         self.response.set_status(400)
         return
 
-    stage = pipeline_func_class.from_id(pipeline_id)
-    if stage is None:
-      logging.error('Pipeline ID "%s" deleted during callback', pipeline_id)
-      self.response.set_status(400)
-      return
-
     kwargs = {}
     for key in self.request.arguments():
       if key != 'pipeline_id':
         kwargs[str(key)] = self.request.get(key)
 
-    callback_result = stage._callback_internal(kwargs)
+    def perform_callback():
+      stage = pipeline_func_class.from_id(pipeline_id)
+      if stage is None:
+        logging.error('Pipeline ID "%s" deleted during callback', pipeline_id)
+        self.response.set_status(400)
+        return
+      return stage._callback_internal(kwargs)
+
+    # callback_xg_transaction is a 3-valued setting (None=no trans,
+    # False=1-eg-trans, True=xg-trans)
+    if pipeline_func_class._callback_xg_transaction is not None:
+      transaction_options = db.create_transaction_options(
+          xg=pipeline_func_class._callback_xg_transaction)
+      callback_result = db.run_in_transaction_options(transaction_options,
+                                                      perform_callback)
+    else:
+      callback_result = perform_callback()
+
     if callback_result is not None:
       status_code, content_type, content = callback_result
       self.response.set_status(status_code)
@@ -2658,8 +2782,11 @@ def _get_timestamp_ms(when):
     when: A datetime.datetime instance.
 
   Returns:
-    Integer time since the epoch in milliseconds.
+    Integer time since the epoch in milliseconds. If the supplied 'when' is
+    None, the return value will be None.
   """
+  if when is None:
+    return None
   ms_since_epoch = float(time.mktime(when.utctimetuple()) * 1000.0)
   ms_since_epoch += when.microsecond / 1000.0
   return int(ms_since_epoch)
@@ -2884,7 +3011,7 @@ def get_status_tree(root_pipeline_id):
   """Gets the full status tree of a pipeline.
 
   Args:
-    root_pipeline_id: The root pipeline ID to get status for.
+    root_pipeline_id: The pipeline ID to get status for.
 
   Returns:
     Dictionary with the keys:
@@ -2901,20 +3028,32 @@ def get_status_tree(root_pipeline_id):
     raise PipelineStatusError(
         'Could not find pipeline ID "%s"' % root_pipeline_id)
 
-  if (root_pipeline_key != 
-      _PipelineRecord.root_pipeline.get_value_for_datastore(
-          root_pipeline_record)):
-    raise PipelineStatusError(
-        'Pipeline ID "%s" is not a root pipeline!' % root_pipeline_id)
+  # If the supplied root_pipeline_id is not actually the root pipeline that's
+  # okay. We'll find the real root and override the value they passed in.
+  actual_root_key = _PipelineRecord.root_pipeline.get_value_for_datastore(
+      root_pipeline_record)
+  if actual_root_key != root_pipeline_key:
+    root_pipeline_key = actual_root_key
+    root_pipeline_id = root_pipeline_key.id_or_name()
+    root_pipeline_record = db.get(root_pipeline_key)
+    if not root_pipeline_record:
+      raise PipelineStatusError(
+          'Could not find pipeline ID "%s"' % root_pipeline_id)
 
-  found_pipeline_dict = dict((stage.key(), stage) for stage in
-      _PipelineRecord.all().filter('root_pipeline =', root_pipeline_key))
-  found_slot_dict = dict((slot.key(), slot) for slot in
-      _SlotRecord.all().filter('root_pipeline =', root_pipeline_key))
-  found_barrier_dict = dict((barrier.key(), barrier) for barrier in
-      _BarrierRecord.all().filter('root_pipeline =', root_pipeline_key))
-  found_status_dict = dict((status.key(), status) for status in
-      _StatusRecord.all().filter('root_pipeline =', root_pipeline_key))
+  # Run all queries asynchronously.
+  queries = {}
+  for model in (_PipelineRecord, _SlotRecord, _BarrierRecord, _StatusRecord):
+    queries[model] = model.all().filter(
+        'root_pipeline =', root_pipeline_key).run(batch_size=1000)
+
+  found_pipeline_dict = dict(
+      (stage.key(), stage) for stage in queries[_PipelineRecord])
+  found_slot_dict = dict(
+      (slot.key(), slot) for slot in queries[_SlotRecord])
+  found_barrier_dict = dict(
+      (barrier.key(), barrier) for barrier in queries[_BarrierRecord])
+  found_status_dict = dict(
+      (status.key(), status) for status in queries[_StatusRecord])
 
   # Breadth-first traversal of _PipelineRecord instances by following
   # _PipelineRecord.fanned_out property values.
@@ -3030,14 +3169,20 @@ def get_root_list(class_path=None, cursor=None, count=50):
 
   results = []
   for pipeline_record in root_list:
-    output = _get_internal_status(
-        pipeline_record.key(),
-        pipeline_dict=pipeline_dict,
-        slot_dict=slot_dict,
-        barrier_dict=barrier_dict,
-        status_dict=status_dict)
-    output['pipelineId'] = pipeline_record.key().name()
-    results.append(output)
+    try:
+      output = _get_internal_status(
+          pipeline_record.key(),
+          pipeline_dict=pipeline_dict,
+          slot_dict=slot_dict,
+          barrier_dict=barrier_dict,
+          status_dict=status_dict)
+      output['pipelineId'] = pipeline_record.key().name()
+      results.append(output)
+    except PipelineStatusError, e:
+      output = {'status': e.message}
+      output['classPath'] = ''
+      output['pipelineId'] = pipeline_record.key().name()
+      results.append(output)
 
   result_dict = {}
   cursor = query.cursor()

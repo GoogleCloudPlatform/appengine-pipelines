@@ -20,6 +20,7 @@ from __future__ import with_statement
 
 import base64
 import datetime
+import functools
 import logging
 import os
 import pickle
@@ -43,9 +44,10 @@ from google.appengine.ext import blobstore
 from google.appengine.ext import db
 
 # For convenience.
+_BarrierIndex = pipeline.models._BarrierIndex
+_BarrierRecord = pipeline.models._BarrierRecord
 _PipelineRecord = pipeline.models._PipelineRecord
 _SlotRecord = pipeline.models._SlotRecord
-_BarrierRecord = pipeline.models._BarrierRecord
 _StatusRecord = pipeline.models._StatusRecord
 
 
@@ -55,6 +57,7 @@ class TestBase(unittest.TestCase):
   def setUp(self):
     testutil.setup_for_testing(define_queues=['other'])
     super(TestBase, self).setUp()
+    self.maxDiff = 10**10
 
   def assertIn(self, the_thing, what_thing_should_be_in):
     """Asserts that something is contained in something else."""
@@ -326,11 +329,6 @@ class PipelineTest(TestBase):
     pipeline.Pipeline._set_class_path(module_dict)
     self.assertEquals(None, pipeline.Pipeline._class_path)
 
-    NothingPipeline._class_path = None
-    self.assertRaises(ImportError, NothingPipeline._set_class_path,
-                      module_dict=module_dict)
-    self.assertEquals(None, NothingPipeline._class_path)
-
     class MyModule(object):
       pass
 
@@ -353,13 +351,6 @@ class PipelineTest(TestBase):
     del module_dict['other']
     NothingPipeline._set_class_path(module_dict=module_dict)
     self.assertEquals('__main__.NothingPipeline', NothingPipeline._class_path)
-
-    # Will break if could not find class name and it's not in __main__.
-    NothingPipeline._class_path = None
-    setattr(mymodule, 'NothingPipeline', object())
-    module_dict = {'__main__': mymodule}
-    self.assertRaises(ImportError, NothingPipeline._set_class_path,
-                      module_dict=module_dict)
 
   def testStart(self):
     """Tests starting a Pipeline."""
@@ -1300,25 +1291,28 @@ class PipelineContextTest(TestBase):
         key=self.slot4_key,
         status=_SlotRecord.FILLED)
 
-    self.barrier1 = _BarrierRecord(
-        parent=self.pipeline1_key,
-        key_name=_BarrierRecord.FINALIZE,
-        root_pipeline=self.pipeline1_key,
-        target=self.pipeline1_key,
-        blocking_slots=[self.slot1_key])
-    self.barrier2 = _BarrierRecord(
-        parent=self.pipeline2_key,
-        key_name=_BarrierRecord.START,
-        root_pipeline=self.pipeline2_key,
-        target=self.pipeline2_key,
-        blocking_slots=[self.slot1_key, self.slot3_key])
-    self.barrier3 = _BarrierRecord(
-        parent=self.pipeline3_key,
-        key_name=_BarrierRecord.START,
-        root_pipeline=self.pipeline3_key,
-        target=self.pipeline3_key,
-        blocking_slots=[self.slot1_key, self.slot4_key],
-        status=_BarrierRecord.FIRED)
+    self.barrier1, self.barrier1_index1 = (
+        pipeline._PipelineContext._create_barrier_entities(
+            self.pipeline1_key,
+            self.pipeline1_key,
+            _BarrierRecord.FINALIZE,
+            [self.slot1_key]))
+
+    self.barrier2, self.barrier2_index1, self.barrier2_index3 = (
+        pipeline._PipelineContext._create_barrier_entities(
+            self.pipeline2_key,
+            self.pipeline2_key,
+            _BarrierRecord.START,
+            [self.slot1_key, self.slot3_key]))
+
+    self.barrier3, self.barrier3_index1, self.barrier3_index4 = (
+        pipeline._PipelineContext._create_barrier_entities(
+            self.pipeline3_key,
+            self.pipeline3_key,
+            _BarrierRecord.START,
+            [self.slot1_key, self.slot4_key]))
+    self.barrier3.status = _BarrierRecord.FIRED
+
     self.barrier4 = _BarrierRecord(
         parent=self.pipeline4_key,
         key_name=_BarrierRecord.START,
@@ -1326,17 +1320,26 @@ class PipelineContextTest(TestBase):
         target=self.pipeline4_key,
         blocking_slots=[self.slot1_key, self.slot2_key],
         status=_BarrierRecord.FIRED)
-    self.barrier5 = _BarrierRecord(
-        parent=self.pipeline5_key,
-        key_name=_BarrierRecord.START,
-        root_pipeline=self.pipeline5_key,
-        target=self.pipeline5_key,
-        blocking_slots=[self.slot1_key])
+
+    self.barrier4, self.barrier4_index1, self.barrier4_index2 = (
+        pipeline._PipelineContext._create_barrier_entities(
+            self.pipeline4_key,
+            self.pipeline4_key,
+            _BarrierRecord.START,
+            [self.slot1_key, self.slot2_key]))
+    self.barrier4.status = _BarrierRecord.FIRED
+
+    self.barrier5, self.barrier5_index1 = (
+        pipeline._PipelineContext._create_barrier_entities(
+            self.pipeline5_key,
+            self.pipeline5_key,
+            _BarrierRecord.START,
+            [self.slot1_key]))
 
     self.context = pipeline._PipelineContext(
         'my-task1', 'default', '/base-path')
 
-  def testNotifyBarrierFire(self):
+  def testNotifyBarrierFire_WithBarrierIndexes(self):
     """Tests barrier firing behavior."""
     self.assertEquals(_BarrierRecord.WAITING, self.barrier1.status)
     self.assertEquals(_BarrierRecord.WAITING, self.barrier2.status)
@@ -1346,10 +1349,14 @@ class PipelineContextTest(TestBase):
     self.assertEquals(_BarrierRecord.WAITING, self.barrier5.status)
 
     db.put([self.barrier1, self.barrier2, self.barrier3, self.barrier4,
-            self.barrier5, self.slot1, self.slot3, self.slot4])
+            self.barrier5, self.slot1, self.slot3, self.slot4,
+            self.barrier1_index1, self.barrier2_index1, self.barrier2_index3,
+            self.barrier3_index1, self.barrier3_index4, self.barrier4_index1,
+            self.barrier4_index2, self.barrier5_index1])
     self.context.notify_barriers(
         self.slot1_key,
         None,
+        use_barrier_indexes=True,
         max_to_notify=3)
     task_list = test_shared.get_tasks()
     test_shared.delete_tasks(task_list)
@@ -1394,11 +1401,31 @@ class PipelineContextTest(TestBase):
     # will not be overwritten again and have its trigger_time changed.
     self.assertTrue(barrier3.trigger_time is None)
 
-    # Run the first continuation task.
+    # Run the first continuation task. It should raise an error because slot2
+    # does not exist.
     self.context.task_name = 'my-task1-ae-barrier-notify-0'
+    self.assertRaises(
+        pipeline.UnexpectedPipelineError,
+        functools.partial(
+            self.context.notify_barriers,
+            self.slot1_key,
+            continuation_task['params']['cursor'][0],
+            use_barrier_indexes=True,
+            max_to_notify=2))
+
+    # No tasks should be added because the exception was raised.
+    task_list = test_shared.get_tasks()
+    self.assertEquals([], task_list)
+
+    # Adding slot2 should allow forward progress.
+    slot2 = _SlotRecord(
+        key=self.slot2_key,
+        status=_SlotRecord.WAITING)
+    db.put(slot2)
     self.context.notify_barriers(
         self.slot1_key,
         continuation_task['params']['cursor'][0],
+        use_barrier_indexes=True,
         max_to_notify=2)
 
     task_list = test_shared.get_tasks()
@@ -1433,6 +1460,7 @@ class PipelineContextTest(TestBase):
     self.context.notify_barriers(
         self.slot1_key,
         continuation_task['params']['cursor'][0],
+        use_barrier_indexes=True,
         max_to_notify=2)
     self.assertEquals(0, len(test_shared.get_tasks()))
 
@@ -1441,6 +1469,138 @@ class PipelineContextTest(TestBase):
     self.context.notify_barriers(
         self.slot1_key,
         continuation2_task['params']['cursor'][0],
+        use_barrier_indexes=True,
+        max_to_notify=2)
+    self.assertEquals(0, len(test_shared.get_tasks()))
+
+  def testNotifyBarrierFire_NoBarrierIndexes(self):
+    """Tests barrier firing behavior without using _BarrierIndexes."""
+    self.assertEquals(_BarrierRecord.WAITING, self.barrier1.status)
+    self.assertEquals(_BarrierRecord.WAITING, self.barrier2.status)
+    self.assertEquals(_BarrierRecord.FIRED, self.barrier3.status)
+    self.assertTrue(self.barrier3.trigger_time is None)
+    self.assertEquals(_BarrierRecord.FIRED, self.barrier4.status)
+    self.assertEquals(_BarrierRecord.WAITING, self.barrier5.status)
+
+    db.put([self.barrier1, self.barrier2, self.barrier3, self.barrier4,
+            self.barrier5, self.slot1, self.slot3, self.slot4])
+    self.context.notify_barriers(
+        self.slot1_key,
+        None,
+        use_barrier_indexes=False,
+        max_to_notify=3)
+    task_list = test_shared.get_tasks()
+    test_shared.delete_tasks(task_list)
+    self.assertEquals(3, len(task_list))
+    task_list.sort(key=lambda x: x['name'])  # For deterministic tests.
+    first_task, second_task, continuation_task = task_list
+
+    self.assertEquals(
+        {'pipeline_key': [str(self.pipeline1_key)],
+         'purpose': [_BarrierRecord.FINALIZE]},
+        first_task['params'])
+    self.assertEquals('/base-path/finalized', first_task['url'])
+
+    self.assertEquals(
+        {'pipeline_key': [str(self.pipeline3_key)],
+         'purpose': [_BarrierRecord.START]},
+        second_task['params'])
+    self.assertEquals('/base-path/run', second_task['url'])
+
+    self.assertEquals('/base-path/output', continuation_task['url'])
+    self.assertEquals(
+        [str(self.slot1_key)], continuation_task['params']['slot_key'])
+    self.assertEquals(
+        'my-task1-ae-barrier-notify-0',
+        continuation_task['name'])
+
+    barrier1, barrier2, barrier3 = db.get(
+        [self.barrier1.key(), self.barrier2.key(), self.barrier3.key()])
+
+    self.assertEquals(_BarrierRecord.FIRED, barrier1.status)
+    self.assertTrue(barrier1.trigger_time is not None)
+
+    self.assertEquals(_BarrierRecord.WAITING, barrier2.status)
+    self.assertTrue(barrier2.trigger_time is None)
+
+    # NOTE: This barrier relies on slots 1 and 4, to force the "blocking slots"
+    # inner loop to be excerised. By putting slot4 last on the last barrier
+    # tested in the loop, we ensure that any inner-loop variables do not pollute
+    # the outer function context.
+    self.assertEquals(_BarrierRecord.FIRED, barrier3.status)
+    # Show that if the _BarrierRecord was already in the FIRED state that it
+    # will not be overwritten again and have its trigger_time changed.
+    self.assertTrue(barrier3.trigger_time is None)
+
+    # Run the first continuation task. It should raise an error because slot2
+    # does not exist.
+    self.context.task_name = 'my-task1-ae-barrier-notify-0'
+    self.assertRaises(
+        pipeline.UnexpectedPipelineError,
+        functools.partial(
+            self.context.notify_barriers,
+            self.slot1_key,
+            continuation_task['params']['cursor'][0],
+            use_barrier_indexes=False,
+            max_to_notify=2))
+
+    # No tasks should be added because the exception was raised.
+    task_list = test_shared.get_tasks()
+    self.assertEquals([], task_list)
+
+    # Adding slot2 should allow forward progress.
+    slot2 = _SlotRecord(
+        key=self.slot2_key,
+        status=_SlotRecord.WAITING)
+    db.put(slot2)
+    self.context.notify_barriers(
+        self.slot1_key,
+        continuation_task['params']['cursor'][0],
+        use_barrier_indexes=False,
+        max_to_notify=2)
+
+    task_list = test_shared.get_tasks()
+    test_shared.delete_tasks(task_list)
+    self.assertEquals(2, len(task_list))
+    third_task, continuation2_task = task_list
+
+    self.assertEquals(
+        {'pipeline_key': [str(self.pipeline5_key)],
+         'purpose': [_BarrierRecord.START]},
+        third_task['params'])
+    self.assertEquals('/base-path/run', third_task['url'])
+
+    self.assertEquals('/base-path/output', continuation2_task['url'])
+    self.assertEquals(
+        [str(self.slot1_key)], continuation2_task['params']['slot_key'])
+    self.assertEquals(
+        'my-task1-ae-barrier-notify-1',
+        continuation2_task['name'])
+
+    barrier4, barrier5 = db.get([self.barrier4.key(), self.barrier5.key()])
+    self.assertEquals(_BarrierRecord.FIRED, barrier4.status)
+    # Shows that the _BarrierRecord entity was not overwritten.
+    self.assertTrue(barrier4.trigger_time is None)
+
+    self.assertEquals(_BarrierRecord.FIRED, barrier5.status)
+    self.assertTrue(barrier5.trigger_time is not None)
+
+    # Running the continuation task again will re-tigger the barriers,
+    # but no tasks will be inserted because they're already tombstoned.
+    self.context.task_name = 'my-task1-ae-barrier-notify-0'
+    self.context.notify_barriers(
+        self.slot1_key,
+        continuation_task['params']['cursor'][0],
+        use_barrier_indexes=False,
+        max_to_notify=2)
+    self.assertEquals(0, len(test_shared.get_tasks()))
+
+    # Running the last continuation task will do nothing.
+    self.context.task_name = 'my-task1-ae-barrier-notify-1'
+    self.context.notify_barriers(
+        self.slot1_key,
+        continuation2_task['params']['cursor'][0],
+        use_barrier_indexes=False,
         max_to_notify=2)
     self.assertEquals(0, len(test_shared.get_tasks()))
 
@@ -2911,6 +3071,42 @@ class PublicPipeline(pipeline.Pipeline):
     return (200, 'text/plain', repr(kwargs))
 
 
+class DummyKind(db.Expando):
+  pass
+
+
+class NoTransactionPipeline(PublicPipeline):
+  """Pipeline that verifies the callback is executed outside a transaction."""
+
+  def callback(self, **kwargs):
+    if db.is_in_transaction():
+      try:
+        # If we are in non xg-transaction, we should be unable to write to 4
+        # new entity groups (1 is used to read pipeline state).
+        for _ in xrange(4):
+          DummyKind().put()
+        try:
+          # Verify something is not wrong in the testbed and/or limits changed
+          DummyKind().put()
+          return (500, 'text/plain', 'More than 5 entity groups used.')
+        except db.BadRequestError:
+          return (203, 'text/plain', 'In a XG transaction')
+      except db.BadRequestError:
+        return (202, 'text/plain', 'In a non-XG transaction')
+    else:
+      return (201, 'text/plain', 'Outside a transaction.')
+
+
+class NoXgTransactionPipeline(NoTransactionPipeline):
+  """Pipeline that verifies the callback is in non-XG transaction."""
+  _callback_xg_transaction = False
+
+
+class XgTransactionPipeline(NoTransactionPipeline):
+  """Pipeline that verifies the callback is in a XG transaction."""
+  _callback_xg_transaction = True
+
+
 class CallbackHandlerTest(TestBase):
   """Tests for the _CallbackHandler class."""
 
@@ -3003,6 +3199,26 @@ class CallbackHandlerTest(TestBase):
         eval(handler.response.out.getvalue()))
     self.assertEquals('text/plain', handler.response.headers['Content-Type'])
 
+  def RunTransactionTest(self, stage, expected_code):
+    stage.start()
+    handler = test_shared.create_handler(
+        pipeline._CallbackHandler,
+        'GET', '/?pipeline_id=%s' % stage.pipeline_id)
+    handler.get()
+    self.assertEquals(expected_code, handler.response._Response__status[0])
+
+  def testNoTransaction(self):
+    """Tests that the callback is not called from within a trans. by default."""
+    self.RunTransactionTest(NoTransactionPipeline(), 201)
+
+  def testNonXgTransaction(self):
+    """Tests that the callback is called within a single EG transaction."""
+    self.RunTransactionTest(NoXgTransactionPipeline(), 202)
+
+  def testXgTransaction(self):
+    """Tests that the callback is called within a cross EG transaction."""
+    self.RunTransactionTest(XgTransactionPipeline(), 203)
+
 
 class CleanupHandlerTest(test_shared.TaskRunningMixin, TestBase):
   """Tests for the _CleanupHandler class."""
@@ -3021,6 +3237,7 @@ class CleanupHandlerTest(test_shared.TaskRunningMixin, TestBase):
     self.assertEquals(1, len(list(_SlotRecord.all())))
     self.assertEquals(1, len(list(_BarrierRecord.all())))
     self.assertEquals(1, len(list(_StatusRecord.all())))
+    self.assertEquals(1, len(list(_BarrierIndex.all())))
 
     stage.cleanup()
     task_list = self.get_tasks()
@@ -3036,6 +3253,7 @@ class CleanupHandlerTest(test_shared.TaskRunningMixin, TestBase):
     self.assertEquals(0, len(list(_SlotRecord.all())))
     self.assertEquals(0, len(list(_BarrierRecord.all())))
     self.assertEquals(0, len(list(_StatusRecord.all())))
+    self.assertEquals(0, len(list(_BarrierIndex.all())))
 
 
 class FanoutHandlerTest(test_shared.TaskRunningMixin, TestBase):
@@ -4533,14 +4751,66 @@ class StatusTest(TestBase):
 
   def testGetStatusTree_NotRoot(self):
     """Tests get_status_tree when the pipeline query is not the root."""
-    self.pipeline1_record.root_pipeline = self.pipeline2_key
-    db.put([self.pipeline1_record])
+    found1_root = _PipelineRecord.root_pipeline.get_value_for_datastore(
+        self.pipeline1_record)
+    found2_root = _PipelineRecord.root_pipeline.get_value_for_datastore(
+        self.pipeline2_record)
+
+    self.assertEquals(found1_root, self.pipeline1_key)
+    self.assertEquals(found2_root, self.pipeline1_key)
+
+    db.put([self.pipeline1_record, self.pipeline2_record,
+            self.slot1_record, self.slot2_record,
+            self.barrier1_record, self.barrier2_record])
+
+    pipeline.get_status_tree(self.pipeline2_key.name())
+
+    expected = {
+        'pipelines': {
+            'one': {
+                'afterSlotKeys': [],
+                'args': [],
+                'backoffFactor': 2,
+                'backoffSeconds': 1,
+                'children': [],
+                'classPath': 'does.not.exist1',
+                'currentAttempt': 1,
+                'kwargs': {},
+                'maxAttempts': 4,
+                'outputs': {
+                    'default': str(self.slot1_key),
+                },
+                'queueName': 'default',
+                'status': 'run',
+            },
+        },
+        'rootPipelineId': 'one',
+        'slots': {},
+    }
+
+    self.assertEquals(
+        expected,
+        pipeline.get_status_tree(self.pipeline2_key.name()))
+
+  def testGetStatusTree_NotRoot_MissingParent(self):
+    """Tests get_status_tree with a non-root pipeline and missing parent."""
+    found1_root = _PipelineRecord.root_pipeline.get_value_for_datastore(
+        self.pipeline1_record)
+    found2_root = _PipelineRecord.root_pipeline.get_value_for_datastore(
+        self.pipeline2_record)
+
+    self.assertEquals(found1_root, self.pipeline1_key)
+    self.assertEquals(found2_root, self.pipeline1_key)
+
+    # Don't put pipeline1_record
+    db.put([self.pipeline2_record, self.slot1_record, self.slot2_record,
+            self.barrier1_record, self.barrier2_record])
 
     try:
       pipeline.get_status_tree(self.pipeline1_key.name())
       self.fail('Did not raise')
     except pipeline.PipelineStatusError, e:
-      self.assertEquals('Pipeline ID "one" is not a root pipeline!', str(e))
+      self.assertEquals('Could not find pipeline ID "one"', str(e))
 
   def testGetStatusTree_ChildMissing(self):
     """Tests get_status_tree when a fanned out child pipeline is missing."""
@@ -4685,6 +4955,33 @@ class StatusTest(TestBase):
 
     self.assertEquals('This one has a message',
                       found['pipelines'][1]['statusMessage'])
+
+  def testGetRootList_FinalizeBarrierMissing(self):
+    """Tests get_status_tree when a finalization barrier is missing."""
+    stage = NothingPipeline('one', 'two', three='red', four=1234)
+    stage.start(idempotence_key='banana')
+    stage.set_status('This one has a message')
+
+    stage_key = db.Key.from_path(
+        pipeline._PipelineRecord.kind(), stage.pipeline_id)
+    finalization_key = db.Key.from_path(
+        pipeline._BarrierRecord.kind(), _BarrierRecord.FINALIZE,
+        parent=stage_key)
+    db.delete(finalization_key)
+
+    found = pipeline.get_root_list()
+    self.assertFalse('cursor' in found)  # No next page available
+
+    found_names = [
+        (p['pipelineId'], p['classPath']) for p in found['pipelines']]
+    expected = [
+        ('banana', '')
+    ]
+    self.assertEquals(expected, found_names)
+
+    self.assertEquals(
+        'Finalization barrier missing for pipeline ID "%s"' % stage.pipeline_id,
+        found['pipelines'][0]['status'])
 
   def testGetRootListCursor(self):
     """Tests the count and cursor behavior of get_root_list."""

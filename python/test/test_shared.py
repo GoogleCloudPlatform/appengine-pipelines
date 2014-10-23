@@ -180,11 +180,14 @@ class TaskRunningMixin(object):
 
     if require_slots_filled:
       for slot_record in _SlotRecord.all():
-        self.assertEquals(_SlotRecord.FILLED, slot_record.status)
+        self.assertEquals(_SlotRecord.FILLED, slot_record.status,
+                          '_SlotRecord = %r' % slot_record.key())
       for barrier_record in _BarrierRecord.all():
-        self.assertEquals(_BarrierRecord.FIRED, barrier_record.status)
+        self.assertEquals(_BarrierRecord.FIRED, barrier_record.status,
+                          '_BarrierRecord = %r' % barrier_record.key())
       for pipeline_record in _PipelineRecord.all():
-        self.assertEquals(_PipelineRecord.DONE, pipeline_record.status)
+        self.assertEquals(_PipelineRecord.DONE, pipeline_record.status,
+                          '_PipelineRecord = %r' % pipeline_record.key())
 
     return pipeline.__class__.from_id(pipeline.pipeline_id).outputs
 

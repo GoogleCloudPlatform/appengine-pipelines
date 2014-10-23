@@ -22,6 +22,7 @@
 var AUTO_REFRESH = true;
 var ROOT_PIPELINE_ID = null;
 var STATUS_MAP = null;
+var LANG = null;
 
 
 // Adjusts the height/width of the embedded status console iframe.
@@ -173,7 +174,7 @@ function constructStageNode(pipelineId, infoMap, sidebar) {
   // Determine timing information based on state.
   var statusTimeLabel = null;
   var statusTimeMs = null;
-  var statusRuntimeDiv = null
+  var statusRuntimeDiv = null;
 
   if (infoMap.status == 'done') {
     statusRuntimeDiv = $('<div class="status-runtime">');
@@ -198,7 +199,8 @@ function constructStageNode(pipelineId, infoMap, sidebar) {
   } else if (infoMap.status == 'finalizing') {
     statusTimeLabel = 'Complete';
     statusTimeMs = infoMap.endTimeMs;
-  } else if (infoMap.status == 'aborted') {
+  } else if (infoMap.status == 'aborted' ||
+             infoMap.status == 'canceled') {
     statusTimeLabel = 'Aborted';
     statusTimeMs = infoMap.endTimeMs;
   } else if (infoMap.status == 'waiting') {
@@ -592,7 +594,7 @@ function generateSidebar(statusMap, nextPipelineId, rootElement) {
   var parentInfoMap = statusMap.pipelines[nextPipelineId];
   currentElement.append(
       constructStageNode(nextPipelineId, parentInfoMap, true));
-  
+
   if (statusMap.pipelines[nextPipelineId]) {
     var children = statusMap.pipelines[nextPipelineId].children;
     if (children.length > 0) {
@@ -649,7 +651,7 @@ function findActivePipeline(pipelineId, isRoot) {
     } else {
       return 0;
     }
-  })
+  });
 
   for (var i = 0; i < children.length; ++i) {
     var foundPipelineId = findActivePipeline(children[i], false);
@@ -741,7 +743,7 @@ function handleHashChange() {
   // Update the detail status frame.
   var stageNode = constructStageNode(pipelineId, infoMap, false);
   $('#overview').remove();
-  stageNode.attr('id', 'overview')
+  stageNode.attr('id', 'overview');
   $('#detail').append(stageNode);
 
   // Make sure everything is the right size.
@@ -777,6 +779,54 @@ function handleRefreshClick(event) {
   return false;
 }
 
+function handleDeleteClick(event) {
+  var ajaxRequest = {
+    type: 'GET',
+    url: 'rpc/delete?root_pipeline_id=' + ROOT_PIPELINE_ID,
+    dataType: 'text',
+    error: function(request, textStatus) {
+      if (request.status == 404) {
+        setButter('Pipeline is already deleted');
+      } else {
+        setButter('Delete request failed: ' + textStatus);
+      }
+      window.setTimeout(function() {
+        clearButter();
+      }, 5000);
+    },
+    success: function(data, textStatus, request) {
+      setButter('Delete request was sent');
+      window.setTimeout(function() {
+        window.location.href = 'list';
+      }, 5000);
+    }
+  };
+  $.ajax(jQuery.extend({}, ajaxRequest));
+}
+
+function handleAbortClick(event) {
+  var ajaxRequest = {
+    type: 'GET',
+    url: 'rpc/abort?root_pipeline_id=' + ROOT_PIPELINE_ID,
+    dataType: 'text',
+    error: function(request, textStatus) {
+      setButter('Abort request failed: ' + textStatus);
+      window.setTimeout(function() {
+        clearButter();
+      }, 5000);
+    },
+    success: function(data, textStatus, request) {
+      setButter('Abort request was sent');
+      window.setTimeout(function() {
+        clearButter();
+        window.location.reload();
+      }, 5000);
+    }
+  };
+  if (confirm('Are you sure you want to abort the pipeline', 'Abort')) {
+    $.ajax(jQuery.extend({}, ajaxRequest));
+  }
+}
 
 /* Initialization. */
 function initStatus() {
@@ -793,32 +843,68 @@ function initStatus() {
         AUTO_REFRESH = false;
       } else if (mapping[0] == 'root') {
         ROOT_PIPELINE_ID = mapping[1];
+        if (ROOT_PIPELINE_ID.match(/^pipeline-/)) {
+          ROOT_PIPELINE_ID = ROOT_PIPELINE_ID.substring(9);
+        }
       }
     });
   }
 
-  setButter('Loading... #' + ROOT_PIPELINE_ID);
-  $.ajax({
+  if (!Boolean(ROOT_PIPELINE_ID)) {
+    setButter('Missing root param' +
+        '. For a job list click <a href="list">here</a>.',
+        true, null, true);
+    return;
+  }
+
+  var loadingMsg = 'Loading... #' + ROOT_PIPELINE_ID;
+  var attempts = 1;
+  var ajaxRequest = {
     type: 'GET',
     url: 'rpc/tree?root_pipeline_id=' + ROOT_PIPELINE_ID,
     dataType: 'text',
     error: function(request, textStatus) {
-      getResponseDataJson(textStatus);
+      if (request.status == 404) {
+        if (++attempts <= 5) {
+          setButter(loadingMsg + ' [attempt #' + attempts + ']');
+          window.setTimeout(function() {
+            $.ajax(jQuery.extend({}, ajaxRequest));
+          }, 2000);
+        } else {
+          setButter('Could not find pipeline #' + ROOT_PIPELINE_ID +
+              '. For a job list click <a href="list">here</a>.',
+              true, null, true);
+        }
+      } else if (request.status == 449) {
+        var root = request.getResponseHeader('root_pipeline_id');
+        var newURL = '?root=' + root + '#pipeline-' + ROOT_PIPELINE_ID;
+        window.location.replace(newURL);
+      } else {
+        getResponseDataJson(textStatus);
+      }
     },
     success: function(data, textStatus, request) {
       var response = getResponseDataJson(null, data);
       if (response) {
         clearButter();
         STATUS_MAP = response;
+        LANG = request.getResponseHeader('Pipeline-Lang');
         initStatusDone();
       }
     }
-  });
+  };
+  setButter(loadingMsg);
+  $.ajax(jQuery.extend({}, ajaxRequest));
 }
 
 
 function initStatusDone() {
   jQuery.timeago.settings.allowFuture = true;
+
+  // Update the root pipeline ID to match what the server returns. This handles
+  // the case where the ID specified is for a child node. We always want to
+  // show status up to the root.
+  ROOT_PIPELINE_ID = STATUS_MAP.rootPipelineId;
 
   // Generate the sidebar.
   generateSidebar(STATUS_MAP, null, $('#sidebar'));
@@ -828,17 +914,19 @@ function initStatusDone() {
     collapsed: true,
     unique: false,
     cookieId: 'pipeline Id here',
-    toggle: handleTreeToggle,
+    toggle: handleTreeToggle
   });
   $('#sidebar').show();
 
-  // Init the control panel.
+  var rootStatus = STATUS_MAP.pipelines[STATUS_MAP.rootPipelineId].status;
+  var isFinalState = /^done$|^aborted$|^canceled$/.test(rootStatus);
+
+    // Init the control panel.
   $('#auto-refresh').click(handleAutoRefreshClick);
   if (!AUTO_REFRESH) {
     $('#auto-refresh').attr('checked', '');
   } else {
-    var rootStatus = STATUS_MAP.pipelines[STATUS_MAP.rootPipelineId].status;
-    if (rootStatus != 'done' && rootStatus != 'aborted') {
+    if (!isFinalState) {
       // Only do auto-refresh behavior if we're not in a terminal state.
       window.setTimeout(function() {
         var loc = window.location;
@@ -848,6 +936,15 @@ function initStatusDone() {
     }
   }
   $('.refresh-link').click(handleRefreshClick);
+  $('.abort-link').click(handleAbortClick);
+  $('.delete-link').click(handleDeleteClick);
+  if (LANG == 'Java') {
+    if (isFinalState) {
+      $('.delete-link').show();
+    } else {
+      $('.abort-link').show();
+    }
+  }
   $('#control').show();
 
   // Properly adjust the console iframe to match the window size.
