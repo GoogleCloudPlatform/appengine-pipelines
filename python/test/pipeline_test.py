@@ -436,6 +436,29 @@ class PipelineTest(TestBase):
     self.assertEquals(0, len(test_shared.get_tasks('default')))
     self.assertEquals(1, len(test_shared.get_tasks('other')))
 
+  def testStartCountdown(self):
+    """Tests starting a pipeline with a countdown."""
+    stage = NothingPipeline('one', 'two', three='red', four=1234)
+    eta = datetime.datetime.utcnow() + datetime.timedelta(seconds=30)
+    task = stage.start(return_task=True, countdown=30)
+    self.assertEquals(0, len(test_shared.get_tasks()))
+    self.assertTrue(eta <= task.eta.replace(tzinfo=None))
+
+  def testStartEta(self):
+    """Tests starting a pipeline with an eta."""
+    stage = NothingPipeline('one', 'two', three='red', four=1234)
+    eta = datetime.datetime.utcnow() + datetime.timedelta(seconds=30)
+    task = stage.start(return_task=True, eta=eta)
+    self.assertEquals(0, len(test_shared.get_tasks()))
+    self.assertEquals(eta, task.eta.replace(tzinfo=None))
+
+  def testStartCountdownAndEta(self):
+    """Tests starting a pipeline with both a countdown and eta."""
+    stage = NothingPipeline('one', 'two', three='red', four=1234)
+    eta = datetime.datetime.utcnow() + datetime.timedelta(seconds=30)
+    self.assertRaises(pipeline.PipelineSetupError,
+                      stage.start, countdown=30, eta=eta)
+
   def testStartUndeclaredOutputs(self):
     """Tests that accessing undeclared outputs on a root pipeline will err.
 
@@ -3218,6 +3241,22 @@ class CallbackHandlerTest(TestBase):
   def testXgTransaction(self):
     """Tests that the callback is called within a cross EG transaction."""
     self.RunTransactionTest(XgTransactionPipeline(), 203)
+
+  def testGiveUpOnTask(self):
+    """Tests that after N retries the task is abandoned."""
+    handler = test_shared.create_handler(
+        pipeline._CallbackHandler,
+        'GET', '/?pipeline_id=does_not_exist')
+    handler.request.environ['HTTP_X_APPENGINE_TASKRETRYCOUNT'] = '1'
+    handler.get()
+    self.assertEquals(400, handler.response._Response__status[0])
+
+    handler = test_shared.create_handler(
+        pipeline._CallbackHandler,
+        'GET', '/?pipeline_id=does_not_exist')
+    handler.request.environ['HTTP_X_APPENGINE_TASKRETRYCOUNT'] = '10'
+    handler.get()
+    self.assertEquals(200, handler.response._Response__status[0])
 
 
 class CleanupHandlerTest(test_shared.TaskRunningMixin, TestBase):

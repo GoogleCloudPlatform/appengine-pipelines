@@ -5,7 +5,7 @@
   <artifactId>appengine-pipeline</artifactId>
   <name>App Engine Pipeline Framework</name>
   <description>Google App Engine API for connecting together complex workflows</description>
-  <url>http://code.google.com/p/appengine-pipeline/</url>
+  <url>https://github.com/GoogleCloudPlatform/appengine-pipelines/</url>
   <organization>
     <name>Google</name>
   </organization>
