@@ -440,7 +440,9 @@ class Pipeline(object):
     self.outputs = None
     self.backoff_seconds = _DEFAULT_BACKOFF_SECONDS
     self.backoff_factor = _DEFAULT_BACKOFF_FACTOR
-    self.max_attempts = _DEFAULT_MAX_ATTEMPTS
+    # Allow pipeline class to provide it's own default max attempts value.
+    self.max_attempts = (getattr(self, "MAX_ATTEMPTS", _DEFAULT_MAX_ATTEMPTS) or
+                        _DEFAULT_MAX_ATTEMPTS)
     self.target = None
     self.task_retry = False
     self._current_attempt = 0
