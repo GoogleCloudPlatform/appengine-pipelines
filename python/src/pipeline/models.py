@@ -152,6 +152,10 @@ class _PipelineRecord(db.Model):
     """Create a lightweight copy of the pipeline with the args truncated."""
     return _LowMemoryPipelineRecord(self)
 
+  @property
+  def root_pipeline_key(self):
+    """Returns root pipeline key."""
+    return self.root_pipeline.get_value_for_datastore(self)
 
 class _LowMemoryPipelineRecord(object):
   """Substitute for _PipelineRecord that takes up less space.
@@ -175,6 +179,8 @@ class _LowMemoryPipelineRecord(object):
     self.is_root_pipeline = pipeline_record.is_root_pipeline
     self.abort_message = pipeline_record.abort_message
     self.abort_requested = pipeline_record.abort_requested
+    self.root_pipeline_key = \
+      _PipelineRecord.root_pipeline.get_value_for_datastore(pipeline_record)
     self.params = pipeline_record.params
     self.params['args'] = [truncate_value(v) for v in self.params['args']]
     self.params['kwargs'] = truncate_value(self.params['kwargs'])

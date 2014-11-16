@@ -2894,8 +2894,7 @@ def _get_internal_status(pipeline_key=None,
         'Could not find pipeline ID "%s"' % pipeline_key.name())
 
   params = pipeline_record.params
-  root_pipeline_key = \
-      _PipelineRecord.root_pipeline.get_value_for_datastore(pipeline_record)
+  root_pipeline_key = pipeline_record.root_pipeline_key
   default_slot_key = db.Key(params['output_slots']['default'])
   start_barrier_key = db.Key.from_path(
       _BarrierRecord.kind(), _BarrierRecord.START, parent=pipeline_key)
