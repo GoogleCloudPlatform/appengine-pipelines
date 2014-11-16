@@ -157,10 +157,12 @@ class JsonEncoder(simplejson.JSONEncoder):
 
   def default(self, o):
     """Inherit docs."""
-    if type(o) in _TYPE_TO_ENCODER:
-      encoder = _TYPE_TO_ENCODER[type(o)]
+
+    t_name = type(o).__name__
+    if t_name in _TYPE_TO_ENCODER:
+      encoder = _TYPE_TO_ENCODER[t_name]
       json_struct = encoder(o)
-      json_struct[self.TYPE_ID] = type(o).__name__
+      json_struct[self.TYPE_ID] = t_name
       return json_struct
     return super(JsonEncoder, self).default(o)
 
@@ -218,7 +220,7 @@ def _register_json_primitive(object_type, encoder, decoder):
   global _TYPE_TO_ENCODER
   global _TYPE_NAME_TO_DECODER
   if object_type not in _TYPE_TO_ENCODER:
-    _TYPE_TO_ENCODER[object_type] = encoder
+    _TYPE_TO_ENCODER[object_type.__name__] = encoder
     _TYPE_NAME_TO_DECODER[object_type.__name__] = decoder
 
 

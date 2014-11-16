@@ -108,6 +108,7 @@ abbr {
 }
 #detail .outputs-container,
 #detail .param-container,
+#detail .truncation-message-container,
 #detail .child-container,
 #detail .run-after-container,
 #detail .status-retry-params {
