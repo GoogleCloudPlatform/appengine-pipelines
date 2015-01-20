@@ -134,7 +134,7 @@ class _BaseRpcHandler(webapp.RequestHandler):
       output = simplejson.dumps(self.json_response, cls=util.JsonEncoder)
 
     self.response.set_status(200)
-    self.response.headers['Content-Type'] = 'text/javascript'
+    self.response.headers['Content-Type'] = 'application/json'
     self.response.headers['Cache-Control'] = 'no-cache'
     self.response.out.write(output)
 
