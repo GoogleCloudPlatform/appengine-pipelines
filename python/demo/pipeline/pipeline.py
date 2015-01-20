@@ -1514,7 +1514,23 @@ class _PipelineContext(object):
       barrier_index_list = query.fetch(max_to_notify)
       barrier_key_list = [
           _BarrierIndex.to_barrier_key(key) for key in barrier_index_list]
-      results = db.get(barrier_key_list)
+
+      # If there are task and pipeline kickoff retries it's possible for a
+      # _BarrierIndex to exist for a _BarrierRecord that was not successfully
+      # written. It's safe to ignore this because the original task that wrote
+      # the _BarrierIndex and _BarrierRecord would not have made progress to
+      # kick off a real pipeline or child pipeline unless all of the writes for
+      # these dependent entities went through. We assume that the instigator
+      # retried from scratch and somehwere there exists a good _BarrierIndex and
+      # corresponding _BarrierRecord that tries to accomplish the same thing.
+      barriers = db.get(barrier_key_list)
+      results = []
+      for barrier_key, barrier in zip(barrier_key_list, barriers):
+        if barrier is None:
+          logging.debug('Ignoring that Barrier "%r" is missing, '
+                        'relies on Slot "%r"', barrier_key, slot_key)
+        else:
+          results.append(barrier)
     else:
       # TODO(user): Delete this backwards compatible codepath and
       # make use_barrier_indexes the assumed default in all cases.
@@ -1527,6 +1543,7 @@ class _PipelineContext(object):
     blocking_slot_keys = []
     for barrier in results:
       blocking_slot_keys.extend(barrier.blocking_slots)
+
     blocking_slot_dict = {}
     for slot_record in db.get(blocking_slot_keys):
       if slot_record is None:

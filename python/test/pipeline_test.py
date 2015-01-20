@@ -1496,6 +1496,23 @@ class PipelineContextTest(TestBase):
         max_to_notify=2)
     self.assertEquals(0, len(test_shared.get_tasks()))
 
+  def testNotifyBarrierFire_WithBarrierIndexes_BarrierMissing(self):
+      """Tests _BarrierIndex firing when a _BarrierRecord is missing."""
+      self.assertEquals(_BarrierRecord.WAITING, self.barrier1.status)
+      db.put([self.slot1, self.barrier1_index1])
+
+      # The _BarrierRecord corresponding to barrier1_index1 is never put, which
+      # will cause notify_barriers to fail with a missing barrier error.
+      self.assertNotEquals(None, db.get(self.barrier1_index1.key()))
+      self.assertEquals(None, db.get(self.barrier1.key()))
+
+      # This doesn't raise an exception.
+      self.context.notify_barriers(
+          self.slot1_key,
+          None,
+          use_barrier_indexes=True,
+          max_to_notify=3)
+
   def testNotifyBarrierFire_NoBarrierIndexes(self):
     """Tests barrier firing behavior without using _BarrierIndexes."""
     self.assertEquals(_BarrierRecord.WAITING, self.barrier1.status)
