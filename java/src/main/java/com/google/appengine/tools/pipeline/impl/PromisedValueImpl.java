@@ -29,6 +29,10 @@ import com.google.appengine.tools.pipeline.impl.model.Slot;
  */
 public class PromisedValueImpl<E> extends FutureValueImpl<E> implements PromisedValue<E> {
 
+  public PromisedValueImpl(Slot slot) {
+    super(slot);
+  }
+  
   public PromisedValueImpl(Key rootJobGuid, Key generatorJobKey, String graphGUID) {
     super(new Slot(rootJobGuid, generatorJobKey, graphGUID));
   }

@@ -20,6 +20,7 @@ import com.google.appengine.tools.pipeline.impl.PipelineManager;
 import com.google.appengine.tools.pipeline.impl.PromisedValueImpl;
 import com.google.appengine.tools.pipeline.impl.backend.UpdateSpec;
 import com.google.appengine.tools.pipeline.impl.model.JobRecord;
+import com.google.appengine.tools.pipeline.impl.model.Slot;
 
 import java.io.Serializable;
 import java.util.List;
@@ -383,6 +384,15 @@ public abstract class Job<E> implements Serializable {
     PromisedValueImpl<F> promisedValue =
         new PromisedValueImpl<>(getPipelineKey(), thisJobRecord.getKey(), currentRunGUID);
     updateSpec.getNonTransactionalGroup().includeSlot(promisedValue.getSlot());
+    return promisedValue;
+  }
+  
+  public <F> PromisedValue<F> promise(String promiseHandle) {
+    Slot slot = PipelineManager.getPromisedValueSlot(promiseHandle);
+    PromisedValueImpl<F> promisedValue = null;
+    if (slot != null) {
+      promisedValue = new PromisedValueImpl<F>(slot);
+    }
     return promisedValue;
   }
 

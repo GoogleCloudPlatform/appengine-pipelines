@@ -473,6 +473,67 @@ public class PipelineManager {
     backEnd.save(updateSpec, generatorJob.getQueueSettings());
   }
 
+  public static Slot getPromisedValueSlot(String promiseHandle) {
+    Slot slot = null;
+    try {
+      checkNonEmpty(promiseHandle, "promiseHandle");
+      Key key = KeyFactory.stringToKey(promiseHandle);
+      // It is possible, though unlikely, that we might be asked to accept a
+      // promise before the slot to hold the promise has been saved. We will try 5
+      // times, sleeping 1, 2, 4, 8 seconds between attempts.
+      int attempts = 0;
+      boolean interrupted = false;
+      try {
+        while (slot == null) {
+          attempts++;
+          try {
+            slot = backEnd.querySlot(key, false);
+          } catch (NoSuchObjectException e) {
+            if (attempts >= 5) {
+              throw new NoSuchObjectException("There is no promise with handle " + promiseHandle);
+            }
+            try {
+              Thread.sleep((long) Math.pow(2.0, attempts - 1) * 1000L);
+            } catch (InterruptedException f) {
+              interrupted = true;
+            }
+          }
+        }
+      } finally {
+        // TODO(user): replace with Uninterruptibles#sleepUninterruptibly once we use guava
+        if (interrupted) {
+          Thread.currentThread().interrupt();
+        }
+      }
+      Key generatorJobKey = slot.getGeneratorJobKey();
+      if (null == generatorJobKey) {
+        throw new RuntimeException(
+           "Pipeline is fatally corrupted. Slot for promised value has no generatorJobKey: " + slot);
+      }
+      JobRecord generatorJob = backEnd.queryJob(generatorJobKey, JobRecord.InflationType.NONE);
+      if (null == generatorJob) {
+        throw new RuntimeException("Pipeline is fatally corrupted. "
+            + "The generator job for a promised value slot was not found: " + generatorJobKey);
+      }
+      String childGraphGuid = generatorJob.getChildGraphGuid();
+      if (null == childGraphGuid) {
+        // The generator job has not been saved with a childGraphGuid yet. This can happen if the
+        // promise handle leaked out to an external thread before the job that generated it
+        // had finished.
+        throw new NoSuchObjectException(
+            "The framework is not ready to accept the promised value yet. "
+                + "Please try again after the job that generated the promis handle has completed.");
+      }
+      if (!childGraphGuid.equals(slot.getGraphGuid())) {
+        // The slot has been orphaned
+        throw new OrphanedObjectException(promiseHandle);
+      }
+    } catch (Exception e) {
+      logger.log(Level.WARNING, "Find slot for promise with handle " + promiseHandle + " failed.", e);
+    }
+    return slot;
+  }
+  
   /**
    * The root job instance used to wrap a user provided root if the user
    * provided root job has exceptionHandler specified.
