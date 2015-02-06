@@ -20,7 +20,7 @@ setuptools.setup(
     # Exclude these files from installation.
     exclude_package_data={"": ["README"]},
     install_requires=[
-      "GoogleAppEngineCloudStorageClient >= 1.9.15"
+      "GoogleAppEngineCloudStorageClient >= 1.9.15",
       "simplejson >= 3.6.5",
       ]
 )
