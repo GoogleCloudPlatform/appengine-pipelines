@@ -32,7 +32,7 @@ import urlparse
 # Fix up paths for running tests.
 sys.path.insert(0, '../src/')
 
-from pipeline import simplejson
+import simplejson
 
 from pipeline import common
 from pipeline import pipeline
@@ -3121,9 +3121,10 @@ class NoTransactionPipeline(PublicPipeline):
   def callback(self, **kwargs):
     if db.is_in_transaction():
       try:
-        # If we are in non xg-transaction, we should be unable to write to 4
+        # If we are in non xg-transaction, we should be unable to write to 24
         # new entity groups (1 is used to read pipeline state).
-        for _ in xrange(4):
+        # Assumes the entity group limit is 25 (was previously 5).
+        for _ in xrange(24):
           DummyKind().put()
         try:
           # Verify something is not wrong in the testbed and/or limits changed
