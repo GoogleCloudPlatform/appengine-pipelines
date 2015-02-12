@@ -102,7 +102,7 @@ class _BaseRpcHandler(webapp.RequestHandler):
   """Base handler for JSON-RPC responses.
 
   Sub-classes should fill in the 'json_response' property. All exceptions will
-  be rturne
+  be returned.
   """
 
   def get(self):
