@@ -24,6 +24,7 @@ import com.google.appengine.tools.pipeline.Job0;
 import com.google.appengine.tools.pipeline.JobSetting;
 import com.google.appengine.tools.pipeline.NoSuchObjectException;
 import com.google.appengine.tools.pipeline.OrphanedObjectException;
+import com.google.appengine.tools.pipeline.PromisedValue;
 import com.google.appengine.tools.pipeline.Value;
 import com.google.appengine.tools.pipeline.impl.backend.AppEngineBackEnd;
 import com.google.appengine.tools.pipeline.impl.backend.PipelineBackEnd;
@@ -413,11 +414,74 @@ public class PipelineManager {
     backEnd.deletePipeline(key, force, async);
   }
 
+  /**
+   * Fills a the {@link PromisedValue}.
+   * @param promiseHandle the key to the promised value slot.
+   * @param value the value to fill.
+   * @throws NoSuchObjectException If there is no Job with the given key.
+   * @throws OrphanedObjectException If the slot has been orphaned.
+   */
   public static void acceptPromisedValue(String promiseHandle, Object value)
       throws NoSuchObjectException, OrphanedObjectException {
+    Slot slot = queryPromisedValueSlot(promiseHandle);
+    JobRecord generatorJob = getGeneratorJob(slot);
+    UpdateSpec updateSpec = new UpdateSpec(slot.getRootJobKey());
+    registerSlotFilled(updateSpec, generatorJob.getQueueSettings(), slot, value);
+    backEnd.save(updateSpec, generatorJob.getQueueSettings());
+  }
+  
+  private static JobRecord getGeneratorJob(Slot slot)
+      throws OrphanedObjectException, NoSuchObjectException {
+    Key generatorJobKey = slot.getGeneratorJobKey();
+    if (null == generatorJobKey) {
+      throw new RuntimeException(
+          "Pipeline is fatally corrupted. Slot for promised value has no generatorJobKey: " + slot);
+    }
+    JobRecord generatorJob = backEnd.queryJob(generatorJobKey, JobRecord.InflationType.NONE);
+    if (null == generatorJob) {
+      throw new RuntimeException("Pipeline is fatally corrupted. "
+          + "The generator job for a promised value slot was not found: " + generatorJobKey);
+    }
+    String childGraphGuid = generatorJob.getChildGraphGuid();
+    if (null == childGraphGuid) {
+      // The generator job has not been saved with a childGraphGuid yet. This can happen if the
+      // promise handle leaked out to an external thread before the job that generated it
+      // had finished.
+      throw new NoSuchObjectException(
+          "The framework is not ready to accept the promised value yet. "
+          + "Please try again after the job that generated the promis handle has completed.");
+    }
+    if (!childGraphGuid.equals(slot.getGraphGuid())) {
+      // The slot has been orphaned
+      throw new OrphanedObjectException(KeyFactory.keyToString(slot.getKey()));
+    }
+    
+    return generatorJob;
+  }
+
+  /**
+   * Get the {@link Slot} for a promise handle that can be used to construct a
+   * {@link PromisedValue} for use in child {@link Job}s. It will attempt to lookup
+   * the key 5 times with an exponential back-off just in case it has been requested
+   * before the promise has been registered. 
+   * @param promiseHandle Key to find the {@link Slot}
+   * @return A {@link Slot} if the handle can be resolved otherwise <code>null</code>.
+   */
+  public static Slot getPromisedValueSlot(String promiseHandle) {
+    Slot slot = null;
+    try {
+      slot = queryPromisedValueSlot(promiseHandle);
+    } catch (Exception e) {
+      logger.log(Level.WARNING, "Find slot for promise with handle " + promiseHandle + " failed.", e);
+    }
+    return slot;
+  }
+  
+  private static Slot queryPromisedValueSlot(String promiseHandle)
+      throws NoSuchObjectException {
+    Slot slot = null;
     checkNonEmpty(promiseHandle, "promiseHandle");
     Key key = KeyFactory.stringToKey(promiseHandle);
-    Slot slot = null;
     // It is possible, though unlikely, that we might be asked to accept a
     // promise before the slot to hold the promise has been saved. We will try 5
     // times, sleeping 1, 2, 4, 8 seconds between attempts.
@@ -444,92 +508,6 @@ public class PipelineManager {
       if (interrupted) {
         Thread.currentThread().interrupt();
       }
-    }
-    Key generatorJobKey = slot.getGeneratorJobKey();
-    if (null == generatorJobKey) {
-      throw new RuntimeException(
-          "Pipeline is fatally corrupted. Slot for promised value has no generatorJobKey: " + slot);
-    }
-    JobRecord generatorJob = backEnd.queryJob(generatorJobKey, JobRecord.InflationType.NONE);
-    if (null == generatorJob) {
-      throw new RuntimeException("Pipeline is fatally corrupted. "
-          + "The generator job for a promised value slot was not found: " + generatorJobKey);
-    }
-    String childGraphGuid = generatorJob.getChildGraphGuid();
-    if (null == childGraphGuid) {
-      // The generator job has not been saved with a childGraphGuid yet. This can happen if the
-      // promise handle leaked out to an external thread before the job that generated it
-      // had finished.
-      throw new NoSuchObjectException(
-          "The framework is not ready to accept the promised value yet. "
-          + "Please try again after the job that generated the promis handle has completed.");
-    }
-    if (!childGraphGuid.equals(slot.getGraphGuid())) {
-      // The slot has been orphaned
-      throw new OrphanedObjectException(promiseHandle);
-    }
-    UpdateSpec updateSpec = new UpdateSpec(slot.getRootJobKey());
-    registerSlotFilled(updateSpec, generatorJob.getQueueSettings(), slot, value);
-    backEnd.save(updateSpec, generatorJob.getQueueSettings());
-  }
-
-  public static Slot getPromisedValueSlot(String promiseHandle) {
-    Slot slot = null;
-    try {
-      checkNonEmpty(promiseHandle, "promiseHandle");
-      Key key = KeyFactory.stringToKey(promiseHandle);
-      // It is possible, though unlikely, that we might be asked to accept a
-      // promise before the slot to hold the promise has been saved. We will try 5
-      // times, sleeping 1, 2, 4, 8 seconds between attempts.
-      int attempts = 0;
-      boolean interrupted = false;
-      try {
-        while (slot == null) {
-          attempts++;
-          try {
-            slot = backEnd.querySlot(key, false);
-          } catch (NoSuchObjectException e) {
-            if (attempts >= 5) {
-              throw new NoSuchObjectException("There is no promise with handle " + promiseHandle);
-            }
-            try {
-              Thread.sleep((long) Math.pow(2.0, attempts - 1) * 1000L);
-            } catch (InterruptedException f) {
-              interrupted = true;
-            }
-          }
-        }
-      } finally {
-        // TODO(user): replace with Uninterruptibles#sleepUninterruptibly once we use guava
-        if (interrupted) {
-          Thread.currentThread().interrupt();
-        }
-      }
-      Key generatorJobKey = slot.getGeneratorJobKey();
-      if (null == generatorJobKey) {
-        throw new RuntimeException(
-           "Pipeline is fatally corrupted. Slot for promised value has no generatorJobKey: " + slot);
-      }
-      JobRecord generatorJob = backEnd.queryJob(generatorJobKey, JobRecord.InflationType.NONE);
-      if (null == generatorJob) {
-        throw new RuntimeException("Pipeline is fatally corrupted. "
-            + "The generator job for a promised value slot was not found: " + generatorJobKey);
-      }
-      String childGraphGuid = generatorJob.getChildGraphGuid();
-      if (null == childGraphGuid) {
-        // The generator job has not been saved with a childGraphGuid yet. This can happen if the
-        // promise handle leaked out to an external thread before the job that generated it
-        // had finished.
-        throw new NoSuchObjectException(
-            "The framework is not ready to accept the promised value yet. "
-                + "Please try again after the job that generated the promis handle has completed.");
-      }
-      if (!childGraphGuid.equals(slot.getGraphGuid())) {
-        // The slot has been orphaned
-        throw new OrphanedObjectException(promiseHandle);
-      }
-    } catch (Exception e) {
-      logger.log(Level.WARNING, "Find slot for promise with handle " + promiseHandle + " failed.", e);
     }
     return slot;
   }
