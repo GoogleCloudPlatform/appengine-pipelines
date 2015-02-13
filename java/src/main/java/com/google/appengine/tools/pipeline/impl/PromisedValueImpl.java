@@ -34,7 +34,7 @@ public class PromisedValueImpl<E> extends FutureValueImpl<E> implements Promised
   }
   
   public PromisedValueImpl(Key rootJobGuid, Key generatorJobKey, String graphGUID) {
-    super(new Slot(rootJobGuid, generatorJobKey, graphGUID));
+    this(new Slot(rootJobGuid, generatorJobKey, graphGUID));
   }
 
   @Override
