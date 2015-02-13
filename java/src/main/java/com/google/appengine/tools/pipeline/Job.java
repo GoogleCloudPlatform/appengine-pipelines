@@ -380,6 +380,18 @@ public abstract class Job<E> implements Serializable {
     return promisedValue;
   }
 
+  /**
+   * Invoke this method from within the {@code run} method of a <b>generator
+   * job</b> in order to declare that some value will be provided asynchronously
+   * by some external agent.
+   *
+   * @param <F> The type of the asynchronously provided value.
+   * @return A {@code PromisedValue} that represents an empty value slot that
+   *         will be filled at a later time when the external agent invokes
+   *         {@link PipelineService#submitPromisedValue(String, Object)}. This
+   *         may be passed in to further invocations of {@code futureCall()} in
+   *         order to specify a data dependency.
+   */
   public <F> PromisedValue<F> newPromise() {
     PromisedValueImpl<F> promisedValue =
         new PromisedValueImpl<>(getPipelineKey(), thisJobRecord.getKey(), currentRunGUID);
@@ -387,6 +399,25 @@ public abstract class Job<E> implements Serializable {
     return promisedValue;
   }
   
+  /**
+   * Invoke this method from within the {@code run} method of a <b>generator
+   * job</b> in order to get some value that has been previously declared and
+   * that will be provided asynchronously by some external agent. This can be
+   * used to share the same value with child {@link Job}s
+   * 
+   * 
+   * @param promiseHandle The unique identifier for the {@link PromisedValue}
+   *        obtained during the execution of some job via the method
+   *        {@link PromisedValue#getHandle()}.
+   * @return A {@code PromisedValue} that represents an empty value slot that
+   *         will be filled at a later time when the external agent invokes
+   *         {@link PipelineService#submitPromisedValue(String, Object)}. This
+   *         may be passed in to further invocations of {@code futureCall()} in
+   *         order to specify a data dependency.
+   *         
+   *         Note: This method will return <code>null</code> if the slot for the
+   *         handle could not be found. 
+   */
   public <F> PromisedValue<F> promise(String promiseHandle) {
     Slot slot = PipelineManager.getPromisedValueSlot(promiseHandle);
     PromisedValueImpl<F> promisedValue = null;
