@@ -2680,12 +2680,16 @@ class _FanoutHandler(webapp.RequestHandler):
         all_pipeline_keys.add(str(parent.fanned_out[index]))
 
     all_tasks = []
-    for pipeline_key in all_pipeline_keys:
+    all_pipelines = db.get([db.Key(pipeline_key) for pipeline_key in all_pipeline_keys])
+    for child_pipeline in all_pipelines:
+      if child_pipeline is None:
+        continue
       all_tasks.append(taskqueue.Task(
           url=context.pipeline_handler_path,
           params=dict(pipeline_key=pipeline_key),
+          target=child_pipeline.params['target'],
           headers={'X-Ae-Pipeline-Key': pipeline_key},
-          name='ae-pipeline-fan-out-' + db.Key(pipeline_key).name()))
+          name='ae-pipeline-fan-out-' + child_pipeline.key().name()))
 
     batch_size = 100  # Limit of taskqueue API bulk add.
     for i in xrange(0, len(all_tasks), batch_size):
