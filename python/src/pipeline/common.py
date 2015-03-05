@@ -1,4 +1,4 @@
-#!/usr/bin/python2.5
+#!/usr/bin/env python
 #
 # Copyright 2010 Google Inc.
 #
@@ -22,7 +22,6 @@ import random
 
 from google.appengine.api import mail
 from google.appengine.api import taskqueue
-from google.appengine.ext import webapp
 
 import pipeline
 
