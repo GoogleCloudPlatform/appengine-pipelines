@@ -1,4 +1,4 @@
-#!/usr/bin/python2.5
+#!/usr/bin/env python
 #
 # Copyright 2010 Google Inc.
 #
@@ -32,7 +32,10 @@ import urlparse
 # Fix up paths for running tests.
 sys.path.insert(0, '../src/')
 
-import simplejson
+try:
+  import json
+except ImportError:
+  import simplejson as json
 
 from pipeline import common
 from pipeline import pipeline
@@ -96,7 +99,7 @@ class SlotTest(TestBase):
     now = datetime.datetime.utcnow()
     slot_record = _SlotRecord(
         filler=filler_key,
-        value=simplejson.dumps('my value'),
+        value=json.dumps('my value'),
         status=_SlotRecord.FILLED,
         fill_time=now)
 
@@ -239,14 +242,14 @@ class PipelineFutureTest(TestBase):
   def testInheritOutputsResolveValues(self):
     """Tests _inherit_outputs with resolving their current values."""
     one = _SlotRecord(
-        value=simplejson.dumps('hi one'),
+        value=json.dumps('hi one'),
         status=_SlotRecord.FILLED,
         fill_time=datetime.datetime.utcnow(),
         filler=db.Key.from_path('mykind', 'mykey1'))
     one.put()
 
     two = _SlotRecord(
-        value=simplejson.dumps('hi two'),
+        value=json.dumps('hi two'),
         status=_SlotRecord.FILLED,
         fill_time=datetime.datetime.utcnow(),
         filler=db.Key.from_path('mykind', 'mykey2'))
@@ -1219,7 +1222,7 @@ class UtilitiesTest(TestBase):
         output_slot_keys)
 
     self.assertEquals(None, params_blob)
-    params = simplejson.loads(params_text)
+    params = json.loads(params_text)
     self.assertEquals(
         {
             'queue_name': 'my-queue',
@@ -1270,7 +1273,7 @@ class UtilitiesTest(TestBase):
         output_slot_keys)
 
     self.assertEquals(None, params_text)
-    params = simplejson.loads(blobstore.BlobInfo(params_blob).open().read())
+    params = json.loads(blobstore.BlobInfo(params_blob).open().read())
     self.assertEquals('some value' * 1000000, params['args'][1]['value'])
 
   def testShortRepr(self):
@@ -1723,7 +1726,7 @@ class PipelineContextTest(TestBase):
         current_attempt=4,
         # Bug in DB means we need to use the storage name here,
         # not the local property name.
-        params=simplejson.dumps(params),
+        params=json.dumps(params),
         root_pipeline=self.pipeline5_key)
     pipeline_record.put()
     self.assertTrue(db.get(self.pipeline1_key) is not None)
@@ -1758,7 +1761,7 @@ class PipelineContextTest(TestBase):
         current_attempt=0,
         # Bug in DB means we need to use the storage name here,
         # not the local property name.
-        params=simplejson.dumps(params),
+        params=json.dumps(params),
         root_pipeline=self.pipeline5_key)
     pipeline_record.put()
     self.assertTrue(db.get(self.pipeline1_key) is not None)
@@ -1832,7 +1835,7 @@ class PipelineContextTest(TestBase):
         key=self.pipeline1_key,
         # Bug in DB means we need to use the storage name here,
         # not the local property name.
-        params=simplejson.dumps(params))
+        params=json.dumps(params))
     pipeline_record.put()
     self.assertTrue(db.get(self.pipeline1_key) is not None)
 
@@ -1853,7 +1856,7 @@ class PipelineContextTest(TestBase):
         key=self.pipeline1_key,
         # Bug in DB means we need to use the storage name here,
         # not the local property name.
-        params=simplejson.dumps(params))
+        params=json.dumps(params))
     pipeline_record.put()
     self.assertTrue(db.get(self.pipeline1_key) is not None)
 
@@ -1873,7 +1876,7 @@ class PipelineContextTest(TestBase):
         key=self.pipeline1_key,
         # Bug in DB means we need to use the storage name here,
         # not the local property name.
-        params=simplejson.dumps(params))
+        params=json.dumps(params))
     pipeline_record.put()
     self.assertTrue(db.get(self.pipeline1_key) is not None)
 
@@ -1903,35 +1906,35 @@ class PipelineContextTest(TestBase):
         key=self.pipeline1_key,
         # Bug in DB means we need to use the storage name here,
         # not the local property name.
-        params=simplejson.dumps(params),
+        params=json.dumps(params),
         root_pipeline=self.pipeline1_key)
     pipeline_record2 = _PipelineRecord(
         status=_PipelineRecord.RUN,
         key=self.pipeline2_key,
         # Bug in DB means we need to use the storage name here,
         # not the local property name.
-        params=simplejson.dumps(params),
+        params=json.dumps(params),
         root_pipeline=self.pipeline1_key)
     pipeline_record3 = _PipelineRecord(
         status=_PipelineRecord.RUN,
         key=self.pipeline3_key,
         # Bug in DB means we need to use the storage name here,
         # not the local property name.
-        params=simplejson.dumps(params),
+        params=json.dumps(params),
         root_pipeline=self.pipeline1_key)
     pipeline_record4 = _PipelineRecord(
         status=_PipelineRecord.ABORTED,
         key=self.pipeline4_key,
         # Bug in DB means we need to use the storage name here,
         # not the local property name.
-        params=simplejson.dumps(params),
+        params=json.dumps(params),
         root_pipeline=self.pipeline1_key)
     pipeline_record5 = _PipelineRecord(
         status=_PipelineRecord.DONE,
         key=self.pipeline5_key,
         # Bug in DB means we need to use the storage name here,
         # not the local property name.
-        params=simplejson.dumps(params),
+        params=json.dumps(params),
         root_pipeline=self.pipeline1_key)
 
     db.put([pipeline_record1, pipeline_record2, pipeline_record3,
@@ -2051,7 +2054,7 @@ class PipelineContextTest(TestBase):
         key=self.pipeline1_key,
         # Bug in DB means we need to use the storage name here,
         # not the local property name.
-        params=simplejson.dumps(params),
+        params=json.dumps(params),
         finalized_time=finalized_time)
     pipeline_record.put()
     self.assertTrue(db.get(self.pipeline1_key) is not None)
@@ -2076,7 +2079,7 @@ class PipelineContextTest(TestBase):
         key=self.pipeline1_key,
         # Bug in DB means we need to use the storage name here,
         # not the local property name.
-        params=simplejson.dumps(params))
+        params=json.dumps(params))
     pipeline_record.put()
     self.assertTrue(db.get(self.pipeline1_key) is not None)
 
@@ -2121,7 +2124,7 @@ class EvaluateErrorTest(test_shared.TaskRunningMixin, TestBase):
         status=_PipelineRecord.WAITING,
         # Bug in DB means we need to use the storage name here,
         # not the local property name.
-        params=simplejson.dumps({
+        params=json.dumps({
             'output_slots': {'default': str(self.slot_key)}}),
         key=self.pipeline_key)
     pipeline_record.put()
@@ -2140,7 +2143,7 @@ class EvaluateErrorTest(test_shared.TaskRunningMixin, TestBase):
         status=_PipelineRecord.WAITING,
         # Bug in DB means we need to use the storage name here,
         # not the local property name.
-        params=simplejson.dumps({
+        params=json.dumps({
             'output_slots': {'default': str(self.slot_key)}}),
         key=self.pipeline_key)
     pipeline_record.put()
@@ -2160,7 +2163,7 @@ class EvaluateErrorTest(test_shared.TaskRunningMixin, TestBase):
         class_path='does.not.exist',
         # Bug in DB means we need to use the storage name here,
         # not the local property name.
-        params=simplejson.dumps({
+        params=json.dumps({
             'output_slots': {'default': str(self.slot_key)}}),
         key=self.pipeline_key)
     pipeline_record.put()
@@ -2316,7 +2319,7 @@ class TaskRunningTest(test_shared.TaskRunningMixin, TestBase):
         class_path='does.not.exist',
         # Bug in DB means we need to use the storage name here,
         # not the local property name.
-        params=simplejson.dumps({
+        params=json.dumps({
                  'output_slots': {'default': str(self.slot_key)},
                  'args': [],
                  'kwargs': {},
@@ -2394,7 +2397,7 @@ class TaskRunningTest(test_shared.TaskRunningMixin, TestBase):
         'args': [{'type': 'value', 'value': True}],
         'kwargs': {},
     })
-    self.pipeline_record.params_text = simplejson.dumps(params)
+    self.pipeline_record.params_text = json.dumps(params)
     db.put([self.pipeline_record, self.slot_record, self.barrier_record])
 
     before_record = db.get(self.pipeline_key)
@@ -2453,7 +2456,7 @@ class TaskRunningTest(test_shared.TaskRunningMixin, TestBase):
         'args': [{'type': 'value', 'value': True}],
         'kwargs': {},
     })
-    self.pipeline_record.params_text = simplejson.dumps(params)
+    self.pipeline_record.params_text = json.dumps(params)
     db.put([self.pipeline_record, self.slot_record, self.barrier_record])
 
     before_record = db.get(self.pipeline_key)
@@ -2498,7 +2501,7 @@ class TaskRunningTest(test_shared.TaskRunningMixin, TestBase):
     """Tests a finalizing, sync pipeline task being re-run."""
     self.pipeline_record.class_path = '__main__.DumbSync'
     self.slot_record.status = _SlotRecord.FILLED
-    self.slot_record.value_text = simplejson.dumps(None)
+    self.slot_record.value_text = json.dumps(None)
     db.put([self.pipeline_record, self.slot_record])
 
     self.context.evaluate(self.pipeline_key, purpose=_BarrierRecord.FINALIZE)
@@ -2520,7 +2523,7 @@ class TaskRunningTest(test_shared.TaskRunningMixin, TestBase):
     self.pipeline_record.status = _PipelineRecord.DONE
     self.pipeline_record.finalized_time = now
     self.slot_record.status = _SlotRecord.FILLED
-    self.slot_record.value_text = simplejson.dumps(None)
+    self.slot_record.value_text = json.dumps(None)
     db.put([self.pipeline_record, self.slot_record])
 
     self.context.evaluate(self.pipeline_key, purpose=_BarrierRecord.FINALIZE)
@@ -2585,7 +2588,7 @@ class TaskRunningTest(test_shared.TaskRunningMixin, TestBase):
     """Tests a finalizing, async pipeline task being re-run."""
     self.pipeline_record.class_path = '__main__.DumbAsync'
     self.slot_record.status = _SlotRecord.FILLED
-    self.slot_record.value_text = simplejson.dumps(None)
+    self.slot_record.value_text = json.dumps(None)
     db.put([self.pipeline_record, self.slot_record])
 
     self.context.evaluate(self.pipeline_key, purpose=_BarrierRecord.FINALIZE)
@@ -2610,7 +2613,7 @@ class TaskRunningTest(test_shared.TaskRunningMixin, TestBase):
     self.pipeline_record.status = _PipelineRecord.DONE
     self.pipeline_record.finalized_time = now
     self.slot_record.status = _SlotRecord.FILLED
-    self.slot_record.value_text = simplejson.dumps(None)
+    self.slot_record.value_text = json.dumps(None)
     db.put([self.pipeline_record, self.slot_record])
 
     self.context.evaluate(self.pipeline_key, purpose=_BarrierRecord.FINALIZE)
@@ -2674,7 +2677,7 @@ class TaskRunningTest(test_shared.TaskRunningMixin, TestBase):
     self.pipeline_record.class_path = '__main__.DumbGeneratorYields'
     self.pipeline_record.status = _PipelineRecord.RUN
     self.slot_record.status = _SlotRecord.FILLED
-    self.slot_record.value_text = simplejson.dumps(None)
+    self.slot_record.value_text = json.dumps(None)
     db.put([self.pipeline_record, self.slot_record])
 
     self.context.evaluate(self.pipeline_key, purpose=_BarrierRecord.FINALIZE)
@@ -2696,7 +2699,7 @@ class TaskRunningTest(test_shared.TaskRunningMixin, TestBase):
     self.pipeline_record.status = _PipelineRecord.DONE
     self.pipeline_record.finalized_time = now
     self.slot_record.status = _SlotRecord.FILLED
-    self.slot_record.value_text = simplejson.dumps(None)
+    self.slot_record.value_text = json.dumps(None)
     db.put([self.pipeline_record, self.slot_record])
 
     self.context.evaluate(self.pipeline_key, purpose=_BarrierRecord.FINALIZE)
@@ -2849,7 +2852,7 @@ class TaskRunningTest(test_shared.TaskRunningMixin, TestBase):
         class_path='does.not.exist',
         # Bug in DB means we need to use the storage name here,
         # not the local property name.
-        params=simplejson.dumps({
+        params=json.dumps({
                  'output_slots': {'default': str(self.slot_key)},
                  'args': [],
                  'kwargs': {},
@@ -3173,7 +3176,7 @@ class CallbackHandlerTest(TestBase):
         stage.pipeline_id)
     params = pipeline_record.params
     params['class_path'] = 'does.not.exist'
-    pipeline_record.params_text = simplejson.dumps(params)
+    pipeline_record.params_text = json.dumps(params)
     pipeline_record.put()
 
     handler = test_shared.create_handler(
@@ -4393,7 +4396,7 @@ class StatusTest(TestBase):
         class_path='does.not.exist1',
         # Bug in DB means we need to use the storage name here,
         # not the local property name.
-        params=simplejson.dumps(self.params1),
+        params=json.dumps(self.params1),
         key=self.pipeline1_key,
         max_attempts=4)
     self.pipeline2_record = _PipelineRecord(
@@ -4402,7 +4405,7 @@ class StatusTest(TestBase):
         class_path='does.not.exist2',
         # Bug in DB means we need to use the storage name here,
         # not the local property name.
-        params=simplejson.dumps(self.params2),
+        params=json.dumps(self.params2),
         key=self.pipeline2_key,
         max_attempts=3)
     self.pipeline3_record = _PipelineRecord(
@@ -4411,7 +4414,7 @@ class StatusTest(TestBase):
         class_path='does.not.exist3',
         # Bug in DB means we need to use the storage name here,
         # not the local property name.
-        params=simplejson.dumps(self.params3),
+        params=json.dumps(self.params3),
         key=self.pipeline3_key,
         max_attempts=2)
 
@@ -4769,7 +4772,7 @@ class StatusTest(TestBase):
     self.slot1_record.filler = self.pipeline2_key
     self.slot1_record.fill_time = self.fill_time
     self.slot1_record.root_pipeline = self.pipeline1_key
-    self.slot1_record.value_text = simplejson.dumps({
+    self.slot1_record.value_text = json.dumps({
         'one': 1234, 'two': 'hello'})
     expected = {
         'status': 'filled',
@@ -4897,7 +4900,7 @@ class StatusTest(TestBase):
         class_path='does.not.exist4',
         # Bug in DB means we need to use the storage name here,
         # not the local property name.
-        params=simplejson.dumps(self.params1),
+        params=json.dumps(self.params1),
         key=bad_pipeline_key,
         max_attempts=4)
 

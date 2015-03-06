@@ -1,4 +1,4 @@
-#!/usr/bin/python2.5
+#!/usr/bin/env python
 #
 # Copyright 2010 Google Inc.
 #
@@ -27,8 +27,10 @@ import inspect
 import logging
 import os
 
-# Relative imports
-import simplejson
+try:
+  import json
+except ImportError:
+  import simplejson as json
 
 # pylint: disable=protected-access
 
@@ -150,7 +152,7 @@ def is_generator_function(obj):
                obj.func_code.co_flags & CO_GENERATOR))
 
 
-class JsonEncoder(simplejson.JSONEncoder):
+class JsonEncoder(json.JSONEncoder):
   """Pipeline customized json encoder."""
 
   TYPE_ID = "__pipeline_json_type"
@@ -165,7 +167,7 @@ class JsonEncoder(simplejson.JSONEncoder):
     return super(JsonEncoder, self).default(o)
 
 
-class JsonDecoder(simplejson.JSONDecoder):
+class JsonDecoder(json.JSONDecoder):
   """Pipeline customized json decoder."""
 
   def __init__(self, **kwargs):
