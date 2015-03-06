@@ -191,4 +191,18 @@ public interface JobSetting extends Serializable {
       super(statusConsoleUrl);
     }
   }
+
+  /** 
+   * A setting specifying the job's display name. This will replace 
+   * the default class name when the job is added 
+   */
+  final class DisplayName extends StringValuedSetting {
+
+    private static final long serialVersionUID = 6398735593999229298L;
+    
+    public DisplayName(String displayName) {
+      super(displayName);
+    }
+    
+  }
 }
