@@ -325,7 +325,7 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
       Job<?> jobInstance, boolean callExceptionHandler, JobSetting[] settings,
       QueueSettings parentQueueSettings) {
     super(rootJobKey, null, thisKey, generatorJobKey, graphGUID);
-    createSettingsMap(settings);
+    settingsMap = createSettingsMap(settings);
     jobInstanceRecordInflated = new JobInstanceRecord(this, jobInstance,
         (JobSetting.DisplayName) settingsMap.get(JobSetting.DisplayName.class));
     jobInstanceKey = jobInstanceRecordInflated.getKey();
@@ -414,11 +414,12 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
   }
   
   // converts the settings array into a map
-  private void createSettingsMap(JobSetting[] settings) {
-    settingsMap = new HashMap<>();
+  private static Map<Class<? extends JobSetting>, JobSetting> createSettingsMap(JobSetting[] settings) {
+    Map<Class<? extends JobSetting>, JobSetting> map = new HashMap<>();
     for (JobSetting setting : settings) {
-      settingsMap.put(setting.getClass(), setting);
+      map.put(setting.getClass(), setting);
     }
+    return map;
   }
   
   private void applySetting(JobSetting setting) {

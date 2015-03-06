@@ -193,8 +193,7 @@ public interface JobSetting extends Serializable {
   }
 
   /** 
-   * A setting specifying the job's display name. This will replace 
-   * the default class name when the job is added 
+   * A setting specifying the job's display name. 
    */
   final class DisplayName extends StringValuedSetting {
 
@@ -203,6 +202,5 @@ public interface JobSetting extends Serializable {
     public DisplayName(String displayName) {
       super(displayName);
     }
-    
   }
 }

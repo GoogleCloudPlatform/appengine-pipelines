@@ -501,8 +501,7 @@ public abstract class Job<E> implements Serializable {
   /**
    * Constructs a new {@code JobSetting.DisplayName}. This method is only
    * syntactic sugar. {@code displayName(x)} is equivalent to
-   * {@code new JobSetting.DisplayName}.
-   * 
+   * {@code new JobSetting.DisplayName(x)}.
    * @param displayName
    *          The job's display name.
    * @return
