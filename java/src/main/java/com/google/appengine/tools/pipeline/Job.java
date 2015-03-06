@@ -135,6 +135,8 @@ public abstract class Job<E> implements Serializable {
   private transient JobRecord thisJobRecord;
   private transient UpdateSpec updateSpec;
   private transient String currentRunGUID;
+  
+  private String displayName = null;
 
   // This method will be invoked by reflection from PipelineManager
   @SuppressWarnings("unused")
@@ -558,9 +560,16 @@ public abstract class Job<E> implements Serializable {
   }
 
   /**
+   * Sets the job's display name. Used for presentation purpose only.
+   */
+  public void setJobDisplayName(String displayName) {
+    this.displayName = displayName;
+  }
+  
+  /**
    * Returns the job's display name. Used for presentation purpose only.
    */
   public String getJobDisplayName() {
-    return getClass().getName();
+    return displayName == null ? getClass().getName() : displayName;
   }
 }
