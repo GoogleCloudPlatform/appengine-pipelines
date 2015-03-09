@@ -2688,6 +2688,7 @@ class _FanoutHandler(webapp.RequestHandler):
     for child_pipeline in all_pipelines:
       if child_pipeline is None:
         continue
+      pipeline_key = str(child_pipeline.key())
       all_tasks.append(taskqueue.Task(
           url=context.pipeline_handler_path,
           params=dict(pipeline_key=pipeline_key),
