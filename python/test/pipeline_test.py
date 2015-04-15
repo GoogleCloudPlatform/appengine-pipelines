@@ -28,6 +28,7 @@ import sys
 import unittest
 import urllib
 import urlparse
+import pytz
 
 # Fix up paths for running tests.
 sys.path.insert(0, '../src/')
@@ -450,10 +451,10 @@ class PipelineTest(TestBase):
   def testStartEta(self):
     """Tests starting a pipeline with an eta."""
     stage = NothingPipeline('one', 'two', three='red', four=1234)
-    eta = datetime.datetime.utcnow() + datetime.timedelta(seconds=30)
+    eta = datetime.datetime.utcnow().replace(tzinfo=pytz.UTC) + datetime.timedelta(seconds=30)
     task = stage.start(return_task=True, eta=eta)
     self.assertEquals(0, len(test_shared.get_tasks()))
-    self.assertEquals(eta, task.eta.replace(tzinfo=None))
+    self.assertEquals(eta, task.eta)
 
   def testStartCountdownAndEta(self):
     """Tests starting a pipeline with both a countdown and eta."""
@@ -673,7 +674,7 @@ class PipelineTest(TestBase):
     """Tests the get_callback_task method."""
     stage = AsyncOutputlessPipeline()
     stage.start(idempotence_key='banana')
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.utcnow().replace(tzinfo=pytz.UTC)
     task = stage.get_callback_task(
         params=dict(one='red', two='blue', three=12345),
         method='overridden',
@@ -688,7 +689,7 @@ class PipelineTest(TestBase):
         urlparse.parse_qs(task.payload))
     self.assertEquals('POST', task.method)
     self.assertEquals('my-name', task.name)
-    self.assertEquals(now, task.eta.replace(tzinfo=None))
+    self.assertEquals(now, task.eta)
 
   def testAccesorsUnknown(self):
     """Tests using accessors when they have unknown values."""
