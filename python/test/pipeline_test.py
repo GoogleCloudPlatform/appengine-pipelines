@@ -41,7 +41,7 @@ except ImportError:
 from pipeline import common
 from pipeline import pipeline
 import test_shared
-from appengine_pipeline.test import testutil
+import testutil
 
 from google.appengine.api import mail
 from google.appengine.ext import blobstore
