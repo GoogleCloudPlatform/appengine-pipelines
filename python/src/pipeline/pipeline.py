@@ -40,7 +40,7 @@ import urllib
 import uuid
 
 from google.appengine.api import mail
-#from google.appengine.api import files
+from google.appengine.api import files
 from google.appengine.api import users
 from google.appengine.api import taskqueue
 from google.appengine.ext import db
@@ -1227,7 +1227,7 @@ def _write_json_blob(encoded_value):
 
   Returns:
     The blobstore.BlobKey for the file that was created.
-  
+  """
   file_name = files.blobstore.create(mime_type='application/json')
   handle = files.open(file_name, 'a')
   try:
@@ -1241,8 +1241,7 @@ def _write_json_blob(encoded_value):
 
   files.finalize(file_name)
   return files.blobstore.get_blob_key(file_name)
-  """
-  pass
+
 
 def _dereference_args(pipeline_name, args, kwargs):
   """Dereference a Pipeline's arguments that are slots, validating them.
