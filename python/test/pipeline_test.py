@@ -28,7 +28,6 @@ import sys
 import unittest
 import urllib
 import urlparse
-import pytz
 
 # Fix up paths for running tests.
 sys.path.insert(0, '../src/')
@@ -451,10 +450,10 @@ class PipelineTest(TestBase):
   def testStartEta(self):
     """Tests starting a pipeline with an eta."""
     stage = NothingPipeline('one', 'two', three='red', four=1234)
-    eta = datetime.datetime.utcnow().replace(tzinfo=pytz.UTC) + datetime.timedelta(seconds=30)
+    eta = datetime.datetime.now() + datetime.timedelta(seconds=30)
     task = stage.start(return_task=True, eta=eta)
     self.assertEquals(0, len(test_shared.get_tasks()))
-    self.assertEquals(eta, task.eta)
+    self.assertEquals(eta, test_shared.utc_to_local(task.eta))
 
   def testStartCountdownAndEta(self):
     """Tests starting a pipeline with both a countdown and eta."""
@@ -674,7 +673,7 @@ class PipelineTest(TestBase):
     """Tests the get_callback_task method."""
     stage = AsyncOutputlessPipeline()
     stage.start(idempotence_key='banana')
-    now = datetime.datetime.utcnow().replace(tzinfo=pytz.UTC)
+    now = datetime.datetime.now()
     task = stage.get_callback_task(
         params=dict(one='red', two='blue', three=12345),
         method='overridden',
@@ -689,7 +688,7 @@ class PipelineTest(TestBase):
         urlparse.parse_qs(task.payload))
     self.assertEquals('POST', task.method)
     self.assertEquals('my-name', task.name)
-    self.assertEquals(now, task.eta)
+    self.assertEquals(now, test_shared.utc_to_local(task.eta))
 
   def testAccesorsUnknown(self):
     """Tests using accessors when they have unknown values."""
@@ -1767,7 +1766,7 @@ class PipelineContextTest(TestBase):
     pipeline_record.put()
     self.assertTrue(db.get(self.pipeline1_key) is not None)
 
-    start_time = datetime.datetime.utcnow()
+    start_time = datetime.datetime.now()
     when_list = [
       start_time + datetime.timedelta(seconds=(30 * i))
       for i in xrange(5)
@@ -1795,7 +1794,7 @@ class PipelineContextTest(TestBase):
           }, task['params'])
 
       next_eta = when_list[attempt] + datetime.timedelta(seconds=delay_seconds)
-      self.assertEquals(next_eta, task['eta'])
+      self.assertEquals(next_eta, test_shared.utc_to_local(task['eta']))
 
       pipeline_record = db.get(self.pipeline1_key)
       self.assertEquals(attempt + 1, pipeline_record.current_attempt)
