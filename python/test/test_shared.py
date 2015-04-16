@@ -20,6 +20,7 @@ import StringIO
 import base64
 import cgi
 import datetime
+import calendar
 import logging
 import random
 import re
@@ -36,7 +37,6 @@ from pipeline import models
 _PipelineRecord = pipeline.models._PipelineRecord
 _SlotRecord = pipeline.models._SlotRecord
 _BarrierRecord = pipeline.models._BarrierRecord
-
 
 def get_tasks(queue_name='default'):
   """Gets pending tasks from a queue, adding a 'params' dictionary to them.
@@ -102,6 +102,10 @@ def create_handler(handler_class, method, url, headers={}, input_body=''):
   handler.initialize(request, response)
   return handler
 
+def utc_to_local(utc_datetime):
+    timestamp = calendar.timegm(utc_datetime.timetuple())
+    local_datetime = datetime.datetime.fromtimestamp(timestamp)
+    return local_datetime.replace(microsecond=utc_datetime.microsecond)
 
 class TaskRunningMixin(object):
   """A mix-in that runs a Pipeline using tasks."""

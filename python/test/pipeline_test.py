@@ -40,7 +40,7 @@ except ImportError:
 from pipeline import common
 from pipeline import pipeline
 import test_shared
-from appengine_pipeline.test import testutil
+import testutil
 
 from google.appengine.api import mail
 from google.appengine.ext import blobstore
@@ -450,10 +450,10 @@ class PipelineTest(TestBase):
   def testStartEta(self):
     """Tests starting a pipeline with an eta."""
     stage = NothingPipeline('one', 'two', three='red', four=1234)
-    eta = datetime.datetime.utcnow() + datetime.timedelta(seconds=30)
+    eta = datetime.datetime.now() + datetime.timedelta(seconds=30)
     task = stage.start(return_task=True, eta=eta)
     self.assertEquals(0, len(test_shared.get_tasks()))
-    self.assertEquals(eta, task.eta.replace(tzinfo=None))
+    self.assertEquals(eta, test_shared.utc_to_local(task.eta))
 
   def testStartCountdownAndEta(self):
     """Tests starting a pipeline with both a countdown and eta."""
@@ -673,7 +673,7 @@ class PipelineTest(TestBase):
     """Tests the get_callback_task method."""
     stage = AsyncOutputlessPipeline()
     stage.start(idempotence_key='banana')
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now()
     task = stage.get_callback_task(
         params=dict(one='red', two='blue', three=12345),
         method='overridden',
@@ -688,7 +688,7 @@ class PipelineTest(TestBase):
         urlparse.parse_qs(task.payload))
     self.assertEquals('POST', task.method)
     self.assertEquals('my-name', task.name)
-    self.assertEquals(now, task.eta.replace(tzinfo=None))
+    self.assertEquals(now, test_shared.utc_to_local(task.eta))
 
   def testAccesorsUnknown(self):
     """Tests using accessors when they have unknown values."""
@@ -1766,7 +1766,7 @@ class PipelineContextTest(TestBase):
     pipeline_record.put()
     self.assertTrue(db.get(self.pipeline1_key) is not None)
 
-    start_time = datetime.datetime.utcnow()
+    start_time = datetime.datetime.now()
     when_list = [
       start_time + datetime.timedelta(seconds=(30 * i))
       for i in xrange(5)
@@ -1794,7 +1794,7 @@ class PipelineContextTest(TestBase):
           }, task['params'])
 
       next_eta = when_list[attempt] + datetime.timedelta(seconds=delay_seconds)
-      self.assertEquals(next_eta, task['eta'])
+      self.assertEquals(next_eta, test_shared.utc_to_local(task['eta']))
 
       pipeline_record = db.get(self.pipeline1_key)
       self.assertEquals(attempt + 1, pipeline_record.current_attempt)

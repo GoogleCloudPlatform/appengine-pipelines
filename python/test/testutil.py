@@ -49,31 +49,28 @@ def setup_for_testing(require_indexes=True, define_queues=[]):
   from google.appengine.api import memcache
   from google.appengine.api import queueinfo
   from google.appengine.datastore import datastore_stub_util
-  from google.appengine.tools import old_dev_appserver
-  from google.appengine.tools import dev_appserver_index
+  from google.appengine.ext import testbed
+  from google.appengine.ext.testbed import TASKQUEUE_SERVICE_NAME
   before_level = logging.getLogger().getEffectiveLevel()
   try:
+    testbed = testbed.Testbed()
     logging.getLogger().setLevel(100)
+    testbed.activate()
+    testbed.setup_env(app_id=TEST_APP_ID)
+    testbed.init_memcache_stub()
+
+    hr_policy = datastore_stub_util.PseudoRandomHRConsistencyPolicy(probability=1)
+    testbed.init_datastore_v3_stub(consistency_policy=hr_policy)
+
+    testbed.init_taskqueue_stub()
+
     root_path = os.path.realpath(os.path.dirname(__file__))
-    old_dev_appserver.SetupStubs(
-        TEST_APP_ID,
-        root_path=root_path,
-        login_url='',
-        datastore_path=tempfile.mktemp(suffix='datastore_stub'),
-        history_path=tempfile.mktemp(suffix='datastore_history'),
-        blobstore_path=tempfile.mktemp(suffix='blobstore_stub'),
-        require_indexes=require_indexes,
-        clear_datastore=False)
-    dev_appserver_index.SetupIndexes(TEST_APP_ID, root_path)
+    
     # Actually need to flush, even though we've reallocated. Maybe because the
     # memcache stub's cache is at the module level, not the API stub?
     memcache.flush_all()
   finally:
     logging.getLogger().setLevel(before_level)
-
-  datastore_stub = apiproxy_stub_map.apiproxy.GetStub('datastore_v3')
-  hr_policy = datastore_stub_util.PseudoRandomHRConsistencyPolicy(probability=1)
-  datastore_stub.SetConsistencyPolicy(hr_policy)
 
   taskqueue_stub = apiproxy_stub_map.apiproxy.GetStub('taskqueue')
   taskqueue_stub.queue_yaml_parser = (
