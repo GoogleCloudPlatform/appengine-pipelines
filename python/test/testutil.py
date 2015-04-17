@@ -27,15 +27,9 @@ import tempfile
 
 class TestSetupMixin(object):
 
-  test_app_id = 'my-app-id'
-  test_version_id = 'my-version.1234'
+  TEST_APP_ID = 'my-app-id'
+  TEST_VERSION_ID = 'my-version.1234'
 
-  os.environ['APPLICATION_ID'] = test_app_id
-  os.environ['CURRENT_VERSION_ID'] = test_version_id
-  os.environ['HTTP_HOST'] = '%s.appspot.com' % test_app_id
-  os.environ['DEFAULT_VERSION_HOSTNAME'] = os.environ['HTTP_HOST']
-  os.environ['CURRENT_MODULE_ID'] = 'foo-module'
-  
   def setUp(self):
     super(TestSetupMixin, self).setUp()
 
@@ -48,12 +42,18 @@ class TestSetupMixin(object):
 
     before_level = logging.getLogger().getEffectiveLevel()
 
+    os.environ['APPLICATION_ID'] = self.TEST_APP_ID
+    os.environ['CURRENT_VERSION_ID'] = self.TEST_VERSION_ID
+    os.environ['HTTP_HOST'] = '%s.appspot.com' % self.TEST_APP_ID
+    os.environ['DEFAULT_VERSION_HOSTNAME'] = os.environ['HTTP_HOST']
+    os.environ['CURRENT_MODULE_ID'] = 'foo-module'
+    
     try:
       logging.getLogger().setLevel(100)
 
       self.testbed = testbed.Testbed()
       self.testbed.activate()
-      self.testbed.setup_env(app_id=self.test_app_id, overwrite=True)
+      self.testbed.setup_env(app_id=self.TEST_APP_ID, overwrite=True)
       self.testbed.init_memcache_stub()
 
       hr_policy = datastore_stub_util.PseudoRandomHRConsistencyPolicy(probability=1)
