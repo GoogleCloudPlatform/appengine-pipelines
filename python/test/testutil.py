@@ -25,24 +25,20 @@ import os
 import sys
 import tempfile
 
-TEST_APP_ID = 'my-app-id'
-TEST_VERSION_ID = 'my-version.1234'
+class TestSetupMixin(object):
 
-# Assign the application ID up front here so we can create db.Key instances
-# before doing any other test setup.
-os.environ['APPLICATION_ID'] = TEST_APP_ID
-os.environ['CURRENT_VERSION_ID'] = TEST_VERSION_ID
-os.environ['HTTP_HOST'] = '%s.appspot.com' % TEST_APP_ID
-os.environ['DEFAULT_VERSION_HOSTNAME'] = os.environ['HTTP_HOST']
-os.environ['CURRENT_MODULE_ID'] = 'foo-module'
+  test_app_id = 'my-app-id'
+  test_version_id = 'my-version.1234'
 
-class TestSetupMixin():
-  def setup_environment(self, app_id = TEST_APP_ID, define_queues=[]):
-    """Sets up the stubs for testing.
+  os.environ['APPLICATION_ID'] = test_app_id
+  os.environ['CURRENT_VERSION_ID'] = test_version_id
+  os.environ['HTTP_HOST'] = '%s.appspot.com' % test_app_id
+  os.environ['DEFAULT_VERSION_HOSTNAME'] = os.environ['HTTP_HOST']
+  os.environ['CURRENT_MODULE_ID'] = 'foo-module'
+  
+  def setUp(self):
+    super(TestSetupMixin, self).setUp()
 
-    Args:
-      define_queues: Additional queues that should be available.
-    """
     from google.appengine.api import apiproxy_stub_map
     from google.appengine.api import memcache
     from google.appengine.api import queueinfo
@@ -57,7 +53,7 @@ class TestSetupMixin():
 
       self.testbed = testbed.Testbed()
       self.testbed.activate()
-      self.testbed.setup_env(app_id=app_id, overwrite=True)
+      self.testbed.setup_env(app_id=self.test_app_id, overwrite=True)
       self.testbed.init_memcache_stub()
 
       hr_policy = datastore_stub_util.PseudoRandomHRConsistencyPolicy(probability=1)
@@ -73,6 +69,7 @@ class TestSetupMixin():
     finally:
       logging.getLogger().setLevel(before_level)
 
+    define_queues=['other']
     taskqueue_stub = apiproxy_stub_map.apiproxy.GetStub('taskqueue')
     taskqueue_stub.queue_yaml_parser = (
         lambda x: queueinfo.LoadSingleQueue(
@@ -80,5 +77,6 @@ class TestSetupMixin():
             '\n'.join('- name: %s\n  rate: 1/s' % name
                       for name in define_queues)))
 
-  def teardown_environment(self):
+  def tearDown(self):
+    super(TestSetupMixin, self).tearDown()
     self.testbed.deactivate()

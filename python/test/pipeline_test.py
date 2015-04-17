@@ -58,12 +58,11 @@ class TestBase(testutil.TestSetupMixin, unittest.TestCase):
   """Base class for all tests in this module."""
 
   def setUp(self):
-    super(TestBase, self).setup_environment(define_queues=['other'])
     super(TestBase, self).setUp()
     self.maxDiff = 10**10
 
   def tearDown(self):
-    super(TestBase, self).teardown_environment()
+    super(TestBase, self).tearDown()
 
   def assertIn(self, the_thing, what_thing_should_be_in):
     """Asserts that something is contained in something else."""
@@ -808,7 +807,9 @@ class PipelineTest(TestBase):
 
   def testFinalizeEmailDone_HighReplication(self):
     """Tests completion emails for completed root pipelines on HRD."""
-    super(PipelineTest, self).setup_environment(app_id='s~my-hrd-app', define_queues=['other'])
+
+    self.test_app_id = 's~my-hrd-app'
+    super(PipelineTest, self).setUp()
 
     stage = OutputlessPipeline()
     stage.start(idempotence_key='banana')
