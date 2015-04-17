@@ -54,11 +54,10 @@ _SlotRecord = pipeline.models._SlotRecord
 _StatusRecord = pipeline.models._StatusRecord
 
 
-class TestBase(unittest.TestCase):
+class TestBase(testutil.TestSetupMixin, unittest.TestCase):
   """Base class for all tests in this module."""
 
   def setUp(self):
-    testutil.setup_for_testing(define_queues=['other'])
     super(TestBase, self).setUp()
     self.maxDiff = 10**10
 
@@ -803,52 +802,6 @@ class PipelineTest(TestBase):
     self.assertTrue(stage.abort('gotta bail!'))
     self.assertFalse(stage.abort('gotta bail 2!'))
 
-  def testFinalizeEmailDone_HighReplication(self):
-    """Tests completion emails for completed root pipelines on HRD."""
-    old_app_id = os.environ['APPLICATION_ID']
-    testutil.TEST_APP_ID = 's~my-hrd-app'
-    os.environ['APPLICATION_ID'] = testutil.TEST_APP_ID
-    testutil.setup_for_testing(define_queues=['other'])
-    try:
-      stage = OutputlessPipeline()
-      stage.start(idempotence_key='banana')
-      stage._context.transition_complete(stage._pipeline_key)
-      other = OutputlessPipeline.from_id(stage.pipeline_id)
-
-      result = []
-      def fake_mail(self, sender, subject, body, html=None):
-        result.append((sender, subject, body, html))
-
-      old_sendmail = pipeline.Pipeline._send_mail
-      pipeline.Pipeline._send_mail = fake_mail
-      try:
-        other.send_result_email()
-      finally:
-        pipeline.Pipeline._send_mail = old_sendmail
-
-      self.assertEquals(1, len(result))
-      sender, subject, body, html = result[0]
-      self.assertEquals('my-hrd-app@my-hrd-app.appspotmail.com', sender)
-      self.assertEquals(
-          'Pipeline successful: App "my-hrd-app", '
-          '__main__.OutputlessPipeline#banana',
-          subject)
-      self.assertEquals(
-          'View the pipeline results here:\n\n'
-          'http://my-hrd-app.appspot.com/_ah/pipeline/status?root=banana\n\n'
-          'Thanks,\n\nThe Pipeline API\n',
-          body)
-      self.assertEquals(
-          '<html><body>\n<p>View the pipeline results here:</p>\n\n<p><a href="'
-          'http://my-hrd-app.appspot.com/_ah/pipeline/status?root=banana"\n'
-          '>http://my-hrd-app.appspot.com/_ah/pipeline/status?root=banana'
-          '</a></p>\n\n<p>\nThanks,\n<br>\nThe Pipeline API\n</p>\n'
-          '</body></html>\n',
-          html)
-    finally:
-      testutil.TEST_APP_ID = old_app_id
-      os.environ['APPLICATION_ID'] = old_app_id
-
   def testFinalizeEmailDone(self):
     """Tests completion emails for completed root pipelines."""
     stage = OutputlessPipeline()
@@ -1157,6 +1110,49 @@ class OrderingTest(TestBase):
     self.assertRaises(pipeline.UnexpectedPipelineError, inorder2.__enter__)
     inorder.__exit__(None, None, None)
 
+
+class EmailOnHighReplicationTest(TestBase):
+
+  TEST_APP_ID = 's~my-hrd-app'
+
+  def testFinalizeEmailDone_HighReplication(self):
+    """Tests completion emails for completed root pipelines on HRD."""
+
+    stage = OutputlessPipeline()
+    stage.start(idempotence_key='banana')
+    stage._context.transition_complete(stage._pipeline_key)
+    other = OutputlessPipeline.from_id(stage.pipeline_id)
+
+    result = []
+    def fake_mail(self, sender, subject, body, html=None):
+        result.append((sender, subject, body, html))
+
+    old_sendmail = pipeline.Pipeline._send_mail
+    pipeline.Pipeline._send_mail = fake_mail
+    try:
+        other.send_result_email()
+    finally:
+        pipeline.Pipeline._send_mail = old_sendmail
+
+    self.assertEquals(1, len(result))
+    sender, subject, body, html = result[0]
+    self.assertEquals('my-hrd-app@my-hrd-app.appspotmail.com', sender)
+    self.assertEquals(
+      'Pipeline successful: App "my-hrd-app", '
+      '__main__.OutputlessPipeline#banana',
+      subject)
+    self.assertEquals(
+      'View the pipeline results here:\n\n'
+      'http://my-hrd-app.appspot.com/_ah/pipeline/status?root=banana\n\n'
+      'Thanks,\n\nThe Pipeline API\n',
+      body)
+    self.assertEquals(
+      '<html><body>\n<p>View the pipeline results here:</p>\n\n<p><a href="'
+      'http://my-hrd-app.appspot.com/_ah/pipeline/status?root=banana"\n'
+      '>http://my-hrd-app.appspot.com/_ah/pipeline/status?root=banana'
+      '</a></p>\n\n<p>\nThanks,\n<br>\nThe Pipeline API\n</p>\n'
+      '</body></html>\n',
+      html)
 
 class GenerateArgs(pipeline.Pipeline):
   """Pipeline to test the _generate_args helper function."""
@@ -5074,6 +5070,7 @@ class StatusTest(TestBase):
     self.assertEquals(['__main__.EchoSync'],
                       [p['classPath'] for p in found['pipelines']])
 
+  
 
 if __name__ == '__main__':
   logging.getLogger().setLevel(logging.DEBUG)
