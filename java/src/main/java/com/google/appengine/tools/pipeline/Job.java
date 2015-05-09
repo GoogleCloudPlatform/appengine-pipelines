@@ -412,10 +412,8 @@ public abstract class Job<E> implements Serializable {
    *         will be filled at a later time when the external agent invokes
    *         {@link PipelineService#submitPromisedValue(String, Object)}. This
    *         may be passed in to further invocations of {@code futureCall()} in
-   *         order to specify a data dependency.
-   *         
-   *         Note: This method will return <code>null</code> if the slot for the
-   *         handle could not be found. 
+   *         order to specify a data dependency. This method will return 
+   *         <code>null</code> if the slot for the handle could not be found. 
    */
   public <F> PromisedValue<F> promise(String promiseHandle) {
     Slot slot = PipelineManager.getPromisedValueSlot(promiseHandle);
