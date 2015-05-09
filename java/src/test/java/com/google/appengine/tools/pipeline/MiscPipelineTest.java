@@ -644,4 +644,95 @@ public class MiscPipelineTest extends PipelineTest {
       return immediate(bytes.length);
     }
   }
+  
+  public void testUnfilledPromiseFromHandle() throws Exception {
+    PipelineService service = PipelineServiceFactory.newPipelineService();
+    String pipelineId = service
+        .startNewPipeline(new UnfilledPromiseFromHandleParentJob());
+    String value = waitForJobToComplete(pipelineId);
+    assertEquals("1323", value);
+  }
+
+  @SuppressWarnings("serial")
+  private static class UnfilledPromiseFromHandleParentJob extends Job0<String> {
+
+    @Override
+    public Value<String> run() throws Exception {
+      PromisedValue<String> promise = newPromise();
+      FutureValue<String> child1 = futureCall(new PromiseDelegateJob(),
+          immediate("1"), immediate(promise.getHandle()));
+      FutureValue<String> child2 = futureCall(new PromiseDelegateJob(),
+          immediate("2"), immediate(promise.getHandle()));
+      futureCall(new FillPromiseJob(), immediate("3"),
+          immediate(promise.getHandle()));
+      FutureValue<String> child4 = futureCall(new StringAdderJob(), child1,
+          child2);
+      return child4;
+    }
+  }
+
+  @SuppressWarnings("serial")
+  private static class PromiseDelegateJob extends Job2<String, String, String> {
+    @Override
+    public Value<String> run(String value, String handle) {
+      PromisedValue<String> promise = promise(handle);
+      FutureValue<String> added = futureCall(new StringAdderJob(),
+          immediate(value), promise);
+      return added;
+    }
+  }
+
+  @SuppressWarnings("serial")
+  private static class StringAdderJob extends Job2<String, String, String> {
+    @Override
+    public Value<String> run(String value1, String value2) {
+      return immediate(value1 + value2);
+    }
+  }
+
+  public void testFilledPromiseFromHandle() throws Exception {
+    PipelineService service = PipelineServiceFactory.newPipelineService();
+    String pipelineId = service
+        .startNewPipeline(new FilledPromiseFromHandleParentJob());
+    String value = waitForJobToComplete(pipelineId);
+    assertEquals("1323", value);
+  }
+
+  @SuppressWarnings("serial")
+  private static class FilledPromiseFromHandleParentJob extends Job0<String> {
+
+    @Override
+    public Value<String> run() throws Exception {
+      PromisedValue<String> promise = newPromise();
+      waitFor(futureCall(new FillPromiseJob(), immediate("3"),
+          immediate(promise.getHandle())));
+
+      FutureValue<String> child1 = futureCall(new PromiseDelegateJob(),
+          immediate("1"), immediate(promise.getHandle()));
+      FutureValue<String> child2 = futureCall(new PromiseDelegateJob(),
+          immediate("2"), immediate(promise.getHandle()));
+
+      return futureCall(new StringAdderJob(), child1, child2);
+    }
+  }
+
+  public void testPromiseFromNonExistentHandle() throws Exception {
+    PipelineService service = PipelineServiceFactory.newPipelineService();
+    String pipelineId = service
+        .startNewPipeline(new PromiseFromNonExistentHandleParentJob());
+    String value = waitForJobToComplete(pipelineId);
+    assertNull(value);
+  }
+
+  @SuppressWarnings("serial")
+  private static class PromiseFromNonExistentHandleParentJob extends
+      Job0<String> {
+
+    @Override
+    public Value<String> run() throws Exception {
+      PromisedValue<String> promise = promise("SOME_NON_HANDLE");
+      return immediate(promise == null ? null : "This is odd!");
+    }
+  }
+  
 }
