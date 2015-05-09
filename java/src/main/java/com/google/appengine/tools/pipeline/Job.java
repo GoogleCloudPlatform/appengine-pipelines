@@ -405,7 +405,6 @@ public abstract class Job<E> implements Serializable {
    * that will be provided asynchronously by some external agent. This can be
    * used to share the same value with child {@link Job}s
    * 
-   * 
    * @param promiseHandle The unique identifier for the {@link PromisedValue}
    *        obtained during the execution of some job via the method
    *        {@link PromisedValue#getHandle()}.
