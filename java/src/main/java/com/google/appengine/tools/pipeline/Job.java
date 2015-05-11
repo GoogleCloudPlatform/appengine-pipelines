@@ -401,9 +401,9 @@ public abstract class Job<E> implements Serializable {
   
   /**
    * Invoke this method from within the {@code run} method of a <b>generator
-   * job</b> in order to get some value that has been previously declared and
-   * that will be provided asynchronously by some external agent. This can be
-   * used to share the same value with child {@link Job}s
+   * job</b> in order to get a promised value that was created by an ancestor
+   * job that will be provided asynchronously by some external agent. This can 
+   * be used to share the same value with child {@link Job}s
    * 
    * @param promiseHandle The unique identifier for the {@link PromisedValue}
    *        obtained during the execution of some job via the method
@@ -419,7 +419,7 @@ public abstract class Job<E> implements Serializable {
     Slot slot = PipelineManager.getPromisedValueSlot(promiseHandle);
     PromisedValueImpl<F> promisedValue = null;
     if (slot != null) {
-      promisedValue = new PromisedValueImpl<F>(slot);
+      promisedValue = new PromisedValueImpl<>(slot);
     }
     return promisedValue;
   }
