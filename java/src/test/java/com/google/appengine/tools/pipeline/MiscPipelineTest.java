@@ -16,6 +16,7 @@ package com.google.appengine.tools.pipeline;
 
 import com.google.appengine.tools.pipeline.JobInfo.State;
 import com.google.appengine.tools.pipeline.JobSetting.StatusConsoleUrl;
+import com.google.appengine.tools.pipeline.JobSetting.WaitForSetting;
 import com.google.appengine.tools.pipeline.impl.PipelineManager;
 import com.google.appengine.tools.pipeline.impl.model.JobRecord;
 import com.google.appengine.tools.pipeline.impl.model.PipelineObjects;
@@ -647,8 +648,7 @@ public class MiscPipelineTest extends PipelineTest {
   
   public void testUnfilledPromiseFromHandle() throws Exception {
     PipelineService service = PipelineServiceFactory.newPipelineService();
-    String pipelineId = service
-        .startNewPipeline(new UnfilledPromiseFromHandleParentJob());
+    String pipelineId = service.startNewPipeline(new UnfilledPromiseFromHandleParentJob());
     String value = waitForJobToComplete(pipelineId);
     assertEquals("1323", value);
   }
@@ -659,14 +659,12 @@ public class MiscPipelineTest extends PipelineTest {
     @Override
     public Value<String> run() throws Exception {
       PromisedValue<String> promise = newPromise();
-      FutureValue<String> child1 = futureCall(new PromiseDelegateJob(),
-          immediate("1"), immediate(promise.getHandle()));
-      FutureValue<String> child2 = futureCall(new PromiseDelegateJob(),
-          immediate("2"), immediate(promise.getHandle()));
-      futureCall(new FillPromiseJob(), immediate("3"),
+      FutureValue<String> child1 = futureCall(new PromiseDelegateJob(), immediate("1"),
           immediate(promise.getHandle()));
-      FutureValue<String> child4 = futureCall(new StringAdderJob(), child1,
-          child2);
+      FutureValue<String> child2 = futureCall(new PromiseDelegateJob(), immediate("2"),
+          immediate(promise.getHandle()));
+      futureCall(new FillPromiseJob(), immediate("3"), immediate(promise.getHandle()));
+      FutureValue<String> child4 = futureCall(new StringAdderJob(), child1, child2);
       return child4;
     }
   }
@@ -676,8 +674,7 @@ public class MiscPipelineTest extends PipelineTest {
     @Override
     public Value<String> run(String value, String handle) {
       PromisedValue<String> promise = promise(handle);
-      FutureValue<String> added = futureCall(new StringAdderJob(),
-          immediate(value), promise);
+      FutureValue<String> added = futureCall(new StringAdderJob(), immediate(value), promise);
       return added;
     }
   }
@@ -692,8 +689,7 @@ public class MiscPipelineTest extends PipelineTest {
 
   public void testFilledPromiseFromHandle() throws Exception {
     PipelineService service = PipelineServiceFactory.newPipelineService();
-    String pipelineId = service
-        .startNewPipeline(new FilledPromiseFromHandleParentJob());
+    String pipelineId = service.startNewPipeline(new FilledPromiseFromHandleParentJob());
     String value = waitForJobToComplete(pipelineId);
     assertEquals("1323", value);
   }
@@ -704,13 +700,13 @@ public class MiscPipelineTest extends PipelineTest {
     @Override
     public Value<String> run() throws Exception {
       PromisedValue<String> promise = newPromise();
-      waitFor(futureCall(new FillPromiseJob(), immediate("3"),
+      WaitForSetting wait = waitFor(futureCall(new FillPromiseJob(), immediate("3"),
           immediate(promise.getHandle())));
 
-      FutureValue<String> child1 = futureCall(new PromiseDelegateJob(),
-          immediate("1"), immediate(promise.getHandle()));
-      FutureValue<String> child2 = futureCall(new PromiseDelegateJob(),
-          immediate("2"), immediate(promise.getHandle()));
+      FutureValue<String> child1 = futureCall(new PromiseDelegateJob(), immediate("1"),
+          immediate(promise.getHandle()), wait);
+      FutureValue<String> child2 = futureCall(new PromiseDelegateJob(), immediate("2"),
+          immediate(promise.getHandle()), wait);
 
       return futureCall(new StringAdderJob(), child1, child2);
     }
@@ -718,20 +714,18 @@ public class MiscPipelineTest extends PipelineTest {
 
   public void testPromiseFromNonExistentHandle() throws Exception {
     PipelineService service = PipelineServiceFactory.newPipelineService();
-    String pipelineId = service
-        .startNewPipeline(new PromiseFromNonExistentHandleParentJob());
-    String value = waitForJobToComplete(pipelineId);
-    assertNull(value);
+    String pipelineId = service.startNewPipeline(new PromiseFromNonExistentHandleParentJob());
+    Boolean value = waitForJobToComplete(pipelineId);
+    assertTrue(value);
   }
 
   @SuppressWarnings("serial")
-  private static class PromiseFromNonExistentHandleParentJob extends
-      Job0<String> {
+  private static class PromiseFromNonExistentHandleParentJob extends Job0<Boolean> {
 
     @Override
-    public Value<String> run() throws Exception {
+    public Value<Boolean> run() throws Exception {
       PromisedValue<String> promise = promise("SOME_NON_HANDLE");
-      return immediate(promise == null ? null : "This is odd!");
+      return immediate(promise == null);
     }
   }
   
