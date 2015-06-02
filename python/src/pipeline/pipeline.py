@@ -1231,7 +1231,7 @@ def _write_json_blob(encoded_value):
     The blobstore.BlobKey for the file that was created.
   """
   default_bucket = app_identity.get_default_gcs_bucket_name()
-  file_name = "/%s/%s" % (default_bucket, str(uuid.uuid4()))
+  file_name = "/%s/appengine_pipeline/%s" % (default_bucket, str(uuid.uuid4()))
   with cloudstorage.open(file_name, 'w', content_type='application/json') as f:
     for start_index in xrange(0, len(encoded_value), _MAX_JSON_SIZE):
       end_index = start_index + _MAX_JSON_SIZE
