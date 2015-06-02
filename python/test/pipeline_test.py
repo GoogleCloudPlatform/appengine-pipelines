@@ -45,6 +45,7 @@ import testutil
 from google.appengine.api import mail
 from google.appengine.ext import blobstore
 from google.appengine.ext import db
+from google.appengine.ext import testbed
 
 # For convenience.
 _BarrierIndex = pipeline.models._BarrierIndex
@@ -60,6 +61,15 @@ class TestBase(testutil.TestSetupMixin, unittest.TestCase):
   def setUp(self):
     super(TestBase, self).setUp()
     self.maxDiff = 10**10
+    # First, create an instance of the Testbed class.
+    self.testbed = testbed.Testbed()
+    # Then activate the testbed, which prepares the service stubs for use.
+    self.testbed.activate()
+    # Next, declare which service stubs you want to use.
+    self.testbed.init_all_stubs()
+
+  def tearDown(self):
+    self.testbed.deactivate()
 
   def assertIn(self, the_thing, what_thing_should_be_in):
     """Asserts that something is contained in something else."""
