@@ -39,10 +39,12 @@ import time
 import urllib
 import uuid
 
+import cloudstorage
 from google.appengine.api import mail
-from google.appengine.api import files
+from google.appengine.api import app_identity
 from google.appengine.api import users
 from google.appengine.api import taskqueue
+from google.appengine.ext import blobstore
 from google.appengine.ext import db
 from google.appengine.ext import webapp
 
@@ -1228,19 +1230,16 @@ def _write_json_blob(encoded_value):
   Returns:
     The blobstore.BlobKey for the file that was created.
   """
-  file_name = files.blobstore.create(mime_type='application/json')
-  handle = files.open(file_name, 'a')
-  try:
-    # Chunk the file into individual writes of less than 1MB, since the files
-    # API does not do buffered writes implicitly.
+  default_bucket = app_identity.get_default_gcs_bucket_name()
+  file_name = "/%s/%s" % (default_bucket, str(uuid.uuid4()))
+  with cloudstorage.open(file_name, 'w', content_type='application/json') as f:
     for start_index in xrange(0, len(encoded_value), _MAX_JSON_SIZE):
       end_index = start_index + _MAX_JSON_SIZE
-      handle.write(encoded_value[start_index:end_index])
-  finally:
-    handle.close()
+      f.write(encoded_value[start_index:end_index])
 
-  files.finalize(file_name)
-  return files.blobstore.get_blob_key(file_name)
+  key_str = blobstore.create_gs_key("/gs" + file_name)
+  logging.debug("Created blob for filename = %s gs_key = %s", file_name, key_str)
+  return blobstore.BlobKey(key_str)
 
 
 def _dereference_args(pipeline_name, args, kwargs):
