@@ -40,7 +40,6 @@ import time
 import urllib
 import uuid
 
-import cloudstorage
 from google.appengine.api import mail
 from google.appengine.api import app_identity
 from google.appengine.api import users
@@ -48,6 +47,16 @@ from google.appengine.api import taskqueue
 from google.appengine.ext import blobstore
 from google.appengine.ext import db
 from google.appengine.ext import webapp
+
+# pylint: disable=g-import-not-at-top
+# TODO(user): Cleanup imports if/when cloudstorage becomes part of runtime.
+try:
+  # Check if the full cloudstorage package exists. The stub part is in runtime.
+  import cloudstorage
+  if hasattr(cloudstorage, "_STUB"):
+    cloudstorage = None
+except ImportError:
+  pass  # CloudStorage library not available
 
 try:
   import json
