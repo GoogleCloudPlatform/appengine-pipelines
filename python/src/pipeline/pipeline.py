@@ -1472,7 +1472,7 @@ class _PipelineContext(object):
         value_text = db.Text(encoded_value)
       else:
         # The encoded value is too big. Save it as a blob.
-        value_blob = _write_json_blob(encoded_value, str(filler_pipeline_key))
+        value_blob = _write_json_blob(encoded_value, filler_pipeline_key.name())
 
       def txn():
         slot_record = db.get(slot.key)
