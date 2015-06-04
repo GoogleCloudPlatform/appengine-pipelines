@@ -31,6 +31,7 @@ import hashlib
 import itertools
 import logging
 import os
+import posixpath
 import pprint
 import re
 import sys
@@ -40,11 +41,22 @@ import urllib
 import uuid
 
 from google.appengine.api import mail
-from google.appengine.api import files
+from google.appengine.api import app_identity
 from google.appengine.api import users
 from google.appengine.api import taskqueue
+from google.appengine.ext import blobstore
 from google.appengine.ext import db
 from google.appengine.ext import webapp
+
+# pylint: disable=g-import-not-at-top
+# TODO(user): Cleanup imports if/when cloudstorage becomes part of runtime.
+try:
+  # Check if the full cloudstorage package exists. The stub part is in runtime.
+  import cloudstorage
+  if hasattr(cloudstorage, "_STUB"):
+    cloudstorage = None
+except ImportError:
+  pass  # CloudStorage library not available
 
 try:
   import json
@@ -1219,28 +1231,36 @@ def _short_repr(obj):
   return stringified
 
 
-def _write_json_blob(encoded_value):
-  """Writes a JSON encoded value to a Blobstore File.
-
+def _write_json_blob(encoded_value, pipeline_id=None):
+  """Writes a JSON encoded value to a Cloud Storage File.
+  
+  This function will store the blob in a GCS file in the default bucket under
+  the appengine_pipeline directory. Optionally using another directory level
+  specified by pipeline_id
   Args:
     encoded_value: The encoded JSON string.
+    pipeline_id: A pipeline id to segment files in Cloud Storage, if none, 
+      the file will be created under appengine_pipeline
 
   Returns:
     The blobstore.BlobKey for the file that was created.
   """
-  file_name = files.blobstore.create(mime_type='application/json')
-  handle = files.open(file_name, 'a')
-  try:
-    # Chunk the file into individual writes of less than 1MB, since the files
-    # API does not do buffered writes implicitly.
+  
+  default_bucket = app_identity.get_default_gcs_bucket_name()
+  path_components = ['/', default_bucket, "appengine_pipeline"]
+  if pipeline_id:
+    path_components.append(pipeline_id)
+  path_components.append(uuid.uuid4().hex)
+  # Use posixpath to get a / even if we're running on windows somehow
+  file_name = posixpath.join(*path_components)
+  with cloudstorage.open(file_name, 'w', content_type='application/json') as f:
     for start_index in xrange(0, len(encoded_value), _MAX_JSON_SIZE):
       end_index = start_index + _MAX_JSON_SIZE
-      handle.write(encoded_value[start_index:end_index])
-  finally:
-    handle.close()
+      f.write(encoded_value[start_index:end_index])
 
-  files.finalize(file_name)
-  return files.blobstore.get_blob_key(file_name)
+  key_str = blobstore.create_gs_key("/gs" + file_name)
+  logging.debug("Created blob for filename = %s gs_key = %s", file_name, key_str)
+  return blobstore.BlobKey(key_str)
 
 
 def _dereference_args(pipeline_name, args, kwargs):
@@ -1379,7 +1399,7 @@ def _generate_args(pipeline, future, queue_name, base_path):
   params_text = None
   params_blob = None
   if len(params_encoded) > _MAX_JSON_SIZE:
-    params_blob = _write_json_blob(params_encoded)
+    params_blob = _write_json_blob(params_encoded, pipeline.pipeline_id)
   else:
     params_text = params_encoded
 
@@ -1452,7 +1472,7 @@ class _PipelineContext(object):
         value_text = db.Text(encoded_value)
       else:
         # The encoded value is too big. Save it as a blob.
-        value_blob = _write_json_blob(encoded_value)
+        value_blob = _write_json_blob(encoded_value, filler_pipeline_key.name())
 
       def txn():
         slot_record = db.get(slot.key)
