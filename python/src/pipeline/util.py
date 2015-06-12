@@ -27,6 +27,8 @@ import inspect
 import logging
 import os
 
+from google.appengine.ext import ndb
+
 try:
   import json
 except ImportError:
@@ -208,6 +210,19 @@ def _json_decode_datetime(d):
   return datetime.datetime.strptime(d["isostr"], _DATETIME_FORMAT)
 
 
+def _json_encode_key(o):
+    """Json encode an ndb.Key object."""
+    return {'key_string': o.urlsafe()}
+
+
+def _json_decode_key(d):
+    """Json decode a ndb.Key object."""
+    k_c = d['key_string']
+    if isinstance(k_c, (list, tuple)):
+        return ndb.Key(flat=k_c)
+    return ndb.Key(urlsafe=d['key_string'])
+
+
 def _register_json_primitive(object_type, encoder, decoder):
   """Extend what Pipeline can serialize.
 
@@ -229,3 +244,4 @@ _TYPE_NAME_TO_DECODER = {}
 _register_json_primitive(datetime.datetime,
                          _json_encode_datetime,
                          _json_decode_datetime)
+_register_json_primitive(ndb.Key, _json_encode_key, _json_decode_key)
