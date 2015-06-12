@@ -32,6 +32,8 @@ try:
 except ImportError:
   import simplejson as json
 
+from google.appengine.ext import ndb
+
 # pylint: disable=protected-access
 
 
@@ -229,3 +231,17 @@ _TYPE_NAME_TO_DECODER = {}
 _register_json_primitive(datetime.datetime,
                          _json_encode_datetime,
                          _json_decode_datetime)
+
+# ndb.Key
+def _JsonEncodeKey(o):
+    """Json encode an ndb.Key object."""
+    return {'key_string': o.urlsafe()}
+
+def _JsonDecodeKey(d):
+    """Json decode a ndb.Key object."""
+    k_c = d['key_string']
+    if isinstance(k_c, (list, tuple)):
+        return ndb.Key(flat=k_c)
+    return ndb.Key(urlsafe=d['key_string'])
+
+_register_json_primitive(ndb.Key, _JsonEncodeKey, _JsonDecodeKey)
