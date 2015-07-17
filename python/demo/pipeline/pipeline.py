@@ -1,4 +1,4 @@
-#!/usr/bin/python2.5
+#!/usr/bin/env python
 #
 # Copyright 2010 Google Inc.
 #
@@ -46,9 +46,13 @@ from google.appengine.api import taskqueue
 from google.appengine.ext import db
 from google.appengine.ext import webapp
 
+try:
+  import json
+except ImportError:
+  import simplejson as json
+
 # Relative imports
 import models
-import simplejson
 import status_ui
 import util as mr_util
 
@@ -255,7 +259,7 @@ class Slot(object):
     self._filler_pipeline_key = filler_pipeline_key
     self._fill_datetime = datetime.datetime.utcnow()
     # Convert to JSON and back again, to simulate the behavior of production.
-    self._value = simplejson.loads(simplejson.dumps(
+    self._value = json.loads(json.dumps(
         value, cls=mr_util.JsonEncoder), cls=mr_util.JsonDecoder)
 
   def __repr__(self):
@@ -1371,7 +1375,7 @@ def _generate_args(pipeline, future, queue_name, base_path):
     output_slot_keys.add(slot.key)
     output_slots[name] = str(slot.key)
 
-  params_encoded = simplejson.dumps(params, cls=mr_util.JsonEncoder)
+  params_encoded = json.dumps(params, cls=mr_util.JsonEncoder)
   params_text = None
   params_blob = None
   if len(params_encoded) > _MAX_JSON_SIZE:
@@ -1439,7 +1443,7 @@ class _PipelineContext(object):
     if _TEST_MODE:
       slot._set_value_test(filler_pipeline_key, value)
     else:
-      encoded_value = simplejson.dumps(value,
+      encoded_value = json.dumps(value,
                                        sort_keys=True,
                                        cls=mr_util.JsonEncoder)
       value_text = None
@@ -1514,7 +1518,23 @@ class _PipelineContext(object):
       barrier_index_list = query.fetch(max_to_notify)
       barrier_key_list = [
           _BarrierIndex.to_barrier_key(key) for key in barrier_index_list]
-      results = db.get(barrier_key_list)
+
+      # If there are task and pipeline kickoff retries it's possible for a
+      # _BarrierIndex to exist for a _BarrierRecord that was not successfully
+      # written. It's safe to ignore this because the original task that wrote
+      # the _BarrierIndex and _BarrierRecord would not have made progress to
+      # kick off a real pipeline or child pipeline unless all of the writes for
+      # these dependent entities went through. We assume that the instigator
+      # retried from scratch and somehwere there exists a good _BarrierIndex and
+      # corresponding _BarrierRecord that tries to accomplish the same thing.
+      barriers = db.get(barrier_key_list)
+      results = []
+      for barrier_key, barrier in zip(barrier_key_list, barriers):
+        if barrier is None:
+          logging.debug('Ignoring that Barrier "%r" is missing, '
+                        'relies on Slot "%r"', barrier_key, slot_key)
+        else:
+          results.append(barrier)
     else:
       # TODO(user): Delete this backwards compatible codepath and
       # make use_barrier_indexes the assumed default in all cases.
@@ -1527,6 +1547,7 @@ class _PipelineContext(object):
     blocking_slot_keys = []
     for barrier in results:
       blocking_slot_keys.extend(barrier.blocking_slots)
+
     blocking_slot_dict = {}
     for slot_record in db.get(blocking_slot_keys):
       if slot_record is None:
@@ -2663,12 +2684,16 @@ class _FanoutHandler(webapp.RequestHandler):
         all_pipeline_keys.add(str(parent.fanned_out[index]))
 
     all_tasks = []
-    for pipeline_key in all_pipeline_keys:
+    all_pipelines = db.get([db.Key(pipeline_key) for pipeline_key in all_pipeline_keys])
+    for child_pipeline in all_pipelines:
+      if child_pipeline is None:
+        continue
       all_tasks.append(taskqueue.Task(
           url=context.pipeline_handler_path,
           params=dict(pipeline_key=pipeline_key),
+          target=child_pipeline.params['target'],
           headers={'X-Ae-Pipeline-Key': pipeline_key},
-          name='ae-pipeline-fan-out-' + db.Key(pipeline_key).name()))
+          name='ae-pipeline-fan-out-' + child_pipeline.key().name()))
 
     batch_size = 100  # Limit of taskqueue API bulk add.
     for i in xrange(0, len(all_tasks), batch_size):

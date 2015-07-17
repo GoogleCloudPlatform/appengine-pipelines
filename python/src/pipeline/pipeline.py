@@ -1,4 +1,4 @@
-#!/usr/bin/python2.5
+#!/usr/bin/env python
 #
 # Copyright 2010 Google Inc.
 #
@@ -31,6 +31,7 @@ import hashlib
 import itertools
 import logging
 import os
+import posixpath
 import pprint
 import re
 import sys
@@ -40,15 +41,30 @@ import urllib
 import uuid
 
 from google.appengine.api import mail
-from google.appengine.api import files
+from google.appengine.api import app_identity
 from google.appengine.api import users
 from google.appengine.api import taskqueue
+from google.appengine.ext import blobstore
 from google.appengine.ext import db
 from google.appengine.ext import webapp
 
+# pylint: disable=g-import-not-at-top
+# TODO(user): Cleanup imports if/when cloudstorage becomes part of runtime.
+try:
+  # Check if the full cloudstorage package exists. The stub part is in runtime.
+  import cloudstorage
+  if hasattr(cloudstorage, "_STUB"):
+    cloudstorage = None
+except ImportError:
+  pass  # CloudStorage library not available
+
+try:
+  import json
+except ImportError:
+  import simplejson as json
+
 # Relative imports
 import models
-import simplejson
 import status_ui
 import util as mr_util
 
@@ -254,7 +270,7 @@ class Slot(object):
     self._filler_pipeline_key = filler_pipeline_key
     self._fill_datetime = datetime.datetime.utcnow()
     # Convert to JSON and back again, to simulate the behavior of production.
-    self._value = simplejson.loads(simplejson.dumps(
+    self._value = json.loads(json.dumps(
         value, cls=mr_util.JsonEncoder), cls=mr_util.JsonDecoder)
 
   def __repr__(self):
@@ -1216,28 +1232,36 @@ def _short_repr(obj):
   return stringified
 
 
-def _write_json_blob(encoded_value):
-  """Writes a JSON encoded value to a Blobstore File.
-
+def _write_json_blob(encoded_value, pipeline_id=None):
+  """Writes a JSON encoded value to a Cloud Storage File.
+  
+  This function will store the blob in a GCS file in the default bucket under
+  the appengine_pipeline directory. Optionally using another directory level
+  specified by pipeline_id
   Args:
     encoded_value: The encoded JSON string.
+    pipeline_id: A pipeline id to segment files in Cloud Storage, if none, 
+      the file will be created under appengine_pipeline
 
   Returns:
     The blobstore.BlobKey for the file that was created.
   """
-  file_name = files.blobstore.create(mime_type='application/json')
-  handle = files.open(file_name, 'a')
-  try:
-    # Chunk the file into individual writes of less than 1MB, since the files
-    # API does not do buffered writes implicitly.
+  
+  default_bucket = app_identity.get_default_gcs_bucket_name()
+  path_components = ['/', default_bucket, "appengine_pipeline"]
+  if pipeline_id:
+    path_components.append(pipeline_id)
+  path_components.append(uuid.uuid4().hex)
+  # Use posixpath to get a / even if we're running on windows somehow
+  file_name = posixpath.join(*path_components)
+  with cloudstorage.open(file_name, 'w', content_type='application/json') as f:
     for start_index in xrange(0, len(encoded_value), _MAX_JSON_SIZE):
       end_index = start_index + _MAX_JSON_SIZE
-      handle.write(encoded_value[start_index:end_index])
-  finally:
-    handle.close()
+      f.write(encoded_value[start_index:end_index])
 
-  files.finalize(file_name)
-  return files.blobstore.get_blob_key(file_name)
+  key_str = blobstore.create_gs_key("/gs" + file_name)
+  logging.debug("Created blob for filename = %s gs_key = %s", file_name, key_str)
+  return blobstore.BlobKey(key_str)
 
 
 def _dereference_args(pipeline_name, args, kwargs):
@@ -1372,11 +1396,11 @@ def _generate_args(pipeline, future, queue_name, base_path):
     output_slot_keys.add(slot.key)
     output_slots[name] = str(slot.key)
 
-  params_encoded = simplejson.dumps(params, cls=mr_util.JsonEncoder)
+  params_encoded = json.dumps(params, cls=mr_util.JsonEncoder)
   params_text = None
   params_blob = None
   if len(params_encoded) > _MAX_JSON_SIZE:
-    params_blob = _write_json_blob(params_encoded)
+    params_blob = _write_json_blob(params_encoded, pipeline.pipeline_id)
   else:
     params_text = params_encoded
 
@@ -1440,7 +1464,7 @@ class _PipelineContext(object):
     if _TEST_MODE:
       slot._set_value_test(filler_pipeline_key, value)
     else:
-      encoded_value = simplejson.dumps(value,
+      encoded_value = json.dumps(value,
                                        sort_keys=True,
                                        cls=mr_util.JsonEncoder)
       value_text = None
@@ -1449,7 +1473,7 @@ class _PipelineContext(object):
         value_text = db.Text(encoded_value)
       else:
         # The encoded value is too big. Save it as a blob.
-        value_blob = _write_json_blob(encoded_value)
+        value_blob = _write_json_blob(encoded_value, filler_pipeline_key.name())
 
       def txn():
         slot_record = db.get(slot.key)
@@ -1515,7 +1539,23 @@ class _PipelineContext(object):
       barrier_index_list = query.fetch(max_to_notify)
       barrier_key_list = [
           _BarrierIndex.to_barrier_key(key) for key in barrier_index_list]
-      results = db.get(barrier_key_list)
+
+      # If there are task and pipeline kickoff retries it's possible for a
+      # _BarrierIndex to exist for a _BarrierRecord that was not successfully
+      # written. It's safe to ignore this because the original task that wrote
+      # the _BarrierIndex and _BarrierRecord would not have made progress to
+      # kick off a real pipeline or child pipeline unless all of the writes for
+      # these dependent entities went through. We assume that the instigator
+      # retried from scratch and somehwere there exists a good _BarrierIndex and
+      # corresponding _BarrierRecord that tries to accomplish the same thing.
+      barriers = db.get(barrier_key_list)
+      results = []
+      for barrier_key, barrier in zip(barrier_key_list, barriers):
+        if barrier is None:
+          logging.debug('Ignoring that Barrier "%r" is missing, '
+                        'relies on Slot "%r"', barrier_key, slot_key)
+        else:
+          results.append(barrier)
     else:
       # TODO(user): Delete this backwards compatible codepath and
       # make use_barrier_indexes the assumed default in all cases.
@@ -1528,14 +1568,14 @@ class _PipelineContext(object):
     blocking_slot_keys = []
     for barrier in results:
       blocking_slot_keys.extend(barrier.blocking_slots)
+
     blocking_slot_dict = {}
     for slot_record in db.get(blocking_slot_keys):
       if slot_record is None:
         continue
       blocking_slot_dict[slot_record.key()] = slot_record
 
-    task_list = []
-    updated_barriers = []
+    barriers_to_trigger = []
     for barrier in results:
       ready_slots = []
       for blocking_slot_key in barrier.blocking_slots:
@@ -1554,31 +1594,43 @@ class _PipelineContext(object):
       # the task name tombstones.
       pending_slots = set(barrier.blocking_slots) - set(ready_slots)
       if not pending_slots:
-        if barrier.status != _BarrierRecord.FIRED:
-          barrier.status = _BarrierRecord.FIRED
-          barrier.trigger_time = self._gettime()
-          updated_barriers.append(barrier)
-
-        purpose = barrier.key().name()
-        if purpose == _BarrierRecord.START:
-          path = self.pipeline_handler_path
-          countdown = None
-        else:
-          path = self.finalized_handler_path
-          # NOTE: Wait one second before finalization to prevent
-          # contention on the _PipelineRecord entity.
-          countdown = 1
-        pipeline_key = _BarrierRecord.target.get_value_for_datastore(barrier)
-        logging.debug('Firing barrier %r', barrier.key())
-        task_list.append(taskqueue.Task(
-            url=path,
-            countdown=countdown,
-            name='ae-barrier-fire-%s-%s' % (pipeline_key.name(), purpose),
-            params=dict(pipeline_key=pipeline_key, purpose=purpose),
-            headers={'X-Ae-Pipeline-Key': pipeline_key}))
+        barriers_to_trigger.append(barrier)
       else:
         logging.debug('Not firing barrier %r, Waiting for slots: %r',
                       barrier.key(), pending_slots)
+
+    pipeline_keys_to_trigger = [
+        _BarrierRecord.target.get_value_for_datastore(barrier)
+        for barrier in barriers_to_trigger]
+    pipelines_to_trigger = dict(zip(
+        pipeline_keys_to_trigger, db.get(pipeline_keys_to_trigger)))
+    task_list = []
+    updated_barriers = []
+    for barrier in barriers_to_trigger:
+      if barrier.status != _BarrierRecord.FIRED:
+        barrier.status = _BarrierRecord.FIRED
+        barrier.trigger_time = self._gettime()
+        updated_barriers.append(barrier)
+
+      purpose = barrier.key().name()
+      if purpose == _BarrierRecord.START:
+        path = self.pipeline_handler_path
+        countdown = None
+      else:
+        path = self.finalized_handler_path
+        # NOTE: Wait one second before finalization to prevent
+        # contention on the _PipelineRecord entity.
+        countdown = 1
+      pipeline_key = _BarrierRecord.target.get_value_for_datastore(barrier)
+      target = pipelines_to_trigger[pipeline_key].params.get('target')
+      logging.debug('Firing barrier %r', barrier.key())
+      task_list.append(taskqueue.Task(
+          url=path,
+          countdown=countdown,
+          name='ae-barrier-fire-%s-%s' % (pipeline_key.name(), purpose),
+          params=dict(pipeline_key=pipeline_key, purpose=purpose),
+          headers={'X-Ae-Pipeline-Key': pipeline_key},
+          target=target))
 
     # Blindly overwrite _BarrierRecords that have an updated status. This is
     # acceptable because by this point all finalization barriers for
@@ -2554,7 +2606,8 @@ class _PipelineContext(object):
             params=dict(pipeline_key=pipeline_key,
                         purpose=_BarrierRecord.START,
                         attempt=pipeline_record.current_attempt),
-            headers={'X-Ae-Pipeline-Key': pipeline_key})
+            headers={'X-Ae-Pipeline-Key': pipeline_key},
+            target=pipeline_record.params.get('target'))
         task.add(queue_name=self.queue_name, transactional=True)
 
       pipeline_record.put()
@@ -2664,12 +2717,17 @@ class _FanoutHandler(webapp.RequestHandler):
         all_pipeline_keys.add(str(parent.fanned_out[index]))
 
     all_tasks = []
-    for pipeline_key in all_pipeline_keys:
+    all_pipelines = db.get([db.Key(pipeline_key) for pipeline_key in all_pipeline_keys])
+    for child_pipeline in all_pipelines:
+      if child_pipeline is None:
+        continue
+      pipeline_key = str(child_pipeline.key())
       all_tasks.append(taskqueue.Task(
           url=context.pipeline_handler_path,
           params=dict(pipeline_key=pipeline_key),
+          target=child_pipeline.params.get('target'),
           headers={'X-Ae-Pipeline-Key': pipeline_key},
-          name='ae-pipeline-fan-out-' + db.Key(pipeline_key).name()))
+          name='ae-pipeline-fan-out-' + child_pipeline.key().name()))
 
     batch_size = 100  # Limit of taskqueue API bulk add.
     for i in xrange(0, len(all_tasks), batch_size):
@@ -2856,6 +2914,7 @@ def _get_internal_status(pipeline_key=None,
       outputs: Dictionary of output slot dictionaries.
       children: List of child pipeline IDs.
       queueName: Queue on which this pipeline is running.
+      target: Target version/module for the pipeline.
       afterSlotKeys: List of Slot Ids after which this pipeline runs.
       currentAttempt: Number of the current attempt, starting at 1.
       maxAttempts: Maximum number of attempts before aborting.
@@ -2923,6 +2982,7 @@ def _get_internal_status(pipeline_key=None,
     'outputs': params['output_slots'].copy(),
     'children': [key.name() for key in pipeline_record.fanned_out],
     'queueName': params['queue_name'],
+    'target': params['target'],
     'afterSlotKeys': [str(key) for key in params['after_all']],
     'currentAttempt': pipeline_record.current_attempt + 1,
     'maxAttempts': pipeline_record.max_attempts,

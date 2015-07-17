@@ -1,4 +1,4 @@
-#!/usr/bin/python2.5
+#!/usr/bin/env python
 """Tests for util.py."""
 
 import datetime
@@ -21,7 +21,7 @@ class JsonSerializationTest(unittest.TestCase):
   def testE2e(self):
     now = datetime.datetime.now()
     obj = {"a": 1, "b": [{"c": "d"}], "e": now}
-    new_obj = util.simplejson.loads(util.simplejson.dumps(
+    new_obj = util.json.loads(util.json.dumps(
         obj, cls=util.JsonEncoder), cls=util.JsonDecoder)
     self.assertEquals(obj, new_obj)
 

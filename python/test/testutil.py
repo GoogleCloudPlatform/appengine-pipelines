@@ -1,4 +1,4 @@
-#!/usr/bin/python2.5
+#!/usr/bin/env python
 #
 # Copyright 2009 Google Inc.
 #
@@ -25,59 +25,58 @@ import os
 import sys
 import tempfile
 
+class TestSetupMixin(object):
 
-TEST_APP_ID = 'my-app-id'
-TEST_VERSION_ID = 'my-version.1234'
+  TEST_APP_ID = 'my-app-id'
+  TEST_VERSION_ID = 'my-version.1234'
 
-# Assign the application ID up front here so we can create db.Key instances
-# before doing any other test setup.
-os.environ['APPLICATION_ID'] = TEST_APP_ID
-os.environ['CURRENT_VERSION_ID'] = TEST_VERSION_ID
-os.environ['HTTP_HOST'] = '%s.appspot.com' % TEST_APP_ID
-os.environ['DEFAULT_VERSION_HOSTNAME'] = os.environ['HTTP_HOST']
-os.environ['CURRENT_MODULE_ID'] = 'foo-module'
+  def setUp(self):
+    super(TestSetupMixin, self).setUp()
 
+    from google.appengine.api import apiproxy_stub_map
+    from google.appengine.api import memcache
+    from google.appengine.api import queueinfo
+    from google.appengine.datastore import datastore_stub_util
+    from google.appengine.ext import testbed
+    from google.appengine.ext.testbed import TASKQUEUE_SERVICE_NAME
 
-def setup_for_testing(require_indexes=True, define_queues=[]):
-  """Sets up the stubs for testing.
+    before_level = logging.getLogger().getEffectiveLevel()
 
-  Args:
-    require_indexes: True if indexes should be required for all indexes.
-    define_queues: Additional queues that should be available.
-  """
-  from google.appengine.api import apiproxy_stub_map
-  from google.appengine.api import memcache
-  from google.appengine.api import queueinfo
-  from google.appengine.datastore import datastore_stub_util
-  from google.appengine.tools import old_dev_appserver
-  from google.appengine.tools import dev_appserver_index
-  before_level = logging.getLogger().getEffectiveLevel()
-  try:
-    logging.getLogger().setLevel(100)
-    root_path = os.path.realpath(os.path.dirname(__file__))
-    old_dev_appserver.SetupStubs(
-        TEST_APP_ID,
-        root_path=root_path,
-        login_url='',
-        datastore_path=tempfile.mktemp(suffix='datastore_stub'),
-        history_path=tempfile.mktemp(suffix='datastore_history'),
-        blobstore_path=tempfile.mktemp(suffix='blobstore_stub'),
-        require_indexes=require_indexes,
-        clear_datastore=False)
-    dev_appserver_index.SetupIndexes(TEST_APP_ID, root_path)
-    # Actually need to flush, even though we've reallocated. Maybe because the
-    # memcache stub's cache is at the module level, not the API stub?
-    memcache.flush_all()
-  finally:
-    logging.getLogger().setLevel(before_level)
+    os.environ['APPLICATION_ID'] = self.TEST_APP_ID
+    os.environ['CURRENT_VERSION_ID'] = self.TEST_VERSION_ID
+    os.environ['HTTP_HOST'] = '%s.appspot.com' % self.TEST_APP_ID
+    os.environ['DEFAULT_VERSION_HOSTNAME'] = os.environ['HTTP_HOST']
+    os.environ['CURRENT_MODULE_ID'] = 'foo-module'
+    
+    try:
+      logging.getLogger().setLevel(100)
 
-  datastore_stub = apiproxy_stub_map.apiproxy.GetStub('datastore_v3')
-  hr_policy = datastore_stub_util.PseudoRandomHRConsistencyPolicy(probability=1)
-  datastore_stub.SetConsistencyPolicy(hr_policy)
+      self.testbed = testbed.Testbed()
+      self.testbed.activate()
+      self.testbed.setup_env(app_id=self.TEST_APP_ID, overwrite=True)
+      self.testbed.init_memcache_stub()
 
-  taskqueue_stub = apiproxy_stub_map.apiproxy.GetStub('taskqueue')
-  taskqueue_stub.queue_yaml_parser = (
-      lambda x: queueinfo.LoadSingleQueue(
-          'queue:\n- name: default\n  rate: 1/s\n' +
-          '\n'.join('- name: %s\n  rate: 1/s' % name
-                    for name in define_queues)))
+      hr_policy = datastore_stub_util.PseudoRandomHRConsistencyPolicy(probability=1)
+      self.testbed.init_datastore_v3_stub(consistency_policy=hr_policy)
+
+      self.testbed.init_taskqueue_stub()
+
+      root_path = os.path.realpath(os.path.dirname(__file__))
+      
+      # Actually need to flush, even though we've reallocated. Maybe because the
+      # memcache stub's cache is at the module level, not the API stub?
+      memcache.flush_all()
+    finally:
+      logging.getLogger().setLevel(before_level)
+
+    define_queues=['other']
+    taskqueue_stub = apiproxy_stub_map.apiproxy.GetStub('taskqueue')
+    taskqueue_stub.queue_yaml_parser = (
+        lambda x: queueinfo.LoadSingleQueue(
+            'queue:\n- name: default\n  rate: 1/s\n' +
+            '\n'.join('- name: %s\n  rate: 1/s' % name
+                      for name in define_queues)))
+
+  def tearDown(self):
+    super(TestSetupMixin, self).tearDown()
+    self.testbed.deactivate()

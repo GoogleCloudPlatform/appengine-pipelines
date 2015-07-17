@@ -1,4 +1,4 @@
-#!/usr/bin/python2.5
+#!/usr/bin/env python
 #
 # Copyright 2010 Google Inc.
 #
@@ -24,8 +24,12 @@ import traceback
 from google.appengine.api import users
 from google.appengine.ext import webapp
 
+try:
+  import json
+except ImportError:
+  import simplejson as json
+
 # Relative imports
-import simplejson
 import util
 
 
@@ -102,7 +106,7 @@ class _BaseRpcHandler(webapp.RequestHandler):
   """Base handler for JSON-RPC responses.
 
   Sub-classes should fill in the 'json_response' property. All exceptions will
-  be rturne
+  be returned.
   """
 
   def get(self):
@@ -125,16 +129,16 @@ class _BaseRpcHandler(webapp.RequestHandler):
     self.json_response = {}
     try:
       self.handle()
-      output = simplejson.dumps(self.json_response, cls=util.JsonEncoder)
+      output = json.dumps(self.json_response, cls=util.JsonEncoder)
     except Exception, e:
       self.json_response.clear()
       self.json_response['error_class'] = e.__class__.__name__
       self.json_response['error_message'] = str(e)
       self.json_response['error_traceback'] = traceback.format_exc()
-      output = simplejson.dumps(self.json_response, cls=util.JsonEncoder)
+      output = json.dumps(self.json_response, cls=util.JsonEncoder)
 
     self.response.set_status(200)
-    self.response.headers['Content-Type'] = 'text/javascript'
+    self.response.headers['Content-Type'] = 'application/json'
     self.response.headers['Cache-Control'] = 'no-cache'
     self.response.out.write(output)
 
