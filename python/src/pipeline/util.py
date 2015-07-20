@@ -1,4 +1,4 @@
-#!/usr/bin/python2.5
+#!/usr/bin/env python
 #
 # Copyright 2010 Google Inc.
 #
@@ -27,8 +27,12 @@ import inspect
 import logging
 import os
 
-# Relative imports
-import simplejson
+try:
+  import json
+except ImportError:
+  import simplejson as json
+
+from google.appengine.ext import ndb
 
 # pylint: disable=protected-access
 
@@ -150,7 +154,7 @@ def is_generator_function(obj):
                obj.func_code.co_flags & CO_GENERATOR))
 
 
-class JsonEncoder(simplejson.JSONEncoder):
+class JsonEncoder(json.JSONEncoder):
   """Pipeline customized json encoder."""
 
   TYPE_ID = "__pipeline_json_type"
@@ -167,7 +171,7 @@ class JsonEncoder(simplejson.JSONEncoder):
     return super(JsonEncoder, self).default(o)
 
 
-class JsonDecoder(simplejson.JSONDecoder):
+class JsonDecoder(json.JSONDecoder):
   """Pipeline customized json decoder."""
 
   def __init__(self, **kwargs):
@@ -229,3 +233,17 @@ _TYPE_NAME_TO_DECODER = {}
 _register_json_primitive(datetime.datetime,
                          _json_encode_datetime,
                          _json_decode_datetime)
+
+# ndb.Key
+def _JsonEncodeKey(o):
+    """Json encode an ndb.Key object."""
+    return {'key_string': o.urlsafe()}
+
+def _JsonDecodeKey(d):
+    """Json decode a ndb.Key object."""
+    k_c = d['key_string']
+    if isinstance(k_c, (list, tuple)):
+        return ndb.Key(flat=k_c)
+    return ndb.Key(urlsafe=d['key_string'])
+
+_register_json_primitive(ndb.Key, _JsonEncodeKey, _JsonDecodeKey)

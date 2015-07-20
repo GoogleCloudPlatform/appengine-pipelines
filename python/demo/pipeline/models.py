@@ -1,4 +1,4 @@
-#!/usr/bin/python2.5
+#!/usr/bin/env python
 #
 # Copyright 2010 Google Inc.
 #
@@ -19,8 +19,12 @@
 from google.appengine.ext import db
 from google.appengine.ext import blobstore
 
+try:
+  import json
+except ImportError:
+  import simplejson as json
+
 # Relative imports
-import simplejson
 import util
 
 
@@ -99,7 +103,7 @@ class _PipelineRecord(db.Model):
     else:
       value_encoded = self.params_text
 
-    value = simplejson.loads(value_encoded, cls=util.JsonDecoder)
+    value = json.loads(value_encoded, cls=util.JsonDecoder)
     if isinstance(value, dict):
       kwargs = value.get('kwargs')
       if kwargs:
@@ -159,7 +163,7 @@ class _SlotRecord(db.Model):
     else:
       encoded_value = self.value_text
 
-    self._value_decoded = simplejson.loads(encoded_value, cls=util.JsonDecoder)
+    self._value_decoded = json.loads(encoded_value, cls=util.JsonDecoder)
     return self._value_decoded
 
 

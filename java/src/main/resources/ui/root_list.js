@@ -43,7 +43,11 @@ function initRootListDone(response) {
   if (response.pipelines && response.pipelines.length > 0) {
     $('#root-list').show();
     if (response.cursor) {
-      $('#next-link').attr('href', '?cursor=' + response.cursor).show();
+      // Prepend the cursor to the next link. This may have a suffix of
+      // the class_path from initRootNamesDone() below.
+      var href = $('#next-link').attr('href');
+      $('#next-link').attr('href', '?cursor=' + response.cursor + href);
+      $('#next-link').show();
     }
 
     $.each(response.pipelines, function(index, infoMap) {
@@ -118,6 +122,10 @@ function initRootNamesDone(response) {
       var option = $('<option>').val(path).text(path);
       if (window.location.search.indexOf(path) != -1) {
         option.attr('selected', 'selected');
+        // Append the class name selected to the "next page" link. This
+        // may already have a value from initRootListDone() above.
+        var href = $('#next-link').attr('href');
+        $('#next-link').attr('href', href + '&class_path=' + path);
       }
       option.appendTo(filterMenu);
     });
