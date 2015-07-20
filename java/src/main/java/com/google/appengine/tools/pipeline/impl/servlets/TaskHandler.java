@@ -37,11 +37,14 @@ public class TaskHandler {
   private static Logger logger = Logger.getLogger(TaskHandler.class.getName());
 
   public static final String PATH_COMPONENT = "handleTask";
-  public static final String HANDLE_TASK_URL = PipelineServlet.BASE_URL + PATH_COMPONENT;
-
   public static final String TASK_NAME_REQUEST_HEADER = "X-AppEngine-TaskName";
   public static final String TASK_RETRY_COUNT_HEADER = "X-AppEngine-TaskRetryCount";
   public static final String TASK_QUEUE_NAME_HEADER = "X-AppEngine-QueueName";
+
+
+  public static String handleTaskUrl() {
+    return PipelineServlet.baseUrl() + PATH_COMPONENT;
+  }
 
   public static void doPost(HttpServletRequest req) throws ServletException {
     Task task = reconstructTask(req);
