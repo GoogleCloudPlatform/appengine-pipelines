@@ -84,9 +84,9 @@ import java.util.List;
  * A Job can provide an optional {@code handleException} method that is called
  * when any unhandled exception is thrown from its run method.
  * <p>
- * Before delivering an exception to the job’s handleException method the
+ * Before delivering an exception to the job's handleException method the
  * Pipelines framework cancels all descendants jobs that originated from the
- * parent’s run method. A descendant job is defined as a job that is either a
+ * parent's run method. A descendant job is defined as a job that is either a
  * child or the child of a child (and so on recursively) of the original job.
  * This cancellation is important for a number of reasons.
  * <ul>
@@ -109,7 +109,7 @@ import java.util.List;
  * A failure of a job that is a descendant of the handleException is handled in
  * the same manner as a failure of a job originated in the run method. All
  * failed job siblings originated in the handleException are cancelled and then
- * exception is propagated to the enclosing scope which is either ancestor’s run
+ * exception is propagated to the enclosing scope which is either ancestor's run
  * or handleException.
  * <p>
  * {@code handleException} methods must have a single argument of type
