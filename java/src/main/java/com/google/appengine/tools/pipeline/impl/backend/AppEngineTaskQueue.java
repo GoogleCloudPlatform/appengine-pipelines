@@ -136,7 +136,8 @@ public class AppEngineTaskQueue implements PipelineTaskQueue {
 
   private TaskOptions toTaskOptions(Task task) {
     final QueueSettings queueSettings = task.getQueueSettings();
-    TaskOptions taskOptions = TaskOptions.Builder.withUrl(TaskHandler.HANDLE_TASK_URL);
+
+    TaskOptions taskOptions = TaskOptions.Builder.withUrl(TaskHandler.handleTaskUrl());
     if (queueSettings.getOnBackend() != null) {
       taskOptions.header("Host", BackendServiceFactory.getBackendService().getBackendAddress(
           queueSettings.getOnBackend()));

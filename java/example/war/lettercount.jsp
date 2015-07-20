@@ -2,6 +2,7 @@
 <%@ page import="com.google.appengine.tools.pipeline.demo.*" %>
 <%@ page import="com.google.appengine.tools.pipeline.demo.LetterCountExample.LetterCounter" %>
 <%@ page import="java.util.SortedMap" %>
+<%@taglib uri="http://github.com/GoogleCloudPlatform/appengine-pipelines/functions" prefix="f" %>
 
 <%!
     private static final String TEXT_PARAM_NAME = "text";
@@ -141,9 +142,8 @@ Enter some text:
     if (null != pipelineId) {
 %>
 <p>
-    <a href="/_ah/pipeline/status.html?root=<%=pipelineId%>" target="Pipeline Status">view status
-        page</a>
-        <%
+  <a href="${f:baseUrl()}status.html?root=<%=pipelineId%>" target="Pipeline Status">view status page</a>
+<%
 }
 %>
 

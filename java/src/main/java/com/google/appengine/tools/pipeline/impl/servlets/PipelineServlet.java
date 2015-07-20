@@ -35,12 +35,23 @@ import javax.servlet.http.HttpServletResponse;
 @SuppressWarnings("serial")
 public class PipelineServlet extends HttpServlet {
 
-  // This must match the URL in web.xml
-  public static final String BASE_URL = "/_ah/pipeline/";
+  public static final String BASE_URL_PROPERTY = "com.google.appengine.tools.pipeline.BASE_URL";
+  public static final String BASE_URL = baseUrl();
+
+  /**
+   * Returns the Pipeline's BASE URL.
+   * This must match the URL in web.xml
+   */
+  public static String baseUrl() {
+    String baseURL =  System.getProperty(BASE_URL_PROPERTY, "/_ah/pipeline/");
+    if (!baseURL.endsWith("/")) {
+      baseURL += "/";
+    }
+    return baseURL;
+  }
 
   public static String makeViewerUrl(Key rootJobKey, Key jobKey) {
-    // TODO(user): BASE_URL could be replaced with ServletContext#getContextPath
-    return BASE_URL + "status.html?root=" + rootJobKey.getName() + "#pipeline-" + jobKey.getName();
+    return baseUrl() + "status.html?root=" + rootJobKey.getName() + "#pipeline-" + jobKey.getName();
   }
 
   private static enum RequestType {
