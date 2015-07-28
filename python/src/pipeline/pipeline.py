@@ -1246,7 +1246,13 @@ def _write_json_blob(encoded_value, pipeline_id=None):
     The blobstore.BlobKey for the file that was created.
   """
 
-  default_bucket = app_identity.get_default_gcs_bucket_name() or "default"
+  default_bucket = app_identity.get_default_gcs_bucket_name()
+  if default_bucket is None:
+    raise Exception(
+      "No default cloud storage bucket has been set for this application. "
+      "This app was likely created before v1.9.0, please see: "
+      "https://cloud.google.com/appengine/docs/php/googlestorage/setup")
+
   path_components = ['/', default_bucket, "appengine_pipeline"]
   if pipeline_id:
     path_components.append(pipeline_id)
