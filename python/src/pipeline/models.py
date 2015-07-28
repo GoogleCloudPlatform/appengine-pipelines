@@ -16,6 +16,8 @@
 
 """Datastore models used by the Google App Engine Pipeline API."""
 
+import unicodedata
+
 from google.appengine.ext import db
 from google.appengine.ext import ndb
 from google.appengine.ext import blobstore
@@ -28,16 +30,6 @@ except ImportError:
 # Relative imports
 import util
 
-def strip_accents(s):
-  """Strips unicode accents from a string"""
-  import unicodedata
-  if s is None:
-    return ''
-  if isinstance(s, str):
-    return s
-  return ''.join(c for c in unicodedata.normalize('NFKD', s)
-                 if unicodedata.category(c) != 'Mn')
-
 def truncate_value(value):
   """Shorten the given value, preserving dict structure."""
   if isinstance(value, dict):
@@ -46,23 +38,17 @@ def truncate_value(value):
     return value.urlsafe()
   elif isinstance(value, db.Key):
     return str(value.urlsafe)
-  else:
+  elif isinstance(value, basestring):
+    # do not truncate string/urlsafe db keys.
+    # TODO: When do we create an ndb.Key vs. db.Key
     try:
-      val = str(value)
-    except UnicodeEncodeError:
-      try:
-        val = unicode(value)
-      except UnicodeEncodeError:
-        val = strip_accents(value)
-
-    # do not truncate keys.
-    try:
-      ndb.Key(urlsafe=val)
-      return val
+      ndb.Key(urlsafe=value)
+      return value
     except:
-      pass
-
-    return val[:100]
+      val = value.encode('utf8')
+  else:
+    val = str(value)
+  return val[:100]
 
 class _PipelineRecord(db.Model):
   """Represents a Pipeline.

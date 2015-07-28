@@ -457,6 +457,9 @@ class Pipeline(object):
     self.backoff_seconds = _DEFAULT_BACKOFF_SECONDS
     self.backoff_factor = _DEFAULT_BACKOFF_FACTOR
     # Allow pipeline class to provide it's own default max attempts value.
+    # We keep the or logic here, a bit unintuitively, in order to
+    # allow a subclass to programmatically revert to the default by
+    # setting self.MAX_ATTEMPTS = None.
     self.max_attempts = (getattr(self, "MAX_ATTEMPTS", _DEFAULT_MAX_ATTEMPTS) or
                         _DEFAULT_MAX_ATTEMPTS)
     self.target = None
@@ -1234,19 +1237,19 @@ def _short_repr(obj):
 
 def _write_json_blob(encoded_value, pipeline_id=None):
   """Writes a JSON encoded value to a Cloud Storage File.
-  
+
   This function will store the blob in a GCS file in the default bucket under
   the appengine_pipeline directory. Optionally using another directory level
   specified by pipeline_id
   Args:
     encoded_value: The encoded JSON string.
-    pipeline_id: A pipeline id to segment files in Cloud Storage, if none, 
+    pipeline_id: A pipeline id to segment files in Cloud Storage, if none,
       the file will be created under appengine_pipeline
 
   Returns:
     The blobstore.BlobKey for the file that was created.
   """
-  
+
   default_bucket = app_identity.get_default_gcs_bucket_name()
   path_components = ['/', default_bucket, "appengine_pipeline"]
   if pipeline_id:

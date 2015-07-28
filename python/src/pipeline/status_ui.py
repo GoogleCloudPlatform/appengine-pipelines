@@ -164,6 +164,8 @@ class _TreeStatusHandler(_BaseRpcHandler):
     try:
       depth = int(self.request.get('depth'))
     except ValueError:
+      logging.debug("depth %r is non-integer, assuming no depth restriction",
+                    self.request.get('depth'))
       depth = None
     self.json_response.update(
         pipeline.get_status_tree(self.request.get('root_pipeline_id'), depth))
