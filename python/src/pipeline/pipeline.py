@@ -2904,7 +2904,6 @@ def _get_internal_status(pipeline_key=None,
       outputs: Dictionary of output slot dictionaries.
       children: List of child pipeline IDs.
       queueName: Queue on which this pipeline is running.
-      target: Target version/module for the pipeline.
       afterSlotKeys: List of Slot Ids after which this pipeline runs.
       currentAttempt: Number of the current attempt, starting at 1.
       maxAttempts: Maximum number of attempts before aborting.
@@ -2973,7 +2972,6 @@ def _get_internal_status(pipeline_key=None,
     'outputs': params['output_slots'].copy(),
     'children': [key.name() for key in pipeline_record.fanned_out],
     'queueName': params['queue_name'],
-    'target': params['target'],
     'afterSlotKeys': [str(key) for key in params['after_all']],
     'currentAttempt': pipeline_record.current_attempt + 1,
     'maxAttempts': pipeline_record.max_attempts,
