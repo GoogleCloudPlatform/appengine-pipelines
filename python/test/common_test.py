@@ -27,13 +27,12 @@ sys.path.insert(0, '../src/')
 from pipeline import common
 from pipeline import pipeline
 import test_shared
-from appengine_pipeline.test import testutil
+import testutil
 
 
-class CommonTest(test_shared.TaskRunningMixin, unittest.TestCase):
+class CommonTest(testutil.TestSetupMixin, test_shared.TaskRunningMixin, unittest.TestCase):
 
   def setUp(self):
-    testutil.setup_for_testing()
     super(CommonTest, self).setUp()
 
   def testReturn(self):

@@ -1,6 +1,7 @@
 <%@ page import="com.google.appengine.tools.pipeline.*" %>
 <%@ page import="com.google.appengine.tools.pipeline.demo.*" %>
 <%@ page import="com.google.appengine.tools.pipeline.demo.GCDExample.GCDJob" %>
+<%@taglib uri="http://github.com/GoogleCloudPlatform/appengine-pipelines/functions" prefix="f" %>
 
 <%!
     private static final String X_PARAM_NAME = "x";
@@ -133,9 +134,8 @@ Enter two positive integers:
     if (null != pipelineId) {
 %>
 <p>
-    <a href="/_ah/pipeline/status.html?root=<%=pipelineId%>" target="Pipeline Status">view status
-        page</a>
-        <%
+  <a href="${f:baseUrl()}status.html?root=<%=pipelineId%>" target="Pipeline Status">view status page</a>
+<%
 }
 %>
 

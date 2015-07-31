@@ -1205,6 +1205,11 @@ class InOrder(object):
 
   def __enter__(self):
     """When entering a 'with' block."""
+    # Reentrancy checking gives false errors in test mode since everything is
+    # on the same thread, and all pipelines are executed in order in test mode
+    # anyway, so disable InOrder for tests.
+    if _TEST_MODE:
+        return
     InOrder._thread_init()
     if InOrder._local._activated:
       raise UnexpectedPipelineError('Already in an InOrder "with" block.')
@@ -1213,6 +1218,8 @@ class InOrder(object):
 
   def __exit__(self, type, value, trace):
     """When exiting a 'with' block."""
+    if _TEST_MODE:
+        return
     InOrder._local._activated = False
     InOrder._local._in_order_futures.clear()
     return False
@@ -1251,6 +1258,12 @@ def _write_json_blob(encoded_value, pipeline_id=None):
   """
 
   default_bucket = app_identity.get_default_gcs_bucket_name()
+  if default_bucket is None:
+    raise Exception(
+      "No default cloud storage bucket has been set for this application. "
+      "This app was likely created before v1.9.0, please see: "
+      "https://cloud.google.com/appengine/docs/php/googlestorage/setup")
+
   path_components = ['/', default_bucket, "appengine_pipeline"]
   if pipeline_id:
     path_components.append(pipeline_id)
@@ -1948,16 +1961,6 @@ class _PipelineContext(object):
       else:
         # Generator yielded no children, so treat it as a sync function.
         stage.outputs.default._set_value_test(stage._pipeline_key, None)
-
-      # Enforce the policy of requiring all undeclared output slots from
-      # child pipelines to be consumed by their parent generator.
-      for slot in all_output_slots:
-        if slot.name == 'default':
-          continue
-        if slot.filled and not slot._strict and not slot._touched:
-          raise SlotNotDeclaredError(
-              'Undeclared output "%s"; all dynamic outputs from child '
-              'pipelines must be consumed.' % slot.name)
     else:
       try:
         result = stage.run_test(*stage.args, **stage.kwargs)

@@ -6,6 +6,7 @@
 
   <!-- Configure java.util.logging -->
   <system-properties>
+    <property name="com.google.appengine.tools.pipeline.BASE_URL" value="/pipeline/"/>
     <property name="java.util.logging.config.file" value="WEB-INF/logging.properties"/>
   </system-properties>
 

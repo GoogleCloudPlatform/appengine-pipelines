@@ -20,7 +20,6 @@ import com.google.appengine.tools.pipeline.impl.PipelineManager;
 import com.google.appengine.tools.pipeline.impl.PromisedValueImpl;
 import com.google.appengine.tools.pipeline.impl.backend.UpdateSpec;
 import com.google.appengine.tools.pipeline.impl.model.JobRecord;
-import com.google.appengine.tools.pipeline.impl.model.Slot;
 
 import java.io.Serializable;
 import java.util.List;
@@ -84,9 +83,9 @@ import java.util.List;
  * A Job can provide an optional {@code handleException} method that is called
  * when any unhandled exception is thrown from its run method.
  * <p>
- * Before delivering an exception to the job’s handleException method the
+ * Before delivering an exception to the job's handleException method the
  * Pipelines framework cancels all descendants jobs that originated from the
- * parent’s run method. A descendant job is defined as a job that is either a
+ * parent's run method. A descendant job is defined as a job that is either a
  * child or the child of a child (and so on recursively) of the original job.
  * This cancellation is important for a number of reasons.
  * <ul>
@@ -109,7 +108,7 @@ import java.util.List;
  * A failure of a job that is a descendant of the handleException is handled in
  * the same manner as a failure of a job originated in the run method. All
  * failed job siblings originated in the handleException are cancelled and then
- * exception is propagated to the enclosing scope which is either ancestor’s run
+ * exception is propagated to the enclosing scope which is either ancestor's run
  * or handleException.
  * <p>
  * {@code handleException} methods must have a single argument of type
@@ -380,47 +379,10 @@ public abstract class Job<E> implements Serializable {
     return promisedValue;
   }
 
-  /**
-   * Invoke this method from within the {@code run} method of a <b>generator
-   * job</b> in order to declare that some value will be provided asynchronously
-   * by some external agent.
-   *
-   * @param <F> The type of the asynchronously provided value.
-   * @return A {@code PromisedValue} that represents an empty value slot that
-   *         will be filled at a later time when the external agent invokes
-   *         {@link PipelineService#submitPromisedValue(String, Object)}. This
-   *         may be passed in to further invocations of {@code futureCall()} in
-   *         order to specify a data dependency.
-   */
   public <F> PromisedValue<F> newPromise() {
     PromisedValueImpl<F> promisedValue =
         new PromisedValueImpl<>(getPipelineKey(), thisJobRecord.getKey(), currentRunGUID);
     updateSpec.getNonTransactionalGroup().includeSlot(promisedValue.getSlot());
-    return promisedValue;
-  }
-  
-  /**
-   * Invoke this method from within the {@code run} method of a <b>generator
-   * job</b> in order to get a promised value that was created by an ancestor
-   * job that will be provided asynchronously by some external agent. This can 
-   * be used to share the same value with child {@link Job}s
-   * 
-   * @param promiseHandle The unique identifier for the {@link PromisedValue}
-   *        obtained during the execution of some job via the method
-   *        {@link PromisedValue#getHandle()}.
-   * @return A {@code PromisedValue} that represents an empty value slot that
-   *         will be filled at a later time when the external agent invokes
-   *         {@link PipelineService#submitPromisedValue(String, Object)}. This
-   *         may be passed in to further invocations of {@code futureCall()} in
-   *         order to specify a data dependency. This method will return 
-   *         <code>null</code> if the slot for the handle could not be found. 
-   */
-  public <F> PromisedValue<F> promise(String promiseHandle) {
-    Slot slot = PipelineManager.getPromisedValueSlot(promiseHandle);
-    PromisedValueImpl<F> promisedValue = null;
-    if (slot != null) {
-      promisedValue = new PromisedValueImpl<>(slot);
-    }
     return promisedValue;
   }
 
