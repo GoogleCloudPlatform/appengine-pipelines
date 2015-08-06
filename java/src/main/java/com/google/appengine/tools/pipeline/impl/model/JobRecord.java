@@ -351,10 +351,8 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
     if (queueSettings.getOnBackend() == null) {
       String module = queueSettings.getOnModule();
       if (module == null) {
-        BackendService backendSerivce = BackendServiceFactory.getBackendService();
-        String currentBackend = backendSerivce.getCurrentBackend();
-        // If currentBackend contains ':' it is actually a B type module (see b/12893879)
-        if (currentBackend != null && currentBackend.indexOf(':') == -1) {
+        String currentBackend = getCurrentBackend();
+        if (currentBackend != null) {
           queueSettings.setOnBackend(currentBackend);
         } else {
           ModulesService modulesService = ModulesServiceFactory.getModulesService();
@@ -370,6 +368,20 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
         }
       }
     }
+  }
+
+  private static String getCurrentBackend() {
+    if (Boolean.parseBoolean(System.getenv("GAE_VM"))) {
+      // MVM can't be a backend.
+      return null;
+    }
+    BackendService backendService = BackendServiceFactory.getBackendService();
+    String currentBackend = backendService.getCurrentBackend();
+    // If currentBackend contains ':' it is actually a B type module (see b/12893879)
+    if (currentBackend != null && currentBackend.indexOf(':') != -1) {
+      currentBackend = null;
+    }
+    return currentBackend;
   }
 
   // Constructor for Root Jobs (called by {@link #createRootJobRecord}).
