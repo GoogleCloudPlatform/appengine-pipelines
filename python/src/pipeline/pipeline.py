@@ -2015,6 +2015,13 @@ class _PipelineContext(object):
       return
     if pipeline_record.status not in (
         _PipelineRecord.WAITING, _PipelineRecord.RUN):
+
+      # If we're attempting to abort an already aborted pipeline,
+      # we silently advance. #50
+      if (pipeline_record.status == _PipelineRecord.ABORTED and
+            purpose == _BarrierRecord.ABORT):
+        return
+
       logging.error('Pipeline ID "%s" in bad state for purpose "%s": "%s"',
                     pipeline_key.name(), purpose or _BarrierRecord.START,
                     pipeline_record.status)
