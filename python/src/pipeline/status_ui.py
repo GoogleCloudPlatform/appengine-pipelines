@@ -100,7 +100,10 @@ class _StatusUiHandler(webapp.RequestHandler):
       (zip_file, zip_path) = os.path.relpath(path).split('.zip' + os.sep, 1)
       content = zipfile.ZipFile(zip_file + '.zip').read(zip_path)
     else:
-      content = open(path, 'rb').read()
+      try:
+        content = pkgutil.get_data(__name__, relative_path)
+      except AttributeError:  # Python < 2.6.
+        content = open(path, 'rb').read()
 
     if not pipeline._DEBUG:
       self.response.headers["Cache-Control"] = "public, max-age=300"
@@ -164,6 +167,8 @@ class _TreeStatusHandler(_BaseRpcHandler):
     try:
       depth = int(self.request.get('depth'))
     except ValueError:
+      logging.debug("depth %r is non-integer, assuming no depth restriction",
+                    self.request.get('depth'))
       depth = None
     self.json_response.update(
         pipeline.get_status_tree(self.request.get('root_pipeline_id'), depth))

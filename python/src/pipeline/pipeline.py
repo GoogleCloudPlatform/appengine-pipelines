@@ -457,6 +457,9 @@ class Pipeline(object):
     self.backoff_seconds = _DEFAULT_BACKOFF_SECONDS
     self.backoff_factor = _DEFAULT_BACKOFF_FACTOR
     # Allow pipeline class to provide it's own default max attempts value.
+    # We keep the or logic here, a bit unintuitively, in order to
+    # allow a subclass to programmatically revert to the default by
+    # setting self.MAX_ATTEMPTS = None.
     self.max_attempts = (getattr(self, "MAX_ATTEMPTS", _DEFAULT_MAX_ATTEMPTS) or
                         _DEFAULT_MAX_ATTEMPTS)
     self.target = None
@@ -1202,6 +1205,11 @@ class InOrder(object):
 
   def __enter__(self):
     """When entering a 'with' block."""
+    # Reentrancy checking gives false errors in test mode since everything is
+    # on the same thread, and all pipelines are executed in order in test mode
+    # anyway, so disable InOrder for tests.
+    if _TEST_MODE:
+        return
     InOrder._thread_init()
     if InOrder._local._activated:
       raise UnexpectedPipelineError('Already in an InOrder "with" block.')
@@ -1210,6 +1218,8 @@ class InOrder(object):
 
   def __exit__(self, type, value, trace):
     """When exiting a 'with' block."""
+    if _TEST_MODE:
+        return
     InOrder._local._activated = False
     InOrder._local._in_order_futures.clear()
     return False
@@ -1234,20 +1244,26 @@ def _short_repr(obj):
 
 def _write_json_blob(encoded_value, pipeline_id=None):
   """Writes a JSON encoded value to a Cloud Storage File.
-  
+
   This function will store the blob in a GCS file in the default bucket under
   the appengine_pipeline directory. Optionally using another directory level
   specified by pipeline_id
   Args:
     encoded_value: The encoded JSON string.
-    pipeline_id: A pipeline id to segment files in Cloud Storage, if none, 
+    pipeline_id: A pipeline id to segment files in Cloud Storage, if none,
       the file will be created under appengine_pipeline
 
   Returns:
     The blobstore.BlobKey for the file that was created.
   """
-  
+
   default_bucket = app_identity.get_default_gcs_bucket_name()
+  if default_bucket is None:
+    raise Exception(
+      "No default cloud storage bucket has been set for this application. "
+      "This app was likely created before v1.9.0, please see: "
+      "https://cloud.google.com/appengine/docs/php/googlestorage/setup")
+
   path_components = ['/', default_bucket, "appengine_pipeline"]
   if pipeline_id:
     path_components.append(pipeline_id)
@@ -1945,16 +1961,6 @@ class _PipelineContext(object):
       else:
         # Generator yielded no children, so treat it as a sync function.
         stage.outputs.default._set_value_test(stage._pipeline_key, None)
-
-      # Enforce the policy of requiring all undeclared output slots from
-      # child pipelines to be consumed by their parent generator.
-      for slot in all_output_slots:
-        if slot.name == 'default':
-          continue
-        if slot.filled and not slot._strict and not slot._touched:
-          raise SlotNotDeclaredError(
-              'Undeclared output "%s"; all dynamic outputs from child '
-              'pipelines must be consumed.' % slot.name)
     else:
       try:
         result = stage.run_test(*stage.args, **stage.kwargs)

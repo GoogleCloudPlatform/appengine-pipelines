@@ -917,9 +917,9 @@ function handleAbortClick(event) {
 
 function depthUrlArg() {
   if (DEPTH !== '') {
-    return '&depth=' + DEPTH
+    return '&depth=' + DEPTH;
   } else {
-    return ''
+    return '';
   }
 }
 
@@ -959,7 +959,7 @@ function initStatus() {
   var attempts = 1;
   var ajaxRequest = {
     type: 'GET',
-    url: 'rpc/tree?root_pipeline_id=' + ROOT_PIPELINE_ID + '&depth=' + DEPTH,
+    url: 'rpc/tree?root_pipeline_id=' + ROOT_PIPELINE_ID + depthUrlArg(),
     dataType: 'text',
     error: function(request, textStatus) {
       if (request.status == 404) {
