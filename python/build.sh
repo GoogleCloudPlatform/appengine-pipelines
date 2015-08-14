@@ -42,6 +42,7 @@ $dir/test:\
       echo "FAILED"
       ((exit_status++))
     fi
+    sleep 2
   done
 
   echo "----------------------------------------------------------------------"
@@ -54,6 +55,16 @@ $dir/test:\
   exit $exit_status
 }
 
+build_demo () {
+  fetch_dependencies
+  [ ! -d "$demo_dir/demo/pipeline" ] && ln -s "$demo_dir/src/" "$demo_dir/demo/pipeline"
+}
+
+run_demo () {
+  build_demo
+  dev_appserver.py "$dir/demo"
+}
+
 fetch_dependencies() {
   if [ ! `which pip` ]
   then
@@ -64,6 +75,7 @@ fetch_dependencies() {
   for dep in `cat $dir/src/todelete.txt`
   do
       rm -r $dir/src/$dep $dir/src/$dep*-info 2>/dev/null
+      rm -r $dir/demo/$dep $dir/demo/$dep*-info 2>/dev/null
   done
 
   pip install --exists-action=s -r $dir/src/requirements.txt -t $dir/src/ --upgrade || exit 1
@@ -77,7 +89,13 @@ case "$1" in
   deps)
     fetch_dependencies
     ;;
+  build_demo)
+    build_demo
+    ;;
+  run_demo)
+    run_demo
+    ;;
   *)
-    echo $"Usage: $0 {test|deps}"
+    echo $"Usage: $0 {test|deps|build_demo|run_demo}"
     exit 1
 esac
