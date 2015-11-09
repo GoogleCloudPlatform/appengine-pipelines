@@ -374,7 +374,7 @@ class PipelineTest(TestBase):
 
     self.assertTrue(stage.start() is None)
     self.assertEquals('default', stage.queue_name)
-    self.assertEquals('/_ah/pipeline', stage.base_path)
+    self.assertEquals('/_pipeline', stage.base_path)
     self.assertEquals(stage.pipeline_id, stage.root_pipeline_id)
     self.assertTrue(stage.is_root)
 
@@ -391,7 +391,7 @@ class PipelineTest(TestBase):
          'three': {'type': 'value', 'value': 'red'}})
     self.assertEquals([], params['after_all'])
     self.assertEquals('default', params['queue_name'])
-    self.assertEquals('/_ah/pipeline', params['base_path'])
+    self.assertEquals('/_pipeline', params['base_path'])
     self.assertEquals(set(NothingPipeline.output_names + ['default']),
                       set(params['output_slots'].keys()))
     self.assertTrue(pipeline_record.is_root_pipeline)
@@ -424,7 +424,7 @@ class PipelineTest(TestBase):
         {'pipeline_key': [str(db.Key.from_path(
             _PipelineRecord.kind(), stage.pipeline_id))]},
         task['params'])
-    self.assertEquals('/_ah/pipeline/run', task['url'])
+    self.assertEquals('/_pipeline/run', task['url'])
 
   def testStartIdempotenceKey(self):
     """Tests starting a pipeline with an idempotence key."""
@@ -437,7 +437,7 @@ class PipelineTest(TestBase):
     stage = NothingPipeline('one', 'two', three='red', four=1234)
     task = stage.start(return_task=True, idempotence_key='banana')
     self.assertEquals(0, len(test_shared.get_tasks()))
-    self.assertEquals('/_ah/pipeline/run', task.url)
+    self.assertEquals('/_pipeline/run', task.url)
     self.assertEquals(
         'pipeline_key=%s' % db.Key.from_path(_PipelineRecord.kind(), 'banana'),
         task.payload)
@@ -676,7 +676,7 @@ class PipelineTest(TestBase):
     stage.start(idempotence_key='banana')
     result = stage.get_callback_url(one='red', two='blue', three=12345)
     self.assertEquals(
-        '/_ah/pipeline/callback'
+        '/_pipeline/callback'
         '?one=red&pipeline_id=banana&three=12345&two=blue',
         result)
 
@@ -690,7 +690,7 @@ class PipelineTest(TestBase):
         method='overridden',
         name='my-name',
         eta=now)
-    self.assertEquals('/_ah/pipeline/callback', task.url)
+    self.assertEquals('/_pipeline/callback', task.url)
     self.assertEquals(
         {'two': ['blue'],
          'one': ['red'],
@@ -841,13 +841,13 @@ class PipelineTest(TestBase):
         subject)
     self.assertEquals(
         'View the pipeline results here:\n\n'
-        'http://my-app-id.appspot.com/_ah/pipeline/status?root=banana\n\n'
+        'http://my-app-id.appspot.com/_pipeline/status?root=banana\n\n'
         'Thanks,\n\nThe Pipeline API\n',
         body)
     self.assertEquals(
         '<html><body>\n<p>View the pipeline results here:</p>\n\n<p><a href="'
-        'http://my-app-id.appspot.com/_ah/pipeline/status?root=banana"\n'
-        '>http://my-app-id.appspot.com/_ah/pipeline/status?root=banana'
+        'http://my-app-id.appspot.com/_pipeline/status?root=banana"\n'
+        '>http://my-app-id.appspot.com/_pipeline/status?root=banana'
         '</a></p>\n\n<p>\nThanks,\n<br>\nThe Pipeline API\n</p>\n'
         '</body></html>\n',
         html)
@@ -879,13 +879,13 @@ class PipelineTest(TestBase):
         subject)
     self.assertEquals(
         'View the pipeline results here:\n\n'
-        'http://my-app-id.appspot.com/_ah/pipeline/status?root=banana\n\n'
+        'http://my-app-id.appspot.com/_pipeline/status?root=banana\n\n'
         'Thanks,\n\nThe Pipeline API\n',
         body)
     self.assertEquals(
         '<html><body>\n<p>View the pipeline results here:</p>\n\n<p><a href="'
-        'http://my-app-id.appspot.com/_ah/pipeline/status?root=banana"\n'
-        '>http://my-app-id.appspot.com/_ah/pipeline/status?root=banana'
+        'http://my-app-id.appspot.com/_pipeline/status?root=banana"\n'
+        '>http://my-app-id.appspot.com/_pipeline/status?root=banana'
         '</a></p>\n\n<p>\nThanks,\n<br>\nThe Pipeline API\n</p>\n'
         '</body></html>\n',
         html)
@@ -970,9 +970,9 @@ class PipelineTest(TestBase):
     task_list = test_shared.get_tasks('default')
     self.assertEquals(2, len(task_list))
     start_task, cleanup_task = task_list
-    self.assertEquals('/_ah/pipeline/run', start_task['url'])
+    self.assertEquals('/_pipeline/run', start_task['url'])
 
-    self.assertEquals('/_ah/pipeline/cleanup', cleanup_task['url'])
+    self.assertEquals('/_pipeline/cleanup', cleanup_task['url'])
     self.assertEquals(
         'aglteS1hcHAtaWRyHwsSE19BRV9QaXBlbGluZV9SZWNvcmQiBmJhbmFuYQw',
         dict(cleanup_task['headers'])['X-Ae-Pipeline-Key'])
@@ -997,7 +997,7 @@ class PipelineTest(TestBase):
     task_list = test_shared.get_tasks('default')
     self.assertEquals(1, len(task_list))
     start_task = task_list[0]
-    self.assertEquals('/_ah/pipeline/run', start_task['url'])
+    self.assertEquals('/_pipeline/run', start_task['url'])
     self.assertEquals(
         'my-version.foo-module.my-app-id.appspot.com',
         dict(start_task['headers'])['Host'])
@@ -1011,7 +1011,7 @@ class PipelineTest(TestBase):
     task_list = test_shared.get_tasks('default')
     self.assertEquals(1, len(task_list))
     start_task = task_list[0]
-    self.assertEquals('/_ah/pipeline/run', start_task['url'])
+    self.assertEquals('/_pipeline/run', start_task['url'])
     self.assertEquals(
         'my-cool-target.my-app-id.appspot.com',
         dict(start_task['headers'])['Host'])
@@ -1155,13 +1155,13 @@ class EmailOnHighReplicationTest(TestBase):
       subject)
     self.assertEquals(
       'View the pipeline results here:\n\n'
-      'http://my-hrd-app.appspot.com/_ah/pipeline/status?root=banana\n\n'
+      'http://my-hrd-app.appspot.com/_pipeline/status?root=banana\n\n'
       'Thanks,\n\nThe Pipeline API\n',
       body)
     self.assertEquals(
       '<html><body>\n<p>View the pipeline results here:</p>\n\n<p><a href="'
-      'http://my-hrd-app.appspot.com/_ah/pipeline/status?root=banana"\n'
-      '>http://my-hrd-app.appspot.com/_ah/pipeline/status?root=banana'
+      'http://my-hrd-app.appspot.com/_pipeline/status?root=banana"\n'
+      '>http://my-hrd-app.appspot.com/_pipeline/status?root=banana'
       '</a></p>\n\n<p>\nThanks,\n<br>\nThe Pipeline API\n</p>\n'
       '</body></html>\n',
       html)
@@ -3314,7 +3314,7 @@ class CleanupHandlerTest(test_shared.TaskRunningMixin, TestBase):
     # The order of the tasks (start or cleanup) is unclear, so
     # fish out the one that's the cleanup task and run it directly.
     for task in task_list:
-      if task['url'] == '/_ah/pipeline/cleanup':
+      if task['url'] == '/_pipeline/cleanup':
         self.run_task(task)
 
     self.assertEquals(0, len(list(_PipelineRecord.all())))
@@ -3338,7 +3338,7 @@ class FanoutHandlerTest(test_shared.TaskRunningMixin, TestBase):
     task_list = self.get_tasks()
     self.assertEquals(1, len(task_list))
     fanout_task = task_list[0]
-    self.assertEquals('/_ah/pipeline/fanout', fanout_task['url'])
+    self.assertEquals('/_pipeline/fanout', fanout_task['url'])
 
     after_record = db.get(stage._pipeline_key)
 
@@ -3353,7 +3353,7 @@ class FanoutHandlerTest(test_shared.TaskRunningMixin, TestBase):
 
     self.assertEquals(2, len(task_list))
     for task in task_list:
-      self.assertEquals('/_ah/pipeline/run', task['url'])
+      self.assertEquals('/_pipeline/run', task['url'])
     children_keys = [
         db.Key(t['params']['pipeline_key'][0]) for t in task_list]
 
@@ -5082,7 +5082,7 @@ class StatusTest(TestBase):
     self.assertEquals(['__main__.EchoSync'],
                       [p['classPath'] for p in found['pipelines']])
 
-  
+
 
 if __name__ == '__main__':
   logging.getLogger().setLevel(logging.DEBUG)

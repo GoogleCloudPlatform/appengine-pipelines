@@ -613,7 +613,7 @@ class Pipeline(object):
   def start(self,
             idempotence_key='',
             queue_name='default',
-            base_path='/_ah/pipeline',
+            base_path='/_pipeline',
             return_task=False,
             countdown=None,
             eta=None):
