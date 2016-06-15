@@ -178,6 +178,7 @@ class TaskRunningMixin(object):
       if not task_list:
         break
 
+      print "DID TASKS"
       for task in task_list:
         self.run_task(task)
         delete_tasks([task])
