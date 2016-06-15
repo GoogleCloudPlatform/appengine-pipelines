@@ -83,7 +83,6 @@ abbr {
 
 /* detail-specific styling */
 .status-param,
-.target-param,
 .retry-param {
   padding-left: 1em;
   font-size: 0.85em;
@@ -112,7 +111,6 @@ abbr {
 #detail .truncation-message-container,
 #detail .child-container,
 #detail .run-after-container,
-#detail .status-target-params,
 #detail .status-retry-params {
   margin-top: 1em;
 }

@@ -1591,7 +1591,8 @@ class _PipelineContext(object):
         continue
       blocking_slot_dict[slot_record.key()] = slot_record
 
-    barriers_to_trigger = []
+    task_list = []
+    updated_barriers = []
     for barrier in results:
       ready_slots = []
       for blocking_slot_key in barrier.blocking_slots:
@@ -1610,43 +1611,33 @@ class _PipelineContext(object):
       # the task name tombstones.
       pending_slots = set(barrier.blocking_slots) - set(ready_slots)
       if not pending_slots:
-        barriers_to_trigger.append(barrier)
+        if barrier.status != _BarrierRecord.FIRED:
+          barrier.status = _BarrierRecord.FIRED
+          barrier.trigger_time = self._gettime()
+          updated_barriers.append(barrier)
+
+        purpose = barrier.key().name()
+        if purpose == _BarrierRecord.START:
+          path = self.pipeline_handler_path
+          countdown = None
+        else:
+          path = self.finalized_handler_path
+          # NOTE: Wait one second before finalization to prevent
+          # contention on the _PipelineRecord entity.
+          countdown = 1
+        pipeline_key = _BarrierRecord.target.get_value_for_datastore(barrier)
+        pipeline_record = db.get(pipeline_key)
+        logging.debug('Firing barrier %r', barrier.key())
+        task_list.append(taskqueue.Task(
+            url=path,
+            countdown=countdown,
+            name='ae-barrier-fire-%s-%s' % (pipeline_key.name(), purpose),
+            params=dict(pipeline_key=pipeline_key, purpose=purpose),
+            headers={'X-Ae-Pipeline-Key': pipeline_key},
+            target=pipeline_record.params['target']))
       else:
         logging.debug('Not firing barrier %r, Waiting for slots: %r',
                       barrier.key(), pending_slots)
-
-    pipeline_keys_to_trigger = [
-        _BarrierRecord.target.get_value_for_datastore(barrier)
-        for barrier in barriers_to_trigger]
-    pipelines_to_trigger = dict(zip(
-        pipeline_keys_to_trigger, db.get(pipeline_keys_to_trigger)))
-    task_list = []
-    updated_barriers = []
-    for barrier in barriers_to_trigger:
-      if barrier.status != _BarrierRecord.FIRED:
-        barrier.status = _BarrierRecord.FIRED
-        barrier.trigger_time = self._gettime()
-        updated_barriers.append(barrier)
-
-      purpose = barrier.key().name()
-      if purpose == _BarrierRecord.START:
-        path = self.pipeline_handler_path
-        countdown = None
-      else:
-        path = self.finalized_handler_path
-        # NOTE: Wait one second before finalization to prevent
-        # contention on the _PipelineRecord entity.
-        countdown = 1
-      pipeline_key = _BarrierRecord.target.get_value_for_datastore(barrier)
-      target = pipelines_to_trigger[pipeline_key].params.get('target')
-      logging.debug('Firing barrier %r', barrier.key())
-      task_list.append(taskqueue.Task(
-          url=path,
-          countdown=countdown,
-          name='ae-barrier-fire-%s-%s' % (pipeline_key.name(), purpose),
-          params=dict(pipeline_key=pipeline_key, purpose=purpose),
-          headers={'X-Ae-Pipeline-Key': pipeline_key},
-          target=target))
 
     # Blindly overwrite _BarrierRecords that have an updated status. This is
     # acceptable because by this point all finalization barriers for
@@ -2620,7 +2611,7 @@ class _PipelineContext(object):
                         purpose=_BarrierRecord.START,
                         attempt=pipeline_record.current_attempt),
             headers={'X-Ae-Pipeline-Key': pipeline_key},
-            target=pipeline_record.params.get('target'))
+            target=pipeline_record.params['target'])
         task.add(queue_name=self.queue_name, transactional=True)
 
       pipeline_record.put()
@@ -2738,7 +2729,7 @@ class _FanoutHandler(webapp.RequestHandler):
       all_tasks.append(taskqueue.Task(
           url=context.pipeline_handler_path,
           params=dict(pipeline_key=pipeline_key),
-          target=child_pipeline.params.get('target'),
+          target=child_pipeline.params['target'],
           headers={'X-Ae-Pipeline-Key': pipeline_key},
           name='ae-pipeline-fan-out-' + child_pipeline.key().name()))
 
@@ -2927,7 +2918,6 @@ def _get_internal_status(pipeline_key=None,
       outputs: Dictionary of output slot dictionaries.
       children: List of child pipeline IDs.
       queueName: Queue on which this pipeline is running.
-      target: Target version/module for the pipeline.
       afterSlotKeys: List of Slot Ids after which this pipeline runs.
       currentAttempt: Number of the current attempt, starting at 1.
       maxAttempts: Maximum number of attempts before aborting.
@@ -2995,7 +2985,6 @@ def _get_internal_status(pipeline_key=None,
     'outputs': params['output_slots'].copy(),
     'children': [key.name() for key in pipeline_record.fanned_out],
     'queueName': params['queue_name'],
-    'target': params['target'],
     'afterSlotKeys': [str(key) for key in params['after_all']],
     'currentAttempt': pipeline_record.current_attempt + 1,
     'maxAttempts': pipeline_record.max_attempts,

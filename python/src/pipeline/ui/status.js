@@ -329,29 +329,6 @@ function constructStageNode(pipelineId, infoMap, sidebar) {
     containerDiv.append(linksDiv);
   }
 
-  // Target parameters.
-  if (!sidebar) {
-    var targetParamsDiv = $('<div class="status-target-params">');
-    targetParamsDiv.append(
-        $('<div class="target-params-title">').text('Target parameters'));
-
-    var queueNameDiv = $('<div class="target-param">');
-    $('<span>').text('Queue name: ').appendTo(queueNameDiv);
-    $('<span>')
-        .text(infoMap.queueName)
-        .appendTo(queueNameDiv);
-    targetParamsDiv.append(queueNameDiv);
-
-    var targetDiv = $('<div class="target-param">');
-    $('<span>').text('Target: ').appendTo(targetDiv);
-    $('<span>')
-        .text(infoMap.target || 'Unspecified')
-        .appendTo(targetDiv);
-    targetParamsDiv.append(targetDiv);
-
-    containerDiv.append(targetParamsDiv);
-  }
-
   // Retry parameters.
   if (!sidebar) {
     var retryParamsDiv = $('<div class="status-retry-params">');
