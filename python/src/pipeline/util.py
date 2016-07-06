@@ -63,8 +63,6 @@ def _get_task_target():
 
   version = os.environ["CURRENT_VERSION_ID"].split(".")[0]
   module = os.environ["CURRENT_MODULE_ID"]
-  if module == "default":
-    return version
   return "%s.%s" % (version, module)
 
 

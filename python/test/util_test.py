@@ -41,10 +41,10 @@ class GetTaskTargetTest(unittest.TestCase):
 
   def testGetTaskTargetDefaultModule(self):
     os.environ["CURRENT_MODULE_ID"] = "default"
-    self.assertEqual("v7", util._get_task_target())
+    self.assertEqual("v7.default", util._get_task_target())
     task = taskqueue.Task(url="/relative_url",
                           target=util._get_task_target())
-    self.assertEqual("v7", task.target)
+    self.assertEqual("v7.default", task.target)
 
 
 if __name__ == '__main__':
