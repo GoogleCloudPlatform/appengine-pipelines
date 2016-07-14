@@ -254,8 +254,7 @@ class Slot(object):
     """
     if slot_record.status == _SlotRecord.FILLED:
       self.filled = True
-      self._filler_pipeline_key = _SlotRecord.filler.get_value_for_datastore(
-          slot_record)
+      self._filler_pipeline_key = slot_record.filler_pipeline_key
       self._fill_datetime = slot_record.fill_time
       self._value = slot_record.value
 
@@ -457,7 +456,12 @@ class Pipeline(object):
     self.outputs = None
     self.backoff_seconds = _DEFAULT_BACKOFF_SECONDS
     self.backoff_factor = _DEFAULT_BACKOFF_FACTOR
-    self.max_attempts = _DEFAULT_MAX_ATTEMPTS
+    # Allow pipeline class to provide it's own default max attempts value.
+    # We keep the or logic here, a bit unintuitively, in order to
+    # allow a subclass to programmatically revert to the default by
+    # setting self.MAX_ATTEMPTS = None.
+    self.max_attempts = (getattr(self, "MAX_ATTEMPTS", _DEFAULT_MAX_ATTEMPTS) or
+                        _DEFAULT_MAX_ATTEMPTS)
     self.target = None
     self.task_retry = False
     self._current_attempt = 0
@@ -2952,8 +2956,7 @@ def _get_internal_status(pipeline_key=None,
         'Could not find pipeline ID "%s"' % pipeline_key.name())
 
   params = pipeline_record.params
-  root_pipeline_key = \
-      _PipelineRecord.root_pipeline.get_value_for_datastore(pipeline_record)
+  root_pipeline_key = pipeline_record.root_pipeline_key
   default_slot_key = db.Key(params['output_slots']['default'])
   start_barrier_key = db.Key.from_path(
       _BarrierRecord.kind(), _BarrierRecord.START, parent=pipeline_key)
@@ -2988,11 +2991,6 @@ def _get_internal_status(pipeline_key=None,
     'backoffSeconds': pipeline_record.params['backoff_seconds'],
     'backoffFactor': pipeline_record.params['backoff_factor'],
   }
-
-  # TODO(user): Truncate args, kwargs, and outputs to < 1MB each so we
-  # can reasonably return the whole tree of pipelines and their outputs.
-  # Coerce each value to a string to truncate if necessary. For now if the
-  # params are too big it will just cause the whole status page to break.
 
   # Fix the key names in parameters to match JavaScript style.
   for value_dict in itertools.chain(
@@ -3092,8 +3090,7 @@ def _get_internal_slot(slot_key=None,
     output['status'] = 'filled'
     output['fillTimeMs'] = _get_timestamp_ms(slot_record.fill_time)
     output['value'] = slot_record.value
-    filler_pipeline_key = (
-        _SlotRecord.filler.get_value_for_datastore(slot_record))
+    filler_pipeline_key = slot_record.filler_pipeline_key
   else:
     output['status'] = 'waiting'
 
@@ -3103,11 +3100,106 @@ def _get_internal_slot(slot_key=None,
   return output
 
 
-def get_status_tree(root_pipeline_id):
+def db_get_in_batches(keys):
+  """Given an iterable of keys, load the entities in batches and yield them."""
+  batch_size = 50
+  keys = list(keys)
+  key_batches = [keys[n:n + batch_size]
+                 for n in xrange(0, len(keys), batch_size)]
+  for key_batch in key_batches:
+    for entity in db.get(key_batch):
+      yield entity
+
+
+def get_pipelines_within_depth(start_pipeline_key, depth):
+  """Get all pipelines that are at most the given depth.
+
+  Args:
+    start_pipeline_key: The top-level pipeline to start loading from. Normally
+      this is a root pipeline, but this is not strictly necessary.
+    depth: An integer for the maximum depth to load. For example, if depth is
+      2, we load the start pipeline, its children, and its children's children.
+
+  Returns:
+    A 4-tuple: found_pipeline_dict, found_slot_dict, found_barrier_dict,
+      found_status_dict. Each dict maps datastore keys to the relevant entities
+      for the given set of pipelines to load (or, in the case of pipelines and
+      slots, low-memory entity-like objects which are almost as good).
+  """
+  start_pipeline = db.get(start_pipeline_key).truncated_copy()
+  all_pipelines = [start_pipeline]
+
+  last_seen_pipelines = [start_pipeline]
+  for _ in xrange(depth):
+    # BFS on the pipeline tree to find all pipelines we care about.
+    child_pipeline_keys = set()
+    for pipeline in last_seen_pipelines:
+      child_pipeline_keys.update(pipeline.fanned_out)
+    child_pipelines = [pipeline.truncated_copy()
+                       for pipeline in db_get_in_batches(child_pipeline_keys)
+                       if pipeline is not None]
+    last_seen_pipelines = child_pipelines
+    all_pipelines.extend(child_pipelines)
+
+  found_pipeline_dict = {
+    pipeline.key(): pipeline for pipeline in all_pipelines
+  }
+
+  # Load all slots relevant to these pipelines (any referenced in arguments or
+  # outputs).
+  all_slot_keys = set()
+  for pipeline in all_pipelines:
+    slot_strings = []
+    slot_strings.extend(pipeline.params['output_slots'].itervalues())
+    slot_strings.extend([arg['slot_key'] for arg in pipeline.params['args']
+                         if arg['type'] == 'slot'])
+    slot_strings.extend([arg['slot_key']
+                         for arg in pipeline.params['kwargs'].itervalues()
+                         if arg['type'] == 'slot'])
+    all_slot_keys.update(db.Key(key_str) for key_str in slot_strings)
+
+  all_slots = [slot.truncated_copy()
+               for slot in db_get_in_batches(all_slot_keys)
+               if slot is not None]
+  found_slot_dict = {slot.key(): slot for slot in all_slots}
+
+  # Load all barriers relevant to these pipelines (the start and finalize
+  # barriers for each pipeline).
+  all_barrier_keys = set()
+  for pipeline in all_pipelines:
+    all_barrier_keys.add(db.Key.from_path(
+        _BarrierRecord.kind(), _BarrierRecord.START, parent=pipeline.key()))
+    all_barrier_keys.add(db.Key.from_path(
+        _BarrierRecord.kind(), _BarrierRecord.FINALIZE, parent=pipeline.key()))
+
+  all_barriers = [barrier for barrier in db_get_in_batches(all_barrier_keys)
+                  if barrier is not None]
+  found_barrier_dict = {barrier.key(): barrier for barrier in all_barriers}
+
+  # Load the status records for these pipelines.
+  all_status_keys = set()
+  for pipeline in all_pipelines:
+    all_status_keys.add(db.Key.from_path(
+        _StatusRecord.kind(), pipeline.key().name()))
+
+  all_statuses = [status for status in db_get_in_batches(all_status_keys)
+                  if status is not None]
+  found_status_dict = {status.key(): status for status in all_statuses}
+
+  return (found_pipeline_dict, found_slot_dict, found_barrier_dict,
+          found_status_dict)
+
+
+def get_status_tree(root_pipeline_id, depth=None):
   """Gets the full status tree of a pipeline.
 
   Args:
-    root_pipeline_id: The pipeline ID to get status for.
+    root_pipeline_id: The root pipeline ID to get status for.
+    depth: Usually None, indicating that the full pipeline tree should be
+      loaded. If not none, it is an int indicating the max depth to load. This
+      is useful for cases where the full pipeline tree is too large to load at
+      once. If depth is not none, root_pipeline_id is not required to be a root
+      pipeline.
 
   Returns:
     Dictionary with the keys:
@@ -3128,28 +3220,38 @@ def get_status_tree(root_pipeline_id):
   # okay. We'll find the real root and override the value they passed in.
   actual_root_key = _PipelineRecord.root_pipeline.get_value_for_datastore(
       root_pipeline_record)
-  if actual_root_key != root_pipeline_key:
-    root_pipeline_key = actual_root_key
-    root_pipeline_id = root_pipeline_key.id_or_name()
-    root_pipeline_record = db.get(root_pipeline_key)
-    if not root_pipeline_record:
-      raise PipelineStatusError(
-          'Could not find pipeline ID "%s"' % root_pipeline_id)
 
-  # Run all queries asynchronously.
-  queries = {}
-  for model in (_PipelineRecord, _SlotRecord, _BarrierRecord, _StatusRecord):
-    queries[model] = model.all().filter(
-        'root_pipeline =', root_pipeline_key).run(batch_size=1000)
+  if depth is None:
+    # Common case: load all descendants of the given root pipeline.
+    if actual_root_key != root_pipeline_key:
+      root_pipeline_key = actual_root_key
+      root_pipeline_id = root_pipeline_key.id_or_name()
+      root_pipeline_record = db.get(root_pipeline_key)
+      if not root_pipeline_record:
+        raise PipelineStatusError(
+            'Could not find pipeline ID "%s"' % root_pipeline_id)
 
-  found_pipeline_dict = dict(
-      (stage.key(), stage) for stage in queries[_PipelineRecord])
-  found_slot_dict = dict(
-      (slot.key(), slot) for slot in queries[_SlotRecord])
-  found_barrier_dict = dict(
-      (barrier.key(), barrier) for barrier in queries[_BarrierRecord])
-  found_status_dict = dict(
-      (status.key(), status) for status in queries[_StatusRecord])
+    # Run all queries asynchronously.
+    queries = {}
+    for model in (_PipelineRecord, _SlotRecord, _BarrierRecord, _StatusRecord):
+      queries[model] = model.all().filter(
+          'root_pipeline =', root_pipeline_key).run(batch_size=1000)
+
+    found_pipeline_dict = dict(
+        (stage.key(), stage.truncated_copy()) for stage in
+          queries[_PipelineRecord])
+    found_slot_dict = dict(
+        (slot.key(), slot) for slot in queries[_SlotRecord])
+    found_barrier_dict = dict(
+        (barrier.key(), barrier) for barrier in queries[_BarrierRecord])
+    found_status_dict = dict(
+        (status.key(), status) for status in queries[_StatusRecord])
+  else:
+    # If the user specified a depth, the given pipeline isn't required to be a
+    # root pipeline, and we load the entities in a different way that limits
+    # them to the given depth.
+    (found_pipeline_dict, found_slot_dict, found_barrier_dict,
+     found_status_dict) = get_pipelines_within_depth(root_pipeline_key, depth)
 
   # Breadth-first traversal of _PipelineRecord instances by following
   # _PipelineRecord.fanned_out property values.
@@ -3165,9 +3267,12 @@ def get_status_tree(root_pipeline_id):
         # the Datastore but were never run due to mid-flight task failures.
         child_pipeline_record = found_pipeline_dict.get(child_pipeline_key)
         if child_pipeline_record is None:
-          raise PipelineStatusError(
-              'Pipeline ID "%s" points to child ID "%s" which does not exist.'
-              % (pipeline_record.key().name(), child_pipeline_key.name()))
+          # If we limited the depth, we expect missing children, so don't warn.
+          if depth is None:
+            logging.warning(
+                'Pipeline ID "%s" points to child ID "%s" which does not exist.'
+                % (pipeline_record.key().name(), child_pipeline_key.name()))
+          continue
         expand_stack.append(child_pipeline_record)
         valid_pipeline_keys.add(child_pipeline_key)
 
@@ -3207,8 +3312,11 @@ def get_pipeline_names():
   """Returns the class paths of all Pipelines defined in alphabetical order."""
   class_path_set = set()
   for cls in _PipelineMeta._all_classes:
+      if cls.class_path is None:
+        cls._set_class_path()
       if cls.class_path is not None:
         class_path_set.add(cls.class_path)
+
   return sorted(class_path_set)
 
 
@@ -3286,6 +3394,53 @@ def get_root_list(class_path=None, cursor=None, count=50):
   result_dict.update(pipelines=results)
   return result_dict
 
+
+def get_pipeline_values(pipeline_id):
+  """Get the non-truncated argument and slot values for the given pipeline.
+
+  Args:
+    pipeline_id: The id of the pipeline to look up.
+
+  Returns:
+    Dictionary with the keys:
+      args: List of positional argument slot dictionaries.
+      kwargs: Dictionary of keyword argument slot dictionaries.
+      output_values: Dictionary mapping output slot keys to values.
+
+  Raises:
+    PipelineStatusError if any input is bad.
+  """
+  pipeline_key = db.Key.from_path(_PipelineRecord.kind(), pipeline_id)
+  pipeline_record = db.get(pipeline_key)
+  if pipeline_record is None:
+    raise PipelineStatusError(
+        'Could not find pipeline ID "%s"' % pipeline_key.name())
+
+  params = pipeline_record.params
+  args = list(params['args'])
+  kwargs = params['kwargs'].copy()
+
+  # Collect all slots to fetch across arguments and outputs.
+  slot_keys = params['output_slots'].values()
+
+  for value_dict in itertools.chain(args, kwargs.itervalues()):
+    if 'slot_key' in value_dict:
+      slot_keys.append(value_dict['slot_key'])
+      # Fix the key names in parameters to match JavaScript style.
+      value_dict['slotKey'] = value_dict.pop('slot_key')
+
+  new_slot_values = {}
+  for key, slot_record in zip(slot_keys, db.get(slot_keys)):
+    if slot_record.status == _SlotRecord.FILLED:
+      new_slot_values[key] = slot_record.value
+
+  return {
+    'args': params['args'],
+    'kwargs': params['kwargs'],
+    'newSlotValues': new_slot_values
+  }
+
+
 ################################################################################
 
 def set_enforce_auth(new_status):
@@ -3321,5 +3476,6 @@ def create_handlers_map(prefix='.*'):
       (prefix + '/rpc/tree', status_ui._TreeStatusHandler),
       (prefix + '/rpc/class_paths', status_ui._ClassPathListHandler),
       (prefix + '/rpc/list', status_ui._RootListHandler),
+      (prefix + '/rpc/pipeline_values', status_ui._PipelineValuesHandler),
       (prefix + '(/.+)', status_ui._StatusUiHandler),
       ]

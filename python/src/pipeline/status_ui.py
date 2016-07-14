@@ -108,8 +108,11 @@ class _StatusUiHandler(webapp.RequestHandler):
     if not pipeline._DEBUG:
       self.response.headers["Cache-Control"] = "public, max-age=300"
     self.response.headers["Content-Type"] = content_type
-
-    self.response.out.write(content)
+    try:
+      data = pkgutil.get_data(__name__, relative_path)
+    except AttributeError:  # Python < 2.6.
+      data = None
+    self.response.out.write(data or content)
 
 
 class _BaseRpcHandler(webapp.RequestHandler):
@@ -161,8 +164,14 @@ class _TreeStatusHandler(_BaseRpcHandler):
 
   def handle(self):
     import pipeline  # Break circular dependency
+    try:
+      depth = int(self.request.get('depth'))
+    except ValueError:
+      logging.debug("depth %r is non-integer, assuming no depth restriction",
+                    self.request.get('depth'))
+      depth = None
     self.json_response.update(
-        pipeline.get_status_tree(self.request.get('root_pipeline_id')))
+        pipeline.get_status_tree(self.request.get('root_pipeline_id'), depth))
 
 
 class _ClassPathListHandler(_BaseRpcHandler):
@@ -182,3 +191,13 @@ class _RootListHandler(_BaseRpcHandler):
         pipeline.get_root_list(
             class_path=self.request.get('class_path'),
             cursor=self.request.get('cursor')))
+
+
+class _PipelineValuesHandler(_BaseRpcHandler):
+  """RPC handler for getting the parameter and output values for a pipeline."""
+
+  def handle(self):
+    import pipeline  # Break circular dependency
+    self.json_response.update(
+        pipeline.get_pipeline_values(self.request.get('pipeline_id')))
+
