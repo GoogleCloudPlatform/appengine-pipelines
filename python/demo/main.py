@@ -154,7 +154,7 @@ class StartPipelineHandler(webapp.RequestHandler):
         'color',
         *colors)
     job.start()
-    self.redirect('/_ah/pipeline/status?root=%s' % job.pipeline_id)
+    self.redirect('/_pipeline/status?root=%s' % job.pipeline_id)
 
 
 class MainHandler(webapp.RequestHandler):
@@ -168,13 +168,13 @@ class MainHandler(webapp.RequestHandler):
       GuestbookPost(color=color.lower()).put()
     self.redirect('/')
 
+APP = webapp.WSGIApplication([
+    (r'/', MainHandler),
+    (r'/pipeline', StartPipelineHandler),
+], debug=True)
 
 def main():
-  application = webapp.WSGIApplication([
-      (r'/', MainHandler),
-      (r'/pipeline', StartPipelineHandler),
-  ], debug=True)
-  util.run_wsgi_app(application)
+  util.run_wsgi_app(APP)
 
 
 if __name__ == '__main__':
