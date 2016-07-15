@@ -416,7 +416,14 @@ class EmailToContinue(pipeline.Pipeline):
         'approve_url': cgi.escape(approve_url),
         'disapprove_url': cgi.escape(disapprove_url),
       }
-    EmailToContinue._email_message.im_func(**mail_args).send()
+
+    try:
+      EmailToContinue._email_message.im_func(**mail_args).send()
+    except AssertionError, aexc:
+      # This allows the test cases to pass when the mail proxy stub is
+      # not present.
+      if 'No api proxy found for service "mail"' not in str(aexc):
+        raise
 
   def run_test(self, **kwargs):
     self.run(**kwargs)
