@@ -256,6 +256,22 @@ public class MiscPipelineTest extends PipelineTest {
     PipelineObjects pobjects = PipelineManager.queryFullPipeline(pipelineId);
     assertEquals(job.getJobDisplayName(), pobjects.rootJob.getRootJobDisplayName());
   }
+  
+  public void testGetJobDisplayNameOverride() throws Exception {
+    PipelineService service = PipelineServiceFactory.newPipelineService();
+    ConcreteJob job = new ConcreteJob();
+    JobSetting.DisplayName d = Job.displayName("Shalom aleichem");
+    String pipelineId = service.startNewPipeline(job, d);
+    JobRecord jobRecord = PipelineManager.getJob(pipelineId);
+    assertEquals(d.getValue(), jobRecord.getRootJobDisplayName());
+    assertNotSame(job.getJobDisplayName(), jobRecord.getRootJobDisplayName());
+    JobInfo jobInfo = waitUntilJobComplete(pipelineId);
+    assertEquals("Shalom", jobInfo.getOutput());
+    jobRecord = PipelineManager.getJob(pipelineId);
+    assertEquals(d.getValue(), jobRecord.getRootJobDisplayName());
+    PipelineObjects pobjects = PipelineManager.queryFullPipeline(pipelineId);
+    assertEquals(d.getValue(), pobjects.rootJob.getRootJobDisplayName());
+  }
 
   public void testJobInheritence() throws Exception {
     PipelineService service = PipelineServiceFactory.newPipelineService();

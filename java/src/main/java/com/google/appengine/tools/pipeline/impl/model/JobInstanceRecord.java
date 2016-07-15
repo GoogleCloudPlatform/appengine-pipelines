@@ -17,6 +17,7 @@ package com.google.appengine.tools.pipeline.impl.model;
 import com.google.appengine.api.datastore.Entity;
 import com.google.appengine.api.datastore.Key;
 import com.google.appengine.tools.pipeline.Job;
+import com.google.appengine.tools.pipeline.JobSetting;
 import com.google.appengine.tools.pipeline.impl.PipelineManager;
 
 import java.io.IOException;
@@ -44,11 +45,11 @@ public class JobInstanceRecord extends PipelineModelObject {
   // transient
   private Job<?> jobInstance;
 
-  public JobInstanceRecord(JobRecord job, Job<?> jobInstance) {
+  public JobInstanceRecord(JobRecord job, Job<?> jobInstance, JobSetting.DisplayName displayNameSetting) {
     super(job.getRootJobKey(), job.getGeneratorJobKey(), job.getGraphGuid());
     jobKey = job.getKey();
     jobClassName = jobInstance.getClass().getName();
-    jobDisplayName = jobInstance.getJobDisplayName();
+    jobDisplayName = (displayNameSetting == null ? jobInstance.getJobDisplayName() : displayNameSetting.getValue());
     try {
       value = PipelineManager.getBackEnd().serializeValue(this, jobInstance);
     } catch (IOException e) {
