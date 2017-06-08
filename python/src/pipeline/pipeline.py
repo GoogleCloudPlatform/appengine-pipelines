@@ -1408,6 +1408,7 @@ def _generate_args(pipeline, future, queue_name, base_path):
     output_slot_keys.add(slot.key)
     output_slots[name] = str(slot.key)
 
+
   params_encoded = json.dumps(params, cls=mr_util.JsonEncoder)
   params_text = None
   params_blob = None
@@ -1630,7 +1631,7 @@ class _PipelineContext(object):
             name='ae-barrier-fire-%s-%s' % (pipeline_key.name(), purpose),
             params=dict(pipeline_key=pipeline_key, purpose=purpose),
             headers={'X-Ae-Pipeline-Key': pipeline_key},
-            target=pipeline_record.params['target']))
+            target=pipeline_record.params.get('target', None) if pipeline_record else None))
       else:
         logging.debug('Not firing barrier %r, Waiting for slots: %r',
                       barrier.key(), pending_slots)
@@ -2607,7 +2608,7 @@ class _PipelineContext(object):
                         purpose=_BarrierRecord.START,
                         attempt=pipeline_record.current_attempt),
             headers={'X-Ae-Pipeline-Key': pipeline_key},
-            target=pipeline_record.params['target'])
+            target=pipeline_record.params.get('target', None) if pipeline_record else None)
         task.add(queue_name=self.queue_name, transactional=True)
 
       pipeline_record.put()
@@ -2725,7 +2726,7 @@ class _FanoutHandler(webapp.RequestHandler):
       all_tasks.append(taskqueue.Task(
           url=context.pipeline_handler_path,
           params=dict(pipeline_key=pipeline_key),
-          target=child_pipeline.params['target'],
+          target=child_pipeline.params.get('target', None) if child_pipeline else None,
           headers={'X-Ae-Pipeline-Key': pipeline_key},
           name='ae-pipeline-fan-out-' + child_pipeline.key().name()))
 

@@ -55,6 +55,7 @@ class TestSetupMixin(object):
       self.testbed.activate()
       self.testbed.setup_env(app_id=self.TEST_APP_ID, overwrite=True)
       self.testbed.init_memcache_stub()
+      self.testbed.init_mail_stub()
 
       hr_policy = datastore_stub_util.PseudoRandomHRConsistencyPolicy(probability=1)
       self.testbed.init_datastore_v3_stub(consistency_policy=hr_policy)
