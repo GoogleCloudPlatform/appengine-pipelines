@@ -3178,6 +3178,11 @@ def get_status_tree(root_pipeline_id):
         for output_slot_key in child_outputs.itervalues():
           slot_filler_dict[db.Key(output_slot_key)] = child_pipeline_key
 
+  # Link filed slots on root pipelines.
+  root_outputs = root_pipeline_record.params['output_slots']
+  for output_slot_key in root_outputs.itervalues():
+    slot_filler_dict[db.Key(output_slot_key)] = root_pipeline_key
+
   output = {
     'rootPipelineId': root_pipeline_id,
     'slots': {},
