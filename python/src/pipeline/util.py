@@ -50,6 +50,8 @@ def _get_task_target():
   # Break circular dependency.
   # pylint: disable=g-import-not-at-top
   import pipeline
+  if os.environ['SERVER_SOFTWARE'].startswith('Development'):
+    pipeline._TEST_MODE = True
   if pipeline._TEST_MODE:
     return None
 
