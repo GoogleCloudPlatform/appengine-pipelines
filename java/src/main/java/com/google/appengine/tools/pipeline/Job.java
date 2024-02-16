@@ -499,6 +499,18 @@ public abstract class Job<E> implements Serializable {
   }
 
   /**
+   * Constructs a new {@code JobSetting.DisplayName}. This method is only
+   * syntactic sugar. {@code displayName(x)} is equivalent to
+   * {@code new JobSetting.DisplayName(x)}.
+   * @param displayName
+   *          The job's display name.
+   * @return
+   */
+  public static JobSetting.DisplayName displayName(String displayName) {
+    return new JobSetting.DisplayName(displayName);
+  }
+  
+  /**
    * Constructs a new {@code FutureList}. This method is only syntactic sugar.
    * {@code futureList(listOfValues)} is equivalent to {@code new
    * FutureList(listOfValues)}.

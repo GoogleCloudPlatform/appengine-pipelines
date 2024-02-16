@@ -33,6 +33,7 @@ import com.google.appengine.tools.pipeline.JobSetting.OnModule;
 import com.google.appengine.tools.pipeline.JobSetting.OnQueue;
 import com.google.appengine.tools.pipeline.JobSetting.StatusConsoleUrl;
 import com.google.appengine.tools.pipeline.JobSetting.WaitForSetting;
+import com.google.appengine.tools.pipeline.JobSetting.DisplayName;
 import com.google.appengine.tools.pipeline.impl.FutureValueImpl;
 import com.google.appengine.tools.pipeline.impl.QueueSettings;
 import com.google.appengine.tools.pipeline.impl.util.StringUtils;
@@ -173,6 +174,7 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
   private Slot outputSlotInflated;
   private JobInstanceRecord jobInstanceRecordInflated;
   private Throwable exceptionInflated;
+  private Map<Class<? extends JobSetting>, JobSetting> settingsMap;
 
   /**
    * Re-constitutes an instance of this class from a Data Store entity.
@@ -314,10 +316,6 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
       exceptionHandlingAncestorKey = generatorJob.getExceptionHandlingAncestorKey();
     }
     // Inherit settings from generator job
-    Map<Class<? extends JobSetting>, JobSetting> settingsMap = new HashMap<>();
-    for (JobSetting setting : settings) {
-      settingsMap.put(setting.getClass(), setting);
-    }
     if (!settingsMap.containsKey(StatusConsoleUrl.class)) {
       statusConsoleUrl = generatorJob.statusConsoleUrl;
     }
@@ -327,7 +325,9 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
       Job<?> jobInstance, boolean callExceptionHandler, JobSetting[] settings,
       QueueSettings parentQueueSettings) {
     super(rootJobKey, null, thisKey, generatorJobKey, graphGUID);
-    jobInstanceRecordInflated = new JobInstanceRecord(this, jobInstance);
+    settingsMap = createSettingsMap(settings);
+    jobInstanceRecordInflated = new JobInstanceRecord(this, jobInstance,
+        (JobSetting.DisplayName) settingsMap.get(JobSetting.DisplayName.class));
     jobInstanceKey = jobInstanceRecordInflated.getKey();
     exceptionHandlerSpecified = isExceptionHandlerSpecified(jobInstance);
     this.callExceptionHandler = callExceptionHandler;
@@ -389,7 +389,9 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
     // Root Jobs have their rootJobKey the same as their keys and provide null for generatorKey
     // and graphGUID. Also, callExceptionHandler is always false.
     this(key, key, null, null, jobInstance, false, settings, null);
-    rootJobDisplayName = jobInstance.getJobDisplayName();
+    // set the root job display name from the settings if a setting is availabe
+    JobSetting.DisplayName displayNameSetting = (DisplayName) settingsMap.get(JobSetting.DisplayName.class);
+    rootJobDisplayName = (displayNameSetting == null ? jobInstance.getJobDisplayName() : displayNameSetting.getValue());
   }
 
   /**
@@ -422,7 +424,16 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
     }
     return result;
   }
-
+  
+  // converts the settings array into a map
+  private static Map<Class<? extends JobSetting>, JobSetting> createSettingsMap(JobSetting[] settings) {
+    Map<Class<? extends JobSetting>, JobSetting> map = new HashMap<>();
+    for (JobSetting setting : settings) {
+      map.put(setting.getClass(), setting);
+    }
+    return map;
+  }
+  
   private void applySetting(JobSetting setting) {
     if (setting instanceof WaitForSetting) {
       WaitForSetting wf = (WaitForSetting) setting;
@@ -446,8 +457,10 @@ public class JobRecord extends PipelineModelObject implements JobInfo {
       queueSettings.setOnModule(((OnModule) setting).getValue());
     } else if (setting instanceof OnQueue) {
       queueSettings.setOnQueue(((OnQueue) setting).getValue());
-    } else if (setting instanceof StatusConsoleUrl){
+    } else if (setting instanceof StatusConsoleUrl) {
       statusConsoleUrl = ((StatusConsoleUrl) setting).getValue();
+    } else if (setting instanceof DisplayName) {
+      // display name is extracted using settingsMap
     } else {
       throw new RuntimeException("Unrecognized JobOption class " + setting.getClass().getName());
     }
