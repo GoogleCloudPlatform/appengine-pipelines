@@ -116,6 +116,10 @@ class _PipelineRecord(db.Model):
     self._params_decoded = value
     return self._params_decoded
 
+  @property
+  def root_pipeline_key(self):
+    """Returns root pipeline key."""
+    return self.__class__.root_pipeline.get_value_for_datastore(self)
 
 class _SlotRecord(db.Model):
   """Represents an output slot.
