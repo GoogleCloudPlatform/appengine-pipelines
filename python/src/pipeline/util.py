@@ -46,6 +46,7 @@ def _get_task_target():
   Returns:
     A complete target name is of format version.module. If module is the
   default module, just version. None if target can not be determined.
+  If the version is undetermined, just return the module as the target.
   """
   # Break circular dependency.
   # pylint: disable=g-import-not-at-top
@@ -63,7 +64,10 @@ def _get_task_target():
 
   version = os.environ["CURRENT_VERSION_ID"].split(".")[0]
   module = os.environ["CURRENT_MODULE_ID"]
-  return "%s.%s" % (version, module)
+  if version not in (None, 'None'):
+      return "%s.%s" % (version, module)
+  else:
+      return module
 
 
 def for_name(fq_name, recursive=False):
