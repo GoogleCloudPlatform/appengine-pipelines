@@ -21,6 +21,9 @@
 // Global variables.
 var AUTO_REFRESH = true;
 var ROOT_PIPELINE_ID = null;
+// Either the empty string, meaning we load the full pipeline, or a string
+// containing a number with the max depth to load.
+var DEPTH = '';
 var STATUS_MAP = null;
 var LANG = null;
 
@@ -518,6 +521,65 @@ function constructStageNode(pipelineId, infoMap, sidebar) {
     containerDiv.append(outputContinerDiv);
   }
 
+  // Load full arg/output values, updating the loading state and redrawing as
+  // necessary.
+  function handleLoadFullValues(e) {
+    e.preventDefault();
+    infoMap.fullLoadState = 'loading';
+    handleHashChange();
+    $.ajax({
+      type: 'GET',
+      url: 'rpc/pipeline_values?pipeline_id=' + pipelineId,
+      dataType: 'text',
+      error: function(request, textStatus) {
+        infoMap.fullLoadState = 'error';
+        handleHashChange();
+      },
+      success: function(data, textStatus, request) {
+        var response = getResponseDataJson(null, data);
+        if (response) {
+          infoMap.fullLoadState = 'loaded';
+          infoMap.args = response.args;
+          infoMap.kwargs = response.kwargs;
+          // Some of these slots may be already un-truncated from previous
+          // similar calls, so it's a little wasteful, but still correct, to
+          // load and overwrite them again.
+          for (var slotKey in response.newSlotValues) {
+            STATUS_MAP.slots[slotKey].value = response.newSlotValues[slotKey];
+          }
+        } else {
+          infoMap.fullLoadState = 'error';
+        }
+        handleHashChange();
+      }
+    });
+  }
+
+  if (!sidebar && infoMap.fullLoadState !== 'loaded') {
+    var truncateMessageDiv = $('<div class="truncation-message-container">')
+        .text('Parameters and outputs may be truncated. ');
+
+    var loadSpan = $('<span>');
+    if (infoMap.fullLoadState === 'loading') {
+      loadSpan.text('Loading...');
+    } else if (infoMap.fullLoadState === 'error') {
+      loadSpan.text('Loading failed. ');
+      loadSpan.append($('<a>')
+          .text('Retry')
+          .attr('href', '')
+          .click(handleLoadFullValues));
+    } else {
+      // Nothing loaded yet, so show the option to load.
+      loadSpan.append($('<a>')
+          .text('Load full values')
+          .attr('href', '')
+          .click(handleLoadFullValues));
+    }
+
+    truncateMessageDiv.append(loadSpan);
+    containerDiv.append(truncateMessageDiv);
+  }
+
   // Related pipelines
   function renderRelated(relatedList, relatedTitle, classPrefix) {
     var relatedDiv = $('<div>');
@@ -755,9 +817,9 @@ function handleAutoRefreshClick(event) {
   var loc = window.location;
   var newSearch = null;
   if (!AUTO_REFRESH && event.target.checked) {
-    newSearch = '?root=' + ROOT_PIPELINE_ID;
+    newSearch = '?root=' + ROOT_PIPELINE_ID + depthUrlArg();
   } else if (AUTO_REFRESH && !event.target.checked) {
-    newSearch = '?root=' + ROOT_PIPELINE_ID + '&auto=false';
+    newSearch = '?root=' + ROOT_PIPELINE_ID + '&auto=false' + depthUrlArg();
   }
 
   if (newSearch != null) {
@@ -771,13 +833,14 @@ function handleAutoRefreshClick(event) {
 function handleRefreshClick(event) {
   var loc = window.location;
   if (AUTO_REFRESH) {
-    newSearch = '?root=' + ROOT_PIPELINE_ID;
+    newSearch = '?root=' + ROOT_PIPELINE_ID + depthUrlArg();
   } else {
-    newSearch = '?root=' + ROOT_PIPELINE_ID + '&auto=false';
+    newSearch = '?root=' + ROOT_PIPELINE_ID + '&auto=false' + depthUrlArg();
   }
   loc.href = loc.protocol + '//' + loc.host + loc.pathname + newSearch;
   return false;
 }
+
 
 function handleDeleteClick(event) {
   var ajaxRequest = {
@@ -828,6 +891,16 @@ function handleAbortClick(event) {
   }
 }
 
+
+function depthUrlArg() {
+  if (DEPTH !== '') {
+    return '&depth=' + DEPTH;
+  } else {
+    return '';
+  }
+}
+
+
 /* Initialization. */
 function initStatus() {
   if (window.location.search.length > 0 &&
@@ -846,6 +919,8 @@ function initStatus() {
         if (ROOT_PIPELINE_ID.match(/^pipeline-/)) {
           ROOT_PIPELINE_ID = ROOT_PIPELINE_ID.substring(9);
         }
+      } else if (mapping[0] == 'depth') {
+        DEPTH = mapping[1];
       }
     });
   }
@@ -861,7 +936,7 @@ function initStatus() {
   var attempts = 1;
   var ajaxRequest = {
     type: 'GET',
-    url: 'rpc/tree?root_pipeline_id=' + ROOT_PIPELINE_ID,
+    url: 'rpc/tree?root_pipeline_id=' + ROOT_PIPELINE_ID + depthUrlArg(),
     dataType: 'text',
     error: function(request, textStatus) {
       if (request.status == 404) {
@@ -930,7 +1005,7 @@ function initStatusDone() {
       // Only do auto-refresh behavior if we're not in a terminal state.
       window.setTimeout(function() {
         var loc = window.location;
-        var search = '?root=' + ROOT_PIPELINE_ID;
+        var search = '?root=' + ROOT_PIPELINE_ID + depthUrlArg();
         loc.replace(loc.protocol + '//' + loc.host + loc.pathname + search);
       }, 30 * 1000);
     }
